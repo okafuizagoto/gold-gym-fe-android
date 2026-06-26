@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../utils/storage.dart';
 
 class LanguageProvider with ChangeNotifier {
-  String _language = 'EN';  // 'EN' | 'ID'
+  String _language = 'ID';  // 'EN' | 'ID'
 
   String get language => _language;
   bool get isEnglish => _language == 'EN';

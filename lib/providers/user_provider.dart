@@ -14,6 +14,7 @@ class UserProvider with ChangeNotifier {
 
       Map<String, dynamic> decodedToken = JwtDecoder.decode(tokenPart);
       _user = UserModel.fromJWT(decodedToken);
+      print("user: ${decodedToken}");
       notifyListeners();
     } catch (e) {
       debugPrint('Error decoding JWT: $e');

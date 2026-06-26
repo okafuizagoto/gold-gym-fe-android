@@ -16,6 +16,8 @@ import '../utils/text_formatter.dart';
 import '../utils/toast.dart';
 import '../utils/debouncer.dart';
 import '../utils/constants.dart';
+import '../utils/storage.dart';
+import '../extensions/string_extension.dart';
 
 class PenjualanScreen extends StatefulWidget {
   const PenjualanScreen({super.key});
@@ -38,17 +40,45 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
   final _itemCodeController = TextEditingController();
   final _itemNameController = TextEditingController();
   final _qtyController = TextEditingController();
-
   // Payment modal controllers
   final _cashAmountController = TextEditingController();
+  final _salesNameController = TextEditingController();
+  final _salesStockIDController = TextEditingController();
+
+  final stockArrNotifier = ValueNotifier<List<StockModel>>([]);
 
   StockModel? _currentStock;
+
   int? _editingIndex;
+  int lengths = 5;
+  int pages = 1;
+
+  bool _isLoadingSuggestions = false;
+
+  ValueNotifier<StockPagination?> stockPaginationNotifier = ValueNotifier(null);
+
+  List<StockResponse> _stockSuggestions = [];
+  List<StockModel> _stockListSuggestions = [];
+  List<StockResponse> _stockList = [];
+
+  TextEditingController? _autoCompleteController;
+  FocusNode _autoCompleteFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _transactionDateController.text = DateTime.now().toString();
+    _loadUserName();
+    _typeController.text = 'Cash';
+  }
+
+  Future<void> _loadUserName() async {
+    final name = await Storage.get('userNIP');
+    if (!mounted) return;
+
+    setState(() {
+      _salesPersonController.text = name?.toTitleCase() ?? 'Guest';
+    });
   }
 
   @override
@@ -86,7 +116,59 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     }
   }
 
-  void _showAddProductModal(BuildContext context, LanguageProvider langProvider) {
+  Future<void> getAllStock(String name, int page, int length) async {
+    try {
+      final outcode = await Storage.get('outcode') ?? '';
+      final stockApi = StockApi();
+
+      final response = await stockApi.getAllStock(name, outcode, page, length);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        // final pagination = ItemPagination.fromJson(data);
+        final pagination = StockPagination.fromJson(data);
+
+        stockPaginationNotifier.value = pagination;
+
+        pages = page;
+        lengths = length;
+
+        // itemsPaginationNotifier.value = pagination;
+        _stockList = pagination.data;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Failed to fetch items"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print("ERROR: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Error fetching items"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void addNewSales(value) {
+    _salesNameController.text = value;
+    // _debouncerSuggestion.run(() => getAllItems(value));
+  }
+
+  void addSelectedSales(value) {
+    _salesNameController.text = value.stock_name;
+    _salesStockIDController.text = value.stock_id;
+    _autoCompleteController?.text = value.stock_name;
+    _autoCompleteFocusNode.unfocus();
+  }
+
+  void _showAddProductModal(
+      BuildContext context, LanguageProvider langProvider) {
     _itemCodeController.clear();
     _itemNameController.clear();
     _qtyController.clear();
@@ -107,22 +189,118 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
           // Item Code + Search button
           Row(
             children: [
+              // Expanded(
+              //   child: TextField(
+              //     controller: _itemCodeController,
+              //     decoration: InputDecoration(
+              //       labelText: langProvider.get('Item Name', 'Nama Barang'),
+              //       border: const OutlineInputBorder(),
+              //     ),
+              //   ),
+              // ),
+              // const SizedBox(width: 8),
+              // IconButton(
+              //   icon: const Icon(Icons.search),
+              //   onPressed: () {
+              //     _debouncer
+              //         .run(() => _searchProduct(_itemCodeController.text));
+              //   },
+              // ),
               Expanded(
-                child: TextField(
-                  controller: _itemCodeController,
-                  decoration: InputDecoration(
-                    labelText: langProvider.get('Item Code', 'Kode Barang'),
-                    border: const OutlineInputBorder(),
-                  ),
+                child: ValueListenableBuilder<StockPagination?>(
+                  valueListenable: stockPaginationNotifier,
+                  builder: (context, pagination, _) {
+                    // final items = pagination?.data ?? [];
+
+                    return Autocomplete<StockResponse>(
+                      optionsBuilder: (TextEditingValue textEditingValue) {
+                        final items = stockPaginationNotifier.value?.data ?? [];
+
+                        final query = textEditingValue.text.toLowerCase();
+                        if (textEditingValue.text.isEmpty) {
+                          return items;
+                        }
+                        return items.where((item) =>
+                            item.stock_name.toLowerCase().startsWith(query));
+                      },
+                      displayStringForOption: (option) =>
+                          option.stock_name + " " + option.stock_qty.toString(),
+                      optionsViewBuilder: (context, onSelected, options) {
+                        return Align(
+                          alignment: Alignment.topLeft,
+                          child: Material(
+                            elevation: 4.0,
+                            child: Container(
+                              width: 500,
+                              constraints: const BoxConstraints(maxHeight: 200),
+                              child: _isLoadingSuggestions
+                                  ? const Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.all(16.0),
+                                        child: SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2),
+                                        ),
+                                      ),
+                                    )
+                                  : options.isEmpty
+                                      ? const ListTile(
+                                          leading: Icon(Icons.search_off),
+                                          title: Text('Tidak ada hasil'),
+                                        )
+                                      : ListView.separated(
+                                          padding: EdgeInsets.zero,
+                                          itemCount: options.length,
+                                          separatorBuilder: (_, __) =>
+                                              const Divider(height: 1),
+                                          itemBuilder: (context, index) {
+                                            final suggestion =
+                                                options.elementAt(index);
+                                            return ListTile(
+                                              dense: true,
+                                              leading:
+                                                  const Icon(Icons.inventory_2),
+                                              title:
+                                                  Text(suggestion.stock_name),
+                                              onTap: () =>
+                                                  onSelected(suggestion),
+                                            );
+                                          },
+                                        ),
+                            ),
+                          ),
+                        );
+                      },
+                      onSelected: (StockResponse selection) {
+                        addSelectedSales(selection);
+                      },
+                      fieldViewBuilder:
+                          (context, controller, focusNode, onFieldSubmitted) {
+                        _autoCompleteController = controller;
+                        _autoCompleteFocusNode = focusNode;
+                        return TextField(
+                          controller: controller,
+                          focusNode: _autoCompleteFocusNode,
+                          decoration: InputDecoration(
+                            hintText:
+                                langProvider.get('Enter name', 'Masukkan nama'),
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          onChanged: (value) {
+                            addNewSales(value);
+                          },
+                        );
+                      },
+                    );
+                  },
                 ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.search),
-                onPressed: () {
-                  _debouncer.run(() => _searchProduct(_itemCodeController.text));
-                },
-              ),
+              )
             ],
           ),
           const SizedBox(height: 16),
@@ -158,14 +336,24 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                 onPressed: () => Navigator.pop(context),
                 child: Text(langProvider.get('CANCEL', 'BATAL')),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 8),
               ElevatedButton(
-                onPressed: _currentStock != null && _qtyController.text.isNotEmpty
-                    ? () {
-                        _addToCart(context);
-                        Navigator.pop(context);
-                      }
-                    : null,
+                  onPressed: null,
+                  child: Row(
+                    children: [
+                      // Text(langProvider.get('ADD MORE', 'ADD MORE')),
+                      const Icon(Icons.add, size: 18, color: Colors.blue),
+                    ],
+                  )),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed:
+                    _currentStock != null && _qtyController.text.isNotEmpty
+                        ? () {
+                            _addToCart(context);
+                            Navigator.pop(context);
+                          }
+                        : null,
                 child: Text(langProvider.get('OK', 'OK')),
               ),
             ],
@@ -182,17 +370,21 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     if (qty <= 0) return;
 
     final item = SalesItemModel.create(
-      stockCode: _currentStock!.stockCode,
+      // stockCode: _currentStock!.stockCode,
+      stockCode: "",
       stockName: _currentStock!.stockName,
       qty: qty,
-      stockPack: _currentStock!.stockPack,
-      price: _currentStock!.stockPrice,
+      // stockPack: _currentStock!.stockPack,
+      // price: _currentStock!.stockPrice,
+      stockPack: "",
+      price: 0,
     );
 
     Provider.of<CartProvider>(context, listen: false).addItem(item);
   }
 
-  void _showPaymentModal(BuildContext context, LanguageProvider langProvider, CartProvider cart) {
+  void _showPaymentModal(
+      BuildContext context, LanguageProvider langProvider, CartProvider cart) {
     _cashAmountController.clear();
 
     showModalDialog(
@@ -258,9 +450,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
               ),
               const SizedBox(width: 16),
               ElevatedButton(
-                onPressed: cart.canSave
-                    ? () => Navigator.pop(context)
-                    : null,
+                onPressed: cart.canSave ? () => Navigator.pop(context) : null,
                 child: Text(langProvider.get('OK', 'OK')),
               ),
             ],
@@ -298,7 +488,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                                   controller: _transactionDateController,
                                   enabled: false,
                                   decoration: InputDecoration(
-                                    labelText: langProvider.get('Now', 'Sekarang'),
+                                    labelText:
+                                        langProvider.get('Now', 'Sekarang'),
                                     border: const OutlineInputBorder(),
                                   ),
                                 ),
@@ -308,7 +499,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                                 child: TextField(
                                   controller: _receiptController,
                                   decoration: InputDecoration(
-                                    labelText: langProvider.get('Receipt Number', 'No. Nota'),
+                                    labelText: langProvider.get(
+                                        'Receipt Number', 'No. Nota'),
                                     border: const OutlineInputBorder(),
                                   ),
                                 ),
@@ -320,9 +512,11 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                             children: [
                               Expanded(
                                 child: TextField(
+                                  enabled: false,
                                   controller: _salesPersonController,
                                   decoration: InputDecoration(
-                                    labelText: langProvider.get('Sales Person', 'Kasir'),
+                                    labelText: langProvider.get(
+                                        'Sales Person', 'Kasir'),
                                     border: const OutlineInputBorder(),
                                   ),
                                 ),
@@ -331,6 +525,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                               Expanded(
                                 child: TextField(
                                   controller: _typeController,
+                                  enabled: false,
                                   decoration: InputDecoration(
                                     labelText: langProvider.get('Type', 'Tipe'),
                                     border: const OutlineInputBorder(),
@@ -351,12 +546,15 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                     children: [
                       Text(
                         langProvider.get('Sales Items', 'Item Penjualan'),
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       ElevatedButton.icon(
-                        onPressed: () => _showAddProductModal(context, langProvider),
+                        onPressed: () =>
+                            _showAddProductModal(context, langProvider),
                         icon: const Icon(Icons.add),
-                        label: Text(langProvider.get('Add Product', 'Tambah Produk')),
+                        label: Text(
+                            langProvider.get('Add Product', 'Tambah Produk')),
                       ),
                     ],
                   ),
@@ -388,7 +586,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
           padding: const EdgeInsets.all(40),
           child: Center(
             child: Text(
-              langProvider.get('No items in cart', 'Tidak ada item di keranjang'),
+              langProvider.get(
+                  'No items in cart', 'Tidak ada item di keranjang'),
               style: TextStyle(color: Colors.grey[600]),
             ),
           ),
@@ -424,10 +623,12 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                         ? SizedBox(
                             width: 60,
                             child: TextField(
-                              controller: TextEditingController(text: '${entry.value.stockQty}'),
+                              controller: TextEditingController(
+                                  text: '${entry.value.stockQty}'),
                               keyboardType: TextInputType.number,
                               onSubmitted: (value) {
-                                final newQty = int.tryParse(value) ?? entry.value.stockQty;
+                                final newQty =
+                                    int.tryParse(value) ?? entry.value.stockQty;
                                 cart.updateItemQty(entry.key, newQty);
                                 setState(() => _editingIndex = null);
                               },
@@ -436,17 +637,24 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                         : Text('${entry.value.stockQty}'),
                   ),
                   DataCell(Text(entry.value.stockPack)),
-                  DataCell(Text(TextFormatter.formatRupiah(entry.value.stockPrice))),
-                  DataCell(Text(TextFormatter.formatRupiah(entry.value.stockTotalSales))),
+                  DataCell(
+                      Text(TextFormatter.formatRupiah(entry.value.stockPrice))),
+                  DataCell(Text(
+                      TextFormatter.formatRupiah(entry.value.stockTotalSales))),
                   DataCell(
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: Icon(_editingIndex == entry.key ? Icons.save : Icons.edit, size: 20),
+                          icon: Icon(
+                              _editingIndex == entry.key
+                                  ? Icons.save
+                                  : Icons.edit,
+                              size: 20),
                           onPressed: () {
                             setState(() {
-                              _editingIndex = _editingIndex == entry.key ? null : entry.key;
+                              _editingIndex =
+                                  _editingIndex == entry.key ? null : entry.key;
                             });
                           },
                         ),
@@ -466,7 +674,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     );
   }
 
-  Widget _buildPaymentSummary(CartProvider cart, LanguageProvider langProvider) {
+  Widget _buildPaymentSummary(
+      CartProvider cart, LanguageProvider langProvider) {
     return Card(
       color: Colors.blue[50],
       child: Padding(
@@ -498,7 +707,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool highlight = false}) {
+  Widget _buildSummaryRow(String label, String value,
+      {bool highlight = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -524,7 +734,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     );
   }
 
-  Widget _buildBottomButtons(BuildContext context, CartProvider cart, LanguageProvider langProvider) {
+  Widget _buildBottomButtons(
+      BuildContext context, CartProvider cart, LanguageProvider langProvider) {
     return Row(
       children: [
         Expanded(
@@ -546,7 +757,10 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
             onPressed: cart.hasItems
                 ? () {
                     cart.clear();
-                    Toast.info(context, langProvider.get('Cart cleared', 'Keranjang dikosongkan'));
+                    Toast.info(
+                        context,
+                        langProvider.get(
+                            'Cart cleared', 'Keranjang dikosongkan'));
                   }
                 : null,
             style: ElevatedButton.styleFrom(
@@ -565,7 +779,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                     // TODO: Implement save transaction
                     Toast.success(
                       context,
-                      langProvider.get('Transaction saved!', 'Transaksi disimpan!'),
+                      langProvider.get(
+                          'Transaction saved!', 'Transaksi disimpan!'),
                     );
                   }
                 : null,

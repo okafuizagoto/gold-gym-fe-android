@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../utils/storage.dart';
 import '../utils/constants.dart';
+import '../providers/language_provider.dart';
+import '../services/core_api.dart';
+import '../utils/toast.dart';
 
 class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
@@ -11,6 +14,8 @@ class AppDrawer extends StatefulWidget {
 
 class _AppDrawerState extends State<AppDrawer> {
   List<MenuItem> menuItems = [];
+
+  final _coreApi = CoreApi();
 
   @override
   void initState() {
@@ -32,20 +37,25 @@ class _AppDrawerState extends State<AppDrawer> {
         route: '/penjualan',
       ),
       MenuItem(
-        title: 'Stock Barang',
+        title: 'Stock',
         icon: Icons.inventory,
         route: '/stock-barang',
+      ),
+      MenuItem(
+        title: 'Add Items',
+        icon: Icons.inventory,
+        route: '/add-items',
       ),
       MenuItem(
         title: 'About Us',
         icon: Icons.info,
         route: '/about-us',
       ),
-      MenuItem(
-        title: 'Add Menu',
-        icon: Icons.add_circle,
-        route: '/add-menu',
-      ),
+      // MenuItem(
+      //   title: 'Add Menu',
+      //   icon: Icons.add_circle,
+      //   route: '/add-menu',
+      // ),
     ];
 
     // Custom routes from storage
@@ -77,16 +87,32 @@ class _AppDrawerState extends State<AppDrawer> {
   }
 
   Future<void> _logout() async {
-    await Storage.clear();
-    if (mounted) {
-      Navigator.pushReplacementNamed(context, '/login');
+    try {
+      final response = await _coreApi.logout();
+      if (response.statusCode == 200) {
+        Storage.clear();
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/login');
+        }
+      } else {
+        Toast.error(context, 'Login failed.');
+      }
+    } catch (e) {
+      Toast.error(context, 'Login failed.');
     }
   }
+
+  // Future<void> _logout() async {
+  //   await Storage.clear();
+  //   if (mounted) {
+  //     Navigator.pushReplacementNamed(context, '/login');
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
     return Drawer(
-      backgroundColor: const Color(0xFF6DBAB9),  // primaryTeal
+      backgroundColor: const Color(0xFF6DBAB9), // primaryTeal
       child: Column(
         children: [
           // Header
@@ -135,7 +161,7 @@ class _AppDrawerState extends State<AppDrawer> {
                     style: const TextStyle(color: Colors.white),
                   ),
                   onTap: () {
-                    Navigator.pop(context);  // Close drawer
+                    Navigator.pop(context); // Close drawer
                     Navigator.pushNamed(context, item.route);
                   },
                 );

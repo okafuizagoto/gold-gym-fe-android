@@ -31,7 +31,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   bool get _canSubmit {
-    return _userController.text.isNotEmpty && _passwordController.text.isNotEmpty;
+    return _userController.text.isNotEmpty &&
+        _passwordController.text.isNotEmpty;
   }
 
   Future<void> _handleLogin() async {
@@ -44,33 +45,36 @@ class _LoginScreenState extends State<LoginScreen> {
         _userController.text,
         _passwordController.text,
       );
+      final rawCookie = response.headers['set-cookie'];
+
       // final data = jsonDecode(response.body);
-      print("statusCode: ${response}");
-      print("statusCode2: ${response.statusCode}");
-// print("statuscode3: $data");
       if (response.statusCode == 200) {
-        print("masok1");
         final loginResponse = LoginResponseModel.fromJson(
           jsonDecode(response.body),
         );
-        print("masok2");
+        // print("masok2",   );
 
         // Save to storage
-        await Storage.set(AppConstants.accessTokenKey, loginResponse.bearerToken);
-        await Storage.set(AppConstants.expiresAtKey, loginResponse.expiresAt.toString());
+        await Storage.set(
+            AppConstants.accessTokenKey, loginResponse.bearerToken);
+        await Storage.set(
+            AppConstants.expiresAtKey, loginResponse.expiresAt.toString());
         await Storage.set(AppConstants.userNIPKey, loginResponse.username);
-        await Storage.set(AppConstants.languageKey, AppConstants.defaultLanguage);
-        print("masok3");
+        await Storage.set(AppConstants.userEmail, _userController.text);
+        await Storage.set(
+            AppConstants.languageKey, AppConstants.defaultLanguage);
+        if (rawCookie != null) {
+          final cookie = rawCookie.split(';').first;
+          await Storage.set('refresh_cookie', cookie);
+        }
 
         // Update user provider
         if (mounted) {
-        print("masok4");
           Provider.of<UserProvider>(context, listen: false)
               .setUserFromToken(loginResponse.bearerToken);
-        print("masok5");
 
           // Navigate to home
-          Navigator.pushReplacementNamed(context, '/');
+          Navigator.pushReplacementNamed(context, '/outlet');
         }
       } else {
         if (mounted) {
@@ -164,7 +168,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: _isLoading || !_canSubmit ? null : _handleLogin,
+                        onPressed:
+                            _isLoading || !_canSubmit ? null : _handleLogin,
                         child: _isLoading
                             ? const SizedBox(
                                 width: 20,

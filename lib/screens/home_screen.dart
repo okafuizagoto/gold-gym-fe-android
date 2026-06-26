@@ -6,9 +6,33 @@ import '../widgets/private_route.dart';
 import '../widgets/image_carousel.dart';
 import '../providers/user_provider.dart';
 import '../providers/language_provider.dart';
+import '../utils/storage.dart';
+import '../extensions/string_extension.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  String userName = 'Guest';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserName();
+  }
+
+  Future<void> _loadUserName() async {
+    final name = await Storage.get('userNIP');
+    if (!mounted) return;
+
+    setState(() {
+      userName = name?.toTitleCase() ?? 'Guest';
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +60,8 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    userProvider.user?.email ?? 'Guest',
+                    // userProvider.user?.email ?? 'Guest',
+                    userName,
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.grey[600],
@@ -54,7 +79,6 @@ class HomeScreen extends StatelessWidget {
                     height: 200,
                   ),
                   const SizedBox(height: 32),
-
                   // Quick actions
                   Text(
                     langProvider.get('Quick Actions', 'Aksi Cepat'),
