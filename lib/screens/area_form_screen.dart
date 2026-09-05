@@ -2,10 +2,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/area_api.dart';
 import '../utils/constants.dart';
+import '../utils/responsive.dart';
 import '../utils/storage.dart';
 import '../utils/toast.dart';
 import '../widgets/app_bar_custom.dart';
+import '../widgets/page_header.dart';
 import '../widgets/private_route.dart';
+import '../widgets/section_card.dart';
 
 /// Form "Tambah Area" (indoor/outdoor) untuk fitur Atur Meja.
 class AreaFormScreen extends StatefulWidget {
@@ -55,7 +58,8 @@ class _AreaFormScreenState extends State<AreaFormScreen> {
         Navigator.pop(context, true);
       } else {
         final body = jsonDecode(response.body);
-        Toast.error(context, body['error']?.toString() ?? 'Gagal menambah area');
+        Toast.error(
+            context, body['error']?.toString() ?? 'Gagal menambah area');
       }
     } catch (_) {
       if (mounted) Toast.error(context, 'Gagal menambah area');
@@ -70,47 +74,72 @@ class _AreaFormScreenState extends State<AreaFormScreen> {
       sellerOnly: true,
       child: Scaffold(
         appBar: const AppBarCustom(title: 'Tambah Area'),
-        body: Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Nama Area',
-                  hintText: 'mis. Lantai 1, Teras Depan',
-                  border: OutlineInputBorder(),
+        body: PageBody(
+          maxWidth: 560,
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const PageHeader(
+                  title: 'Tambah Area',
+                  subtitle:
+                      'Area dipakai untuk mengelompokkan meja, mis. Lantai 1 atau Teras Depan.',
+                  icon: Icons.map_outlined,
                 ),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Nama area wajib diisi' : null,
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _areaType,
-                decoration: const InputDecoration(
-                  labelText: 'Tipe Area',
-                  border: OutlineInputBorder(),
+                SectionCard(
+                  title: 'Data Area',
+                  icon: Icons.edit_location_alt_outlined,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextFormField(
+                        controller: _nameController,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                          labelText: 'Nama Area',
+                          hintText: 'mis. Lantai 1, Teras Depan',
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Nama area wajib diisi'
+                            : null,
+                      ),
+                      const SizedBox(height: 14),
+                      DropdownButtonFormField<String>(
+                        initialValue: _areaType,
+                        decoration: const InputDecoration(
+                          labelText: 'Tipe Area',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                              value: 'INDOOR', child: Text('Indoor')),
+                          DropdownMenuItem(
+                              value: 'OUTDOOR', child: Text('Outdoor')),
+                        ],
+                        onChanged: (v) =>
+                            setState(() => _areaType = v ?? 'INDOOR'),
+                      ),
+                    ],
+                  ),
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'INDOOR', child: Text('Indoor')),
-                  DropdownMenuItem(value: 'OUTDOOR', child: Text('Outdoor')),
-                ],
-                onChanged: (v) => setState(() => _areaType = v ?? 'INDOOR'),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _saving ? null : _save,
-                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-                child: _saving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Text('Simpan'),
-              ),
-            ],
+                const SizedBox(height: 20),
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _saving ? null : _save,
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.save_outlined, size: 20),
+                    label: const Text('SIMPAN'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

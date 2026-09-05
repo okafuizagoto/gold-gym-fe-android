@@ -1,13 +1,18 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../config/theme.dart';
 import '../models/area_model.dart';
 import '../services/area_api.dart';
 import '../services/meja_api.dart';
 import '../utils/constants.dart';
+import '../utils/responsive.dart';
 import '../utils/storage.dart';
 import '../utils/toast.dart';
 import '../widgets/app_bar_custom.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/page_header.dart';
 import '../widgets/private_route.dart';
+import '../widgets/section_card.dart';
 
 /// Form "Tambah Meja" -- satu meja atau bulk (pola nama berurutan, mis.
 /// A1 -> A1,A2,A3), dengan kapasitas (jumlah pelanggan) sama semua atau
@@ -67,9 +72,8 @@ class _MejaFormScreenState extends State<MejaFormScreen> {
       if (!mounted) return;
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
-        final list = (body['data'] as List? ?? [])
-            .map((e) => Area.fromJson(e))
-            .toList();
+        final list =
+            (body['data'] as List? ?? []).map((e) => Area.fromJson(e)).toList();
         setState(() {
           _areas = list;
           _selectedAreaId = list.isNotEmpty ? list.first.areaId : null;
@@ -174,7 +178,8 @@ class _MejaFormScreenState extends State<MejaFormScreen> {
         Toast.error(context, 'Belum ada preview nama meja');
         return;
       }
-      final sameCapacity = int.tryParse(_sameCapacityController.text.trim()) ?? 0;
+      final sameCapacity =
+          int.tryParse(_sameCapacityController.text.trim()) ?? 0;
       for (final name in _previewNames) {
         final capacity = _sameCapacityForAll
             ? sameCapacity
@@ -209,7 +214,8 @@ class _MejaFormScreenState extends State<MejaFormScreen> {
         Navigator.pop(context, true);
       } else {
         final body = jsonDecode(response.body);
-        Toast.error(context, body['error']?.toString() ?? 'Gagal menambah meja');
+        Toast.error(
+            context, body['error']?.toString() ?? 'Gagal menambah meja');
       }
     } catch (_) {
       if (mounted) Toast.error(context, 'Gagal menambah meja');
@@ -227,12 +233,17 @@ class _MejaFormScreenState extends State<MejaFormScreen> {
         body: _loadingAreas
             ? const Center(child: CircularProgressIndicator())
             : _areas.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                        'Belum ada area. Buat area terlebih dahulu di tab Area sebelum menambah meja.',
-                        textAlign: TextAlign.center,
+                ? PageBody(
+                    maxWidth: 560,
+                    child: EmptyState(
+                      icon: Icons.map_outlined,
+                      title: 'Belum ada area',
+                      description:
+                          'Buat area terlebih dahulu di tab Area sebelum menambah meja.',
+                      action: OutlinedButton.icon(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                        label: const Text('Kembali'),
                       ),
                     ),
                   )
@@ -241,111 +252,200 @@ class _MejaFormScreenState extends State<MejaFormScreen> {
     );
   }
 
+  Widget _switchTile({
+    required String title,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: SwitchListTile(
+        value: value,
+        onChanged: onChanged,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        title: Text(title, style: Theme.of(context).textTheme.titleSmall),
+      ),
+    );
+  }
+
   Widget _buildForm() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        TextFormField(
-          controller: _startNameController,
-          decoration: InputDecoration(
-            labelText: _isBulk ? 'Nama/Nomor Meja Awal' : 'Nama/Nomor Meja',
-            hintText: 'mis. A1',
-            border: const OutlineInputBorder(),
-            errorText: _isBulk ? _nameError : null,
+    final textTheme = Theme.of(context).textTheme;
+    return PageBody(
+      maxWidth: 560,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const PageHeader(
+            title: 'Tambah Meja',
+            subtitle:
+                'Satu meja, atau banyak sekaligus dengan pola nama berurutan (A1, A2, ...).',
+            icon: Icons.table_bar_rounded,
           ),
-        ),
-        const SizedBox(height: 12),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Tambah banyak meja sekaligus'),
-          value: _isBulk,
-          onChanged: (v) {
-            setState(() => _isBulk = v);
-            _regeneratePreview();
-          },
-        ),
-        if (_isBulk) ...[
-          TextFormField(
-            controller: _countController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Jumlah Meja',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Samakan jumlah pelanggan untuk semua meja'),
-            value: _sameCapacityForAll,
-            onChanged: (v) => setState(() => _sameCapacityForAll = v),
-          ),
-        ],
-        if (!_isBulk || _sameCapacityForAll) ...[
-          const SizedBox(height: 4),
-          TextFormField(
-            controller: _sameCapacityController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Jumlah Pelanggan (Kapasitas)',
-              border: OutlineInputBorder(),
-            ),
-          ),
-        ],
-        const SizedBox(height: 12),
-        DropdownButtonFormField<int>(
-          value: _selectedAreaId,
-          decoration: const InputDecoration(
-            labelText: 'Area',
-            border: OutlineInputBorder(),
-          ),
-          items: _areas
-              .map((a) => DropdownMenuItem(
-                    value: a.areaId,
-                    child: Text('${a.areaName} (${a.areaType})'),
-                  ))
-              .toList(),
-          onChanged: (v) => setState(() => _selectedAreaId = v),
-        ),
-        if (_isBulk && _previewNames.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          const Text('Pratinjau Meja', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          ..._previewNames.map((name) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Expanded(child: Text(name)),
-                    if (!_sameCapacityForAll)
-                      SizedBox(
-                        width: 100,
-                        child: TextFormField(
-                          controller: _perNameCapacity[name],
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Kapasitas',
-                            isDense: true,
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ),
-                  ],
+          SectionCard(
+            title: 'Nama & Jumlah',
+            icon: Icons.tag_rounded,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextFormField(
+                  controller: _startNameController,
+                  decoration: InputDecoration(
+                    labelText:
+                        _isBulk ? 'Nama/Nomor Meja Awal' : 'Nama/Nomor Meja',
+                    hintText: 'mis. A1',
+                    errorText: _isBulk ? _nameError : null,
+                    errorMaxLines: 3,
+                  ),
                 ),
-              )),
+                const SizedBox(height: 12),
+                _switchTile(
+                  title: 'Tambah banyak meja sekaligus',
+                  value: _isBulk,
+                  onChanged: (v) {
+                    setState(() => _isBulk = v);
+                    _regeneratePreview();
+                  },
+                ),
+                if (_isBulk) ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _countController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Jumlah Meja',
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Kapasitas',
+            description: 'Jumlah pelanggan yang muat di satu meja',
+            icon: Icons.groups_outlined,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_isBulk) ...[
+                  _switchTile(
+                    title: 'Samakan jumlah pelanggan untuk semua meja',
+                    value: _sameCapacityForAll,
+                    onChanged: (v) => setState(() => _sameCapacityForAll = v),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (!_isBulk || _sameCapacityForAll)
+                  TextFormField(
+                    controller: _sameCapacityController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Jumlah Pelanggan (Kapasitas)',
+                    ),
+                  )
+                else
+                  Text(
+                    'Isi kapasitas tiap meja di bagian Pratinjau di bawah.',
+                    style: textTheme.bodySmall,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Area',
+            icon: Icons.map_outlined,
+            child: DropdownButtonFormField<int>(
+              initialValue: _selectedAreaId,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Area',
+              ),
+              items: _areas
+                  .map((a) => DropdownMenuItem(
+                        value: a.areaId,
+                        child: Text(
+                          '${a.areaName} (${a.areaType})',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ))
+                  .toList(),
+              onChanged: (v) => setState(() => _selectedAreaId = v),
+            ),
+          ),
+          if (_isBulk && _previewNames.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            SectionCard(
+              title: 'Pratinjau Meja',
+              description: '${_previewNames.length} meja akan dibuat',
+              icon: Icons.preview_outlined,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final name in _previewNames)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.blueLight,
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                            ),
+                            child: Text(
+                              name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.blueDark,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          if (!_sameCapacityForAll)
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                  maxWidth: 130, minWidth: 90),
+                              child: TextFormField(
+                                controller: _perNameCapacity[name],
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: 'Kapasitas',
+                                  isDense: true,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _saving ? null : _save,
+              icon: _saving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.save_outlined, size: 20),
+              label: const Text('SIMPAN'),
+            ),
+          ),
         ],
-        const SizedBox(height: 24),
-        ElevatedButton(
-          onPressed: _saving ? null : _save,
-          style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-          child: _saving
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                )
-              : const Text('Simpan'),
-        ),
-      ],
+      ),
     );
   }
 }

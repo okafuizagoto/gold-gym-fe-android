@@ -6,10 +6,16 @@ import '../models/order_model.dart';
 import '../providers/buyer_order_provider.dart';
 import '../services/order_api.dart';
 import '../utils/constants.dart';
+import '../utils/responsive.dart';
 import '../utils/storage.dart';
 import '../utils/toast.dart';
+import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/info_row.dart';
+import '../widgets/page_header.dart';
 import '../widgets/private_route.dart';
+import '../widgets/section_card.dart';
 
 /// Mode pembeli — layar pertama: pilih outlet penjual tujuan.
 /// Menampilkan SEMUA outlet non-THERAPY yang terdaftar (lintas penjual),
@@ -49,9 +55,9 @@ class _BuyerChooseOutletScreenState extends State<BuyerChooseOutletScreen> {
 
     // pulihkan pilihan sebelumnya
     final saved = await Storage.get(AppConstants.buyerOutcodeKey) ?? '';
-    final savedGold =
-        int.tryParse(await Storage.get(AppConstants.buyerOutletGoldIdKey) ?? '') ??
-            0;
+    final savedGold = int.tryParse(
+            await Storage.get(AppConstants.buyerOutletGoldIdKey) ?? '') ??
+        0;
     final match = _outlets
         .where((o) => o.outletCode == saved && o.outletGoldId == savedGold)
         .toList();
@@ -63,7 +69,8 @@ class _BuyerChooseOutletScreenState extends State<BuyerChooseOutletScreen> {
   Future<void> _selectOutlet(PublicOutlet outlet, {bool silent = false}) async {
     setState(() => _selected = outlet);
     final cart = Provider.of<BuyerOrderProvider>(context, listen: false);
-    cart.selectOutlet(outlet.outletGoldId, outlet.outletCode, outlet.outletName);
+    cart.selectOutlet(
+        outlet.outletGoldId, outlet.outletCode, outlet.outletName);
     await Storage.set(AppConstants.buyerOutcodeKey, outlet.outletCode);
     await Storage.set(AppConstants.buyerOutletNameKey, outlet.outletName);
     await Storage.set(
@@ -73,53 +80,35 @@ class _BuyerChooseOutletScreenState extends State<BuyerChooseOutletScreen> {
     }
   }
 
-  Widget _outletDetailCard(PublicOutlet o) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.store, color: Colors.teal),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    o.outletName.toUpperCase(),
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text('Penjual : ${o.ownerName.isEmpty ? "-" : o.ownerName}'),
-            Text('Kode    : ${o.outletCode}'),
-            Text('Tipe    : ${o.outletType}'),
-            Text('Alamat  : ${o.outletAddress.isEmpty ? "-" : o.outletAddress}'),
-          ],
-        ),
-      ),
-    );
-  }
+  String _keyOf(PublicOutlet o) => '${o.outletGoldId}|${o.outletCode}';
 
   @override
   Widget build(BuildContext context) {
     final cart = Provider.of<BuyerOrderProvider>(context);
+    final selectedKey = _selected == null ? null : _keyOf(_selected!);
     return PrivateRoute(
       child: Scaffold(
-        backgroundColor: AppTheme.background,
-        appBar: AppBar(
-          title: const Text('Pilih Outlet'),
+        appBar: AppBarCustom(
+          title: 'Pilih Outlet',
           actions: [
             if (cart.itemCount > 0)
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Center(
-                    child: Text('${cart.itemCount} item',
-                        style: const TextStyle(fontSize: 13))),
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.tealLight,
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                  child: Text(
+                    '${cart.itemCount} item',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.tealDark),
+                  ),
+                ),
               ),
           ],
         ),
@@ -127,65 +116,104 @@ class _BuyerChooseOutletScreenState extends State<BuyerChooseOutletScreen> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _outlets.isEmpty
-                ? Center(
-                    child: Text('Belum ada outlet tersedia',
-                        style: TextStyle(color: Colors.grey[600])))
-                : Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: DropdownButtonFormField<String>(
-                          value: _selected == null
-                              ? null
-                              : '${_selected!.outletGoldId}|${_selected!.outletCode}',
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Pilih outlet penjual',
-                            prefixIcon: Icon(Icons.search),
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          items: _outlets
-                              .map((o) => DropdownMenuItem<String>(
-                                    value: '${o.outletGoldId}|${o.outletCode}',
-                                    child: Text(
-                                      '${o.outletName.toUpperCase()} — ${o.ownerName}',
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ))
-                              .toList(),
-                          onChanged: (key) {
-                            if (key == null) return;
-                            final parts = key.split('|');
-                            final gid = int.tryParse(parts[0]) ?? 0;
-                            final code = parts.sublist(1).join('|');
-                            _selectOutlet(_outlets.firstWhere((o) =>
-                                o.outletGoldId == gid && o.outletCode == code));
-                          },
+                ? const PageBody(
+                    child: EmptyState(
+                    icon: Icons.storefront_outlined,
+                    title: 'Belum ada outlet tersedia',
+                    description:
+                        'Outlet penjual yang sudah diaktifkan admin akan tampil di sini.',
+                  ))
+                : PageBody(
+                    maxWidth: 720,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const PageHeader(
+                          title: 'Pilih Outlet Penjual',
+                          subtitle:
+                              'Barang yang bisa dipesan mengikuti outlet yang dipilih',
+                          icon: Icons.store_mall_directory_rounded,
                         ),
-                      ),
-                      if (_selected != null) ...[
-                        _outletDetailCard(_selected!),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              icon: const Icon(Icons.shopping_bag),
-                              label: const Text('PILIH OUTLET INI — MULAI PESAN'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green.shade600,
-                                foregroundColor: Colors.white,
-                              ),
-                              onPressed: () => Navigator.pushReplacementNamed(
-                                  context, '/belanja'),
+                        SectionCard(
+                          title: 'Outlet tujuan',
+                          icon: Icons.search_rounded,
+                          child: DropdownButtonFormField<String>(
+                            key: ValueKey(selectedKey),
+                            initialValue: selectedKey,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Pilih outlet penjual',
+                              prefixIcon: Icon(Icons.storefront_outlined),
+                            ),
+                            items: _outlets
+                                .map((o) => DropdownMenuItem<String>(
+                                      value: _keyOf(o),
+                                      child: Text(
+                                        '${o.outletName.toUpperCase()} — ${o.ownerName}',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ))
+                                .toList(),
+                            onChanged: (key) {
+                              if (key == null) return;
+                              final parts = key.split('|');
+                              final gid = int.tryParse(parts[0]) ?? 0;
+                              final code = parts.sublist(1).join('|');
+                              _selectOutlet(_outlets.firstWhere((o) =>
+                                  o.outletGoldId == gid &&
+                                  o.outletCode == code));
+                            },
+                          ),
+                        ),
+                        if (_selected != null) ...[
+                          const SizedBox(height: 12),
+                          SectionCard(
+                            title: _selected!.outletName.toUpperCase(),
+                            description: 'Detail outlet terpilih',
+                            icon: Icons.storefront_rounded,
+                            child: Column(
+                              children: [
+                                InfoRow(
+                                  label: 'Penjual',
+                                  value: _selected!.ownerName.isEmpty
+                                      ? '-'
+                                      : _selected!.ownerName,
+                                ),
+                                InfoRow(
+                                    label: 'Kode',
+                                    value: _selected!.outletCode),
+                                InfoRow(
+                                    label: 'Tipe',
+                                    value: _selected!.outletType),
+                                InfoRow(
+                                  label: 'Alamat',
+                                  value: _selected!.outletAddress.isEmpty
+                                      ? '-'
+                                      : _selected!.outletAddress,
+                                ),
+                                const SizedBox(height: 14),
+                                SizedBox(
+                                  height: 48,
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    icon: const Icon(
+                                        Icons.shopping_bag_outlined,
+                                        size: 20),
+                                    label: const Text('PILIH OUTLET INI'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.successDark,
+                                    ),
+                                    onPressed: () =>
+                                        Navigator.pushReplacementNamed(
+                                            context, '/belanja'),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ),
+                        ],
                       ],
-                      const Spacer(),
-                    ],
+                    ),
                   ),
       ),
     );

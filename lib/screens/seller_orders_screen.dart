@@ -1,11 +1,15 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../models/order_model.dart';
 import '../services/order_api.dart';
+import '../utils/responsive.dart';
 import '../utils/text_formatter.dart';
 import '../utils/toast.dart';
+import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
 
 /// Menu penjual: menampung pesanan masuk dari pembeli.
@@ -46,18 +50,18 @@ class _SellerOrdersScreenState extends State<SellerOrdersScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
-  Color _statusColor(String status) {
+  (Color, Color) _statusColors(String status) {
     switch (status) {
       case 'WAITING':
-        return Colors.orange;
+        return (AppColors.warningLight, AppColors.warningDark);
       case 'PROCESS':
-        return Colors.blue;
+        return (AppColors.infoLight, AppColors.infoDark);
       case 'FINISH':
-        return Colors.green;
+        return (AppColors.successLight, AppColors.successDark);
       case 'REJECT':
-        return Colors.red;
+        return (AppColors.errorLight, AppColors.errorDark);
       default:
-        return Colors.grey;
+        return (AppColors.chipBg, AppColors.muted);
     }
   }
 
@@ -67,22 +71,23 @@ class _SellerOrdersScreenState extends State<SellerOrdersScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Konfirmasi Pesanan'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Terima pesanan dari ${o.orderBuyerName}?'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonController,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Alasan penolakan (isi jika menolak)',
-                border: OutlineInputBorder(),
-                isDense: true,
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Terima pesanan dari ${o.orderBuyerName}?'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Alasan penolakan (isi jika menolak)',
+                  isDense: true,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -95,11 +100,12 @@ class _SellerOrdersScreenState extends State<SellerOrdersScreen> {
               Navigator.pop(dialogContext);
               await _reject(o, reason);
             },
-            child: const Text('Tolak', style: TextStyle(color: Colors.red)),
+            child:
+                const Text('Tolak', style: TextStyle(color: AppColors.error)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green, foregroundColor: Colors.white),
+                backgroundColor: AppColors.successDark),
             onPressed: () async {
               Navigator.pop(dialogContext);
               await _confirm(o);
@@ -149,7 +155,7 @@ class _SellerOrdersScreenState extends State<SellerOrdersScreen> {
               child: const Text('Batal')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green, foregroundColor: Colors.white),
+                backgroundColor: AppColors.successDark),
             onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Ya, Selesai'),
           ),
@@ -183,28 +189,40 @@ class _SellerOrdersScreenState extends State<SellerOrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final pad = context.pagePadding;
+    final sidePad =
+        math.max(pad, (context.screenWidth - context.contentMaxWidth) / 2);
     return PrivateRoute(
       child: Scaffold(
-        backgroundColor: AppTheme.background,
-        appBar: AppBar(
-          title: const Text('Pesanan Masuk'),
+        appBar: AppBarCustom(
+          title: 'Pesanan Masuk',
           actions: [
-            IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+            IconButton(
+                tooltip: 'Muat ulang',
+                icon: const Icon(Icons.refresh_rounded),
+                onPressed: _load),
           ],
         ),
         drawer: const AppDrawer(),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _orders.isEmpty
-                ? Center(
-                    child: Text('Belum ada pesanan masuk',
-                        style: TextStyle(color: Colors.grey[600])))
+                ? const PageBody(
+                    child: EmptyState(
+                    icon: Icons.inbox_outlined,
+                    title: 'Belum ada pesanan masuk',
+                    description:
+                        'Pesanan dari pembeli untuk outlet ini akan tampil di sini.',
+                  ))
                 : RefreshIndicator(
                     onRefresh: _load,
                     child: ListView.builder(
+                      padding: EdgeInsets.fromLTRB(sidePad, pad, sidePad, pad),
                       itemCount: _orders.length,
-                      itemBuilder: (context, index) =>
-                          _orderCard(_orders[index]),
+                      itemBuilder: (context, index) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _orderCard(_orders[index]),
+                      ),
                     ),
                   ),
       ),
@@ -213,89 +231,103 @@ class _SellerOrdersScreenState extends State<SellerOrdersScreen> {
 
   Widget _orderCard(BuyerOrder o) {
     final busy = _busyId == o.orderId;
+    final textTheme = Theme.of(context).textTheme;
+    final (bg, fg) = _statusColors(o.orderStatus);
+
+    Widget? action;
+    if (busy) {
+      action = const SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2));
+    } else if (o.orderStatus == 'WAITING') {
+      action = ElevatedButton.icon(
+        icon: const Icon(Icons.fact_check_outlined, size: 18),
+        label: const Text('Konfirmasi'),
+        onPressed: () => _confirmDialog(o),
+      );
+    } else if (o.orderStatus == 'PROCESS') {
+      action = ElevatedButton.icon(
+        icon: const Icon(Icons.done_all_rounded, size: 18),
+        label: const Text('Selesai Proses'),
+        style: ElevatedButton.styleFrom(backgroundColor: AppColors.successDark),
+        onPressed: () => _finishDialog(o),
+      );
+    }
+
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Text(
                     o.orderBuyerName.isEmpty
                         ? 'Pembeli'
                         : o.orderBuyerName.toUpperCase(),
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleSmall,
                   ),
                 ),
+                const SizedBox(width: 8),
                 Container(
+                  constraints: const BoxConstraints(maxWidth: 150),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: _statusColor(o.orderStatus).withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(6),
+                    color: bg,
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
                   child: Text(orderStatusLabel(o.orderStatus),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
                       style: TextStyle(
                           fontSize: 11,
-                          color: _statusColor(o.orderStatus),
-                          fontWeight: FontWeight.bold)),
+                          color: fg,
+                          fontWeight: FontWeight.w700)),
                 ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Icon(
-                    o.orderPayType == 'TRANSFER'
-                        ? Icons.account_balance
-                        : Icons.payments,
-                    size: 16,
-                    color: Colors.grey[700]),
-                const SizedBox(width: 6),
-                Text('${o.orderPayType} • ${o.isPaid ? "LUNAS" : "BELUM LUNAS"}',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[700])),
-                const Spacer(),
-                Text(TextFormatter.formatRupiah(o.orderTotal),
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 8),
             Row(
               children: [
+                Icon(
+                    o.orderPayType == 'TRANSFER'
+                        ? Icons.account_balance_outlined
+                        : Icons.payments_outlined,
+                    size: 16,
+                    color: AppColors.muted),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                      '${o.orderPayType} • ${o.isPaid ? "LUNAS" : "BELUM LUNAS"}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall),
+                ),
+                const SizedBox(width: 8),
+                Text(TextFormatter.formatRupiah(o.orderTotal),
+                    style: textTheme.titleSmall),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
                 TextButton.icon(
-                  icon: const Icon(Icons.list_alt, size: 18),
+                  icon: const Icon(Icons.list_alt_rounded, size: 18),
                   label: const Text('Detail'),
                   onPressed: () => Navigator.pushNamed(
                       context, '/pesanan-detail',
                       arguments: o.orderId),
                 ),
                 const Spacer(),
-                if (busy)
-                  const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                else if (o.orderStatus == 'WAITING')
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.fact_check, size: 18),
-                    label: const Text('Konfirmasi'),
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white),
-                    onPressed: () => _confirmDialog(o),
-                  )
-                else if (o.orderStatus == 'PROCESS')
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.done_all, size: 18),
-                    label: const Text('Selesai Proses'),
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white),
-                    onPressed: () => _finishDialog(o),
-                  ),
+                if (action != null) Flexible(child: action),
               ],
             ),
           ],

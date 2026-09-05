@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../config/theme.dart';
 import '../models/meja_model.dart';
 import '../services/meja_api.dart';
+import '../utils/responsive.dart';
 import '../utils/toast.dart';
+import 'empty_state.dart';
 
 class MejaSelectionResult {
   final List<int> ids;
@@ -24,9 +27,7 @@ Future<MejaSelectionResult?> showMejaPickerSheet(
   return showModalBottomSheet<MejaSelectionResult>(
     context: context,
     isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-    ),
+    useSafeArea: true,
     builder: (_) => _MejaPickerSheetBody(
       outcode: outcode,
       jumlahPelanggan: jumlahPelanggan,
@@ -74,9 +75,8 @@ class _MejaPickerSheetBodyState extends State<_MejaPickerSheetBody> {
       if (!mounted) return;
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
-        final list = (body['data'] as List? ?? [])
-            .map((e) => Meja.fromJson(e))
-            .toList();
+        final list =
+            (body['data'] as List? ?? []).map((e) => Meja.fromJson(e)).toList();
         setState(() {
           _mejaList = list;
           _loading = false;
@@ -171,8 +171,10 @@ class _MejaPickerSheetBodyState extends State<_MejaPickerSheetBody> {
         if (res.statusCode != 200) {
           if (!mounted) return;
           final body = jsonDecode(res.body);
-          Toast.error(context,
-              body['error']?.toString() ?? 'Beberapa meja baru saja terisi, silakan pilih ulang');
+          Toast.error(
+              context,
+              body['error']?.toString() ??
+                  'Beberapa meja baru saja terisi, silakan pilih ulang');
           setState(() => _confirming = false);
           await _load();
           return;
@@ -198,11 +200,16 @@ class _MejaPickerSheetBodyState extends State<_MejaPickerSheetBody> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     final canConfirm =
         !_confirming && _selectedCapacity >= widget.jumlahPelanggan;
+    final enough = _selectedCapacity >= widget.jumlahPelanggan;
+    // layar pendek (HP landscape): langsung hampir penuh supaya daftar
+    // meja tetap kelihatan
+    final short = context.isShort;
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.75,
+      initialChildSize: short ? 0.95 : 0.75,
       minChildSize: 0.4,
       maxChildSize: 0.95,
       expand: false,
@@ -211,32 +218,64 @@ class _MejaPickerSheetBodyState extends State<_MejaPickerSheetBody> {
           padding: EdgeInsets.only(
             left: 16,
             right: 16,
-            top: 16,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            top: 4,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 12,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Pilih Meja',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Expanded(
+                    child: Text('Pilih Meja', style: textTheme.titleLarge),
+                  ),
                   IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close_rounded),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
-              Text('Kapasitas terpilih: $_selectedCapacity / ${widget.jumlahPelanggan}'),
+              // kapasitas: pil status (hijau kalau sudah cukup)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: enough ? AppColors.successLight : AppColors.chipBg,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      enough
+                          ? Icons.check_circle_rounded
+                          : Icons.people_outline,
+                      size: 18,
+                      color: enough ? AppColors.successDark : AppColors.muted,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Kapasitas terpilih: $_selectedCapacity / ${widget.jumlahPelanggan} orang',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: enough ? AppColors.successDark : AppColors.ink,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: _loading || _confirming ? null : _autoPick,
-                      icon: const Icon(Icons.shuffle),
-                      label: const Text('Acak Otomatis'),
+                      icon: const Icon(Icons.shuffle, size: 18),
+                      label: const Text('Acak Otomatis',
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
                     ),
                   ),
                   if (_reservedByMe.isNotEmpty) ...[
@@ -244,9 +283,14 @@ class _MejaPickerSheetBodyState extends State<_MejaPickerSheetBody> {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: _confirming ? null : _kosongkan,
-                        style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                        icon: const Icon(Icons.event_seat_outlined),
-                        label: const Text('Kosongkan'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.error,
+                          side: BorderSide(
+                              color: AppColors.error.withValues(alpha: 0.5)),
+                        ),
+                        icon: const Icon(Icons.event_seat_outlined, size: 18),
+                        label: const Text('Kosongkan',
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
                       ),
                     ),
                   ],
@@ -256,38 +300,82 @@ class _MejaPickerSheetBodyState extends State<_MejaPickerSheetBody> {
               Expanded(
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())
-                    : ListView.builder(
-                        controller: scrollController,
-                        itemCount: _mejaList.length,
-                        itemBuilder: (context, index) {
-                          final m = _mejaList[index];
-                          final selectable = _isSelectable(m);
-                          final selected = _selected.contains(m.mejaId);
-                          return Opacity(
-                            opacity: selectable ? 1 : 0.4,
-                            child: CheckboxListTile(
-                              value: selected,
-                              onChanged: selectable ? (_) => _toggle(m) : null,
-                              title: Text(m.mejaName),
-                              subtitle: Text('Kapasitas ${m.mejaCapacity} orang'
-                                  '${selectable ? '' : ' - sedang dipakai'}'),
-                              controlAffinity: ListTileControlAffinity.leading,
+                    : _mejaList.isEmpty
+                        ? SingleChildScrollView(
+                            controller: scrollController,
+                            child: const EmptyState(
+                              icon: Icons.table_bar_outlined,
+                              title: 'Belum ada meja',
+                              description:
+                                  'Buat area & meja lewat menu Atur Meja terlebih dahulu.',
+                              compact: true,
                             ),
-                          );
-                        },
-                      ),
+                          )
+                        : ListView.builder(
+                            controller: scrollController,
+                            itemCount: _mejaList.length,
+                            itemBuilder: (context, index) {
+                              final m = _mejaList[index];
+                              final selectable = _isSelectable(m);
+                              final selected = _selected.contains(m.mejaId);
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: Opacity(
+                                  opacity: selectable ? 1 : 0.5,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: selected
+                                          ? AppColors.blueLight
+                                          : AppColors.surface,
+                                      borderRadius:
+                                          BorderRadius.circular(AppRadius.md),
+                                      border: Border.all(
+                                        color: selected
+                                            ? AppColors.blue
+                                            : AppColors.border,
+                                      ),
+                                    ),
+                                    child: CheckboxListTile(
+                                      value: selected,
+                                      onChanged:
+                                          selectable ? (_) => _toggle(m) : null,
+                                      dense: true,
+                                      title: Text(
+                                        m.mejaName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: textTheme.titleSmall,
+                                      ),
+                                      subtitle: Text(
+                                        'Kapasitas ${m.mejaCapacity} orang'
+                                        '${selectable ? '' : ' - sedang dipakai'}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      controlAffinity:
+                                          ListTileControlAffinity.leading,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
               ),
               const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: canConfirm ? _confirm : null,
-                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-                child: _confirming
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Text('Konfirmasi'),
+              SizedBox(
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: canConfirm ? _confirm : null,
+                  icon: _confirming
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.check_rounded, size: 20),
+                  label: const Text('Konfirmasi'),
+                ),
               ),
             ],
           ),

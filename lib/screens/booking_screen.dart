@@ -10,10 +10,13 @@ import '../services/booking_api.dart';
 import '../services/items_api.dart';
 import '../services/sales_api.dart';
 import '../utils/constants.dart';
+import '../utils/responsive.dart';
 import '../utils/storage.dart';
 import '../utils/text_formatter.dart';
 import '../utils/toast.dart';
+import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
 
 /// Booking slot terapi (outlet type THERAPY).
@@ -148,9 +151,9 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Color _slotColor(SlotModel slot) {
-    if (slot.full) return Colors.red.shade400; // fix, tidak bisa digantikan
-    if (slot.hasUnpaid) return Colors.amber.shade400; // ada yang belum bayar
-    return Colors.green.shade400; // tersedia
+    if (slot.full) return AppColors.error; // fix, tidak bisa digantikan
+    if (slot.hasUnpaid) return AppColors.warning; // ada yang belum bayar
+    return AppColors.success; // tersedia
   }
 
   Future<void> _printReceipt(String saleId) async {
@@ -259,179 +262,208 @@ class _BookingScreenState extends State<BookingScreen> {
             }
           }
 
+          final textTheme = Theme.of(context).textTheme;
           return AlertDialog(
             title: Text('Booking ${slot.start}'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Tipe terapi
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      const Text('Tipe: '),
-                      ChoiceChip(
-                        label: const Text('Sofa'),
-                        selected: therapyType == AppConstants.therapySofa,
-                        onSelected: (_) => setDialogState(
-                            () => therapyType = AppConstants.therapySofa),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Kursi Dragon'),
-                        selected: therapyType == AppConstants.therapyDragon,
-                        onSelected: (_) => setDialogState(
-                            () => therapyType = AppConstants.therapyDragon),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Kursi'),
-                        selected: therapyType == AppConstants.therapyKursi,
-                        onSelected: (_) => setDialogState(
-                            () => therapyType = AppConstants.therapyKursi),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Durasi
-                  Row(
-                    children: [
-                      const Text('Durasi: '),
-                      const SizedBox(width: 8),
-                      ChoiceChip(
-                        label: const Text('30 menit'),
-                        selected: duration == 30,
-                        onSelected: (_) => setDialogState(() => duration = 30),
-                      ),
-                      const SizedBox(width: 8),
-                      ChoiceChip(
-                        label: const Text('1 jam'),
-                        selected: duration == 60,
-                        onSelected: (_) => setDialogState(() => duration = 60),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Harga ${_therapyLabel(therapyType)} ${duration == 60 ? "1 jam" : "30 menit"}: '
-                    '${TextFormatter.formatRupiah(_priceFor(therapyType, duration).toDouble())}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Pembeli (khusus penjual; pembeli otomatis atas nama sendiri)
-                  if (_isSeller) ...[
-                    TextField(
-                      controller: buyerSearchController,
-                      decoration: const InputDecoration(
-                        labelText: 'Cari pembeli terdaftar',
-                        prefixIcon: Icon(Icons.search),
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      onChanged: (value) {
-                        debounce?.cancel();
-                        debounce = Timer(const Duration(milliseconds: 400),
-                            () => searchBuyers(value));
-                      },
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+            content: SizedBox(
+              width: context.dialogMaxWidth(480),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Tipe terapi
+                    Text('Tipe terapi', style: textTheme.labelMedium),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('Sofa'),
+                          selected: therapyType == AppConstants.therapySofa,
+                          onSelected: (_) => setDialogState(
+                              () => therapyType = AppConstants.therapySofa),
+                        ),
+                        ChoiceChip(
+                          label: const Text('Kursi Dragon'),
+                          selected: therapyType == AppConstants.therapyDragon,
+                          onSelected: (_) => setDialogState(
+                              () => therapyType = AppConstants.therapyDragon),
+                        ),
+                        ChoiceChip(
+                          label: const Text('Kursi'),
+                          selected: therapyType == AppConstants.therapyKursi,
+                          onSelected: (_) => setDialogState(
+                              () => therapyType = AppConstants.therapyKursi),
+                        ),
+                      ],
                     ),
-                    if (buyerSuggestions.isNotEmpty && selectedBuyer == null)
-                      Container(
-                        constraints: const BoxConstraints(maxHeight: 140),
-                        child: ListView(
-                          shrinkWrap: true,
-                          children: buyerSuggestions
-                              .map((b) => ListTile(
-                                    dense: true,
-                                    leading: const Icon(Icons.verified_user,
-                                        color: Colors.teal, size: 18),
-                                    title: Text(b.nama),
-                                    subtitle: Text(b.email),
-                                    onTap: () {
-                                      setDialogState(() {
-                                        selectedBuyer = b;
-                                        buyerSearchController.text = b.nama;
-                                        nameController.clear();
-                                      });
-                                    },
-                                  ))
-                              .toList(),
-                        ),
-                      ),
-                    if (selectedBuyer != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Chip(
-                          avatar: const Icon(Icons.verified_user,
-                              color: Colors.white, size: 16),
-                          backgroundColor: Colors.teal,
-                          label: Text(
-                            '${selectedBuyer!.nama} (TERDAFTAR)',
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                          onDeleted: () => setDialogState(() {
-                            selectedBuyer = null;
-                            buyerSearchController.clear();
-                          }),
-                          deleteIconColor: Colors.white,
-                        ),
-                      ),
                     const SizedBox(height: 12),
-                    TextField(
-                      controller: nameController,
-                      enabled: selectedBuyer == null,
-                      decoration: const InputDecoration(
-                        labelText: 'Atau nama pembeli (belum terdaftar)',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                        helperText:
-                            'Nama manual ditandai sebagai BELUM TERDAFTAR',
+
+                    // Durasi
+                    Text('Durasi', style: textTheme.labelMedium),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('30 menit'),
+                          selected: duration == 30,
+                          onSelected: (_) =>
+                              setDialogState(() => duration = 30),
+                        ),
+                        ChoiceChip(
+                          label: const Text('1 jam'),
+                          selected: duration == 60,
+                          onSelected: (_) =>
+                              setDialogState(() => duration = 60),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.blueLight,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: Text(
+                        'Harga ${_therapyLabel(therapyType)} ${duration == 60 ? "1 jam" : "30 menit"}: '
+                        '${TextFormatter.formatRupiah(_priceFor(therapyType, duration).toDouble())}',
+                        style: textTheme.titleSmall
+                            ?.copyWith(color: AppColors.blueDark),
                       ),
                     ),
                     const SizedBox(height: 16),
-                  ],
 
-                  // Status bayar
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Bayar sekarang'),
-                    subtitle: Text(paid
-                        ? 'Slot langsung fix (merah) + nota PDF'
-                        : 'Booking ditandai kuning (belum bayar)'),
-                    value: paid,
-                    onChanged: (v) => setDialogState(() => paid = v),
-                  ),
-
-                  // Harga custom (khusus penjual/admin): abaikan harga default,
-                  // ketik harga sendiri. Untuk booking belum bayar, harga custom
-                  // dikunci di booking dan dipakai saat pembayaran nanti.
-                  if (_isSeller) ...[
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Harga custom'),
-                      subtitle: Text(useCustomPrice
-                          ? (paid
-                              ? 'Input harga sendiri (abaikan harga default)'
-                              : 'Harga dikunci & dipakai saat pembayaran nanti')
-                          : 'Pakai harga default'),
-                      value: useCustomPrice,
-                      onChanged: (v) =>
-                          setDialogState(() => useCustomPrice = v),
-                    ),
-                    if (useCustomPrice)
+                    // Pembeli (khusus penjual; pembeli otomatis atas nama sendiri)
+                    if (_isSeller) ...[
                       TextField(
-                        controller: priceController,
-                        keyboardType: TextInputType.number,
+                        controller: buyerSearchController,
                         decoration: const InputDecoration(
-                          labelText: 'Harga custom (Rp)',
-                          border: OutlineInputBorder(),
+                          labelText: 'Cari pembeli terdaftar',
+                          prefixIcon: Icon(Icons.search_rounded),
                           isDense: true,
                         ),
+                        onChanged: (value) {
+                          debounce?.cancel();
+                          debounce = Timer(const Duration(milliseconds: 400),
+                              () => searchBuyers(value));
+                        },
                       ),
+                      if (buyerSuggestions.isNotEmpty && selectedBuyer == null)
+                        Container(
+                          margin: const EdgeInsets.only(top: 6),
+                          constraints: const BoxConstraints(maxHeight: 140),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.border),
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          child: ListView(
+                            shrinkWrap: true,
+                            children: buyerSuggestions
+                                .map((b) => ListTile(
+                                      dense: true,
+                                      leading: const Icon(
+                                          Icons.verified_user_rounded,
+                                          color: AppColors.tealDark,
+                                          size: 18),
+                                      title: Text(b.nama,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis),
+                                      subtitle: Text(b.email,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis),
+                                      onTap: () {
+                                        setDialogState(() {
+                                          selectedBuyer = b;
+                                          buyerSearchController.text = b.nama;
+                                          nameController.clear();
+                                        });
+                                      },
+                                    ))
+                                .toList(),
+                          ),
+                        ),
+                      if (selectedBuyer != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Chip(
+                            avatar: const Icon(Icons.verified_user_rounded,
+                                color: AppColors.tealDark, size: 16),
+                            backgroundColor: AppColors.tealLight,
+                            label: Text(
+                              '${selectedBuyer!.nama} (TERDAFTAR)',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: AppColors.tealDark),
+                            ),
+                            onDeleted: () => setDialogState(() {
+                              selectedBuyer = null;
+                              buyerSearchController.clear();
+                            }),
+                            deleteIconColor: AppColors.tealDark,
+                          ),
+                        ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: nameController,
+                        enabled: selectedBuyer == null,
+                        decoration: const InputDecoration(
+                          labelText: 'Atau nama pembeli (belum terdaftar)',
+                          isDense: true,
+                          helperText:
+                              'Nama manual ditandai sebagai BELUM TERDAFTAR',
+                          helperMaxLines: 2,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    // Status bayar
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Bayar sekarang'),
+                      subtitle: Text(paid
+                          ? 'Slot langsung fix (merah) + nota PDF'
+                          : 'Booking ditandai kuning (belum bayar)'),
+                      value: paid,
+                      onChanged: (v) => setDialogState(() => paid = v),
+                    ),
+
+                    // Harga custom (khusus penjual/admin): abaikan harga default,
+                    // ketik harga sendiri. Untuk booking belum bayar, harga custom
+                    // dikunci di booking dan dipakai saat pembayaran nanti.
+                    if (_isSeller) ...[
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Harga custom'),
+                        subtitle: Text(useCustomPrice
+                            ? (paid
+                                ? 'Input harga sendiri (abaikan harga default)'
+                                : 'Harga dikunci & dipakai saat pembayaran nanti')
+                            : 'Pakai harga default'),
+                        value: useCustomPrice,
+                        onChanged: (v) =>
+                            setDialogState(() => useCustomPrice = v),
+                      ),
+                      if (useCustomPrice)
+                        TextField(
+                          controller: priceController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Harga custom (Rp)',
+                            isDense: true,
+                          ),
+                        ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
             actions: [
@@ -462,30 +494,37 @@ class _BookingScreenState extends State<BookingScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
+      constraints: BoxConstraints(
+        maxHeight: context.screenHeight * 0.9,
+        maxWidth: 720,
+      ),
       builder: (context) {
+        final textTheme = Theme.of(context).textTheme;
         return SafeArea(
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                   child: Column(
                     children: [
                       Text(
                         'Slot ${slot.start} - ${slot.end}  (${slot.used}/${slot.capacity})',
-                        style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                        style: textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 12,
+                        runSpacing: 6,
                         children: [
-                          _legend(Colors.amber.shade400, 'Belum bayar'),
-                          const SizedBox(width: 12),
-                          _legend(Colors.red.shade400, 'Sudah bayar'),
-                          const SizedBox(width: 12),
-                          _legend(Colors.green.shade400, 'Tersedia'),
+                          _legend(AppColors.warning, 'Belum bayar'),
+                          _legend(AppColors.error, 'Sudah bayar'),
+                          _legend(AppColors.success, 'Tersedia'),
                         ],
                       ),
                     ],
@@ -499,19 +538,22 @@ class _BookingScreenState extends State<BookingScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
-                      color: Colors.green.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.green.shade400),
+                      color: AppColors.successLight,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      border: Border.all(color: AppColors.success),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.event_seat, color: Colors.green.shade700),
+                        const Icon(Icons.event_seat_rounded,
+                            color: AppColors.successDark),
                         const SizedBox(width: 8),
-                        Text(
-                          '${slot.available} tempat masih tersedia',
-                          style: TextStyle(
-                            color: Colors.green.shade800,
-                            fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: Text(
+                            '${slot.available} tempat masih tersedia',
+                            style: const TextStyle(
+                              color: AppColors.successDark,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -522,8 +564,9 @@ class _BookingScreenState extends State<BookingScreen> {
                     padding: const EdgeInsets.all(16),
                     child: SizedBox(
                       width: double.infinity,
+                      height: 48,
                       child: ElevatedButton.icon(
-                        icon: const Icon(Icons.add),
+                        icon: const Icon(Icons.add_rounded, size: 20),
                         label: const Text('BOOKING SLOT INI'),
                         onPressed: () {
                           Navigator.pop(context);
@@ -531,7 +574,9 @@ class _BookingScreenState extends State<BookingScreen> {
                         },
                       ),
                     ),
-                  ),
+                  )
+                else
+                  const SizedBox(height: 12),
               ],
             ),
           ),
@@ -544,92 +589,108 @@ class _BookingScreenState extends State<BookingScreen> {
   /// merah = sudah bayar; penjual melihat tombol BAYAR / HAPUS untuk
   /// booking yang belum dibayar.
   Widget _slotBookingTile(BuildContext sheetContext, SlotBookingModel b) {
-    final baseColor = b.isPaid ? Colors.red : Colors.amber;
+    final accent = b.isPaid ? AppColors.error : AppColors.warning;
+    final accentDark = b.isPaid ? AppColors.errorDark : AppColors.warningDark;
+    final bg = b.isPaid ? AppColors.errorLight : AppColors.warningLight;
+    final textTheme = Theme.of(sheetContext).textTheme;
+    final subtitle = 'Mulai ${b.start} • ${b.duration} menit'
+        '${b.therapyLabel.isNotEmpty ? " • ${b.therapyLabel}" : ""}'
+        '${b.price > 0 && !b.isPaid ? " • Harga custom ${TextFormatter.formatRupiah(b.price.toDouble())}" : ""}';
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: b.isPaid ? Colors.red.shade100 : Colors.amber.shade100,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-            color: b.isPaid ? Colors.red.shade400 : Colors.amber.shade400),
+        color: bg,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: accent),
       ),
-      child: ListTile(
-        dense: true,
-        leading: Icon(
-          b.isPaid ? Icons.check_circle : Icons.hourglass_bottom,
-          color: b.isPaid ? Colors.red.shade700 : Colors.amber.shade800,
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // nama pembeli wrap per kata: "tester wowza" turun jadi
-            // "tester" / "wowza", tidak terpotong di tengah kata
-            Text(
-              b.custName,
-              softWrap: true,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            // badge status di bawah nama pembeli
-            Wrap(
-              spacing: 4,
-              runSpacing: 4,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            b.isPaid
+                ? Icons.check_circle_rounded
+                : Icons.hourglass_bottom_rounded,
+            color: accentDark,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: baseColor.shade400,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    b.isPaid ? 'SUDAH BAYAR' : 'BELUM BAYAR',
-                    style: const TextStyle(
-                        fontSize: 10,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold),
-                  ),
+                // nama pembeli wrap per kata: "tester wowza" turun jadi
+                // "tester" / "wowza", tidak terpotong di tengah kata
+                Text(
+                  b.custName,
+                  softWrap: true,
+                  style: textTheme.titleSmall,
                 ),
-                if (!b.isRegistered)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(4),
+                const SizedBox(height: 4),
+                // badge status di bawah nama pembeli
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: accent,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        b.isPaid ? 'SUDAH BAYAR' : 'BELUM BAYAR',
+                        style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold),
+                      ),
                     ),
-                    child: const Text('BELUM TERDAFTAR',
-                        style: TextStyle(fontSize: 10)),
-                  ),
-              ],
-            ),
-          ],
-        ),
-        subtitle: Text('Mulai ${b.start} • ${b.duration} menit'
-            '${b.therapyLabel.isNotEmpty ? " • ${b.therapyLabel}" : ""}'
-            '${b.price > 0 && !b.isPaid ? " • Harga custom ${TextFormatter.formatRupiah(b.price.toDouble())}" : ""}'),
-        trailing: (_isSeller && !b.isPaid)
-            ? Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(sheetContext);
-                      _showPayBookingDialog(b);
-                    },
-                    child: const Text('BAYAR'),
-                  ),
-                  TextButton(
-                    style: TextButton.styleFrom(foregroundColor: Colors.red),
-                    onPressed: () {
-                      Navigator.pop(sheetContext);
-                      _removeBooking(b);
-                    },
-                    child: const Text('HAPUS'),
+                    if (!b.isRegistered)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.chipBg,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text('BELUM TERDAFTAR',
+                            style: TextStyle(
+                                fontSize: 10, color: AppColors.muted)),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(subtitle, style: textTheme.bodySmall),
+                if (_isSeller && !b.isPaid) ...[
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 4,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(sheetContext);
+                          _showPayBookingDialog(b);
+                        },
+                        child: const Text('BAYAR'),
+                      ),
+                      TextButton(
+                        style: TextButton.styleFrom(
+                            foregroundColor: AppColors.error),
+                        onPressed: () {
+                          Navigator.pop(sheetContext);
+                          _removeBooking(b);
+                        },
+                        child: const Text('HAPUS'),
+                      ),
+                    ],
                   ),
                 ],
-              )
-            : null,
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -690,82 +751,91 @@ class _BookingScreenState extends State<BookingScreen> {
             }
           }
 
+          final textTheme = Theme.of(context).textTheme;
           return AlertDialog(
-            title: Text('Bayar booking ${booking.custName}'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (hasType) ...[
-                    Text(
-                      '${booking.therapyLabel} • ${booking.duration} menit',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Harga default: ${TextFormatter.formatRupiah(_priceFor(booking.therapyType, booking.duration).toDouble())}',
-                    ),
-                    if (booking.price > 0) ...[
+            title: Text(
+              'Bayar booking ${booking.custName}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+            content: SizedBox(
+              width: context.dialogMaxWidth(480),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (hasType) ...[
+                      Text(
+                        '${booking.therapyLabel} • ${booking.duration} menit',
+                        style: textTheme.titleSmall,
+                      ),
                       const SizedBox(height: 4),
                       Text(
-                        'Harga custom tersimpan: '
-                        '${TextFormatter.formatRupiah(booking.price.toDouble())} '
-                        '(dipakai saat bayar kecuali diubah)',
-                        style: TextStyle(
-                            color: Colors.teal.shade700,
-                            fontWeight: FontWeight.bold),
+                        'Harga default: ${TextFormatter.formatRupiah(_priceFor(booking.therapyType, booking.duration).toDouble())}',
                       ),
-                    ],
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Jika ada booking 30 menit bersebelahan atas nama & tipe '
-                      'yang sama (belum bayar), nota otomatis digabung jadi '
-                      '1 jam dengan harga 1 jam.',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ] else
-                    DropdownButtonFormField<ItemResponse>(
-                      value: selectedItem,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Item terapi',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: _items
-                          .map((item) => DropdownMenuItem(
-                                value: item,
-                                child: Text(
-                                  '${item.item_name} — ${TextFormatter.formatRupiah(item.item_price.toDouble())}',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ))
-                          .toList(),
-                      onChanged: (v) => setDialogState(() => selectedItem = v),
-                    ),
-                  if (_isSeller) ...[
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Harga custom'),
-                      subtitle: Text(useCustomPrice
-                          ? 'Input harga sendiri'
-                          : 'Pakai harga default'),
-                      value: useCustomPrice,
-                      onChanged: (v) =>
-                          setDialogState(() => useCustomPrice = v),
-                    ),
-                    if (useCustomPrice)
-                      TextField(
-                        controller: priceController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Harga custom (Rp)',
-                          border: OutlineInputBorder(),
-                          isDense: true,
+                      if (booking.price > 0) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Harga custom tersimpan: '
+                          '${TextFormatter.formatRupiah(booking.price.toDouble())} '
+                          '(dipakai saat bayar kecuali diubah)',
+                          style: const TextStyle(
+                              color: AppColors.tealDark,
+                              fontWeight: FontWeight.bold),
                         ),
+                      ],
+                      const SizedBox(height: 6),
+                      Text(
+                        'Jika ada booking 30 menit bersebelahan atas nama & tipe '
+                        'yang sama (belum bayar), nota otomatis digabung jadi '
+                        '1 jam dengan harga 1 jam.',
+                        style: textTheme.bodySmall,
                       ),
+                    ] else
+                      DropdownButtonFormField<ItemResponse>(
+                        initialValue: selectedItem,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Item terapi',
+                        ),
+                        items: _items
+                            .map((item) => DropdownMenuItem(
+                                  value: item,
+                                  child: Text(
+                                    '${item.item_name} — ${TextFormatter.formatRupiah(item.item_price.toDouble())}',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ))
+                            .toList(),
+                        onChanged: (v) =>
+                            setDialogState(() => selectedItem = v),
+                      ),
+                    if (_isSeller) ...[
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Harga custom'),
+                        subtitle: Text(useCustomPrice
+                            ? 'Input harga sendiri'
+                            : 'Pakai harga default'),
+                        value: useCustomPrice,
+                        onChanged: (v) =>
+                            setDialogState(() => useCustomPrice = v),
+                      ),
+                      if (useCustomPrice)
+                        TextField(
+                          controller: priceController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Harga custom (Rp)',
+                            isDense: true,
+                          ),
+                        ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
             actions: [
@@ -832,7 +902,7 @@ class _BookingScreenState extends State<BookingScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade600,
+              backgroundColor: AppColors.error,
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
@@ -862,105 +932,128 @@ class _BookingScreenState extends State<BookingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final columns = context.columnsFor(minTileWidth: 100, min: 3, max: 8);
+    final pad = context.pagePadding;
+
     return PrivateRoute(
       child: Scaffold(
-        backgroundColor: AppTheme.background,
-        appBar: AppBar(
-          title: const Text('Booking Terapi'),
+        appBar: AppBarCustom(
+          title: 'Booking Terapi',
           actions: [
             IconButton(
-              icon: const Icon(Icons.refresh),
+              tooltip: 'Muat ulang',
+              icon: const Icon(Icons.refresh_rounded),
               onPressed: _loadSlots,
             ),
           ],
         ),
         drawer: const AppDrawer(),
-        body: Column(
-          children: [
-            // Pilih tanggal + legenda
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.calendar_today, size: 18),
-                          label: Text(
-                              DateFormat('dd-MM-yyyy').format(_selectedDate)),
-                          onPressed: _pickDate,
-                        ),
+        body: ContentWidth(
+          child: Column(
+            children: [
+              // Pilih tanggal + legenda
+              Padding(
+                padding: EdgeInsets.fromLTRB(pad, pad, pad, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.calendar_today_rounded, size: 18),
+                      label: Text(
+                        DateFormat('EEEE, d MMMM yyyy', 'id_ID')
+                            .format(_selectedDate),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _legend(Colors.green.shade400, 'Tersedia'),
-                      const SizedBox(width: 12),
-                      _legend(Colors.amber.shade400, 'Belum bayar'),
-                      const SizedBox(width: 12),
-                      _legend(Colors.red.shade400, 'Penuh (fix)'),
-                    ],
-                  ),
-                ],
+                      onPressed: _pickDate,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 14,
+                      runSpacing: 6,
+                      children: [
+                        _legend(AppColors.success, 'Tersedia'),
+                        _legend(AppColors.warning, 'Belum bayar'),
+                        _legend(AppColors.error, 'Penuh (fix)'),
+                        _legend(AppColors.disabled, 'Lewat'),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
 
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : RefreshIndicator(
-                      onRefresh: _loadSlots,
-                      child: GridView.builder(
-                        padding: const EdgeInsets.all(12),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          childAspectRatio: 1.6,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
-                        ),
-                        itemCount: _slots.length,
-                        itemBuilder: (context, index) {
-                          final slot = _slots[index];
-                          final color = _slotColor(slot);
-                          return InkWell(
-                            onTap: () => slot.bookings.isEmpty
-                                ? _showBookingDialog(slot)
-                                : _showSlotDetail(slot),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: slot.past ? Colors.grey.shade400 : color,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    slot.start,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${slot.used}/${slot.capacity}',
-                                    style: const TextStyle(
-                                        color: Colors.white, fontSize: 12),
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : RefreshIndicator(
+                        onRefresh: _loadSlots,
+                        child: _slots.isEmpty
+                            ? ListView(
+                                children: const [
+                                  EmptyState(
+                                    icon: Icons.event_busy_rounded,
+                                    title: 'Belum ada slot',
+                                    description:
+                                        'Slot terapi untuk tanggal ini belum tersedia. Coba tanggal lain atau muat ulang.',
                                   ),
                                 ],
+                              )
+                            : GridView.builder(
+                                padding: EdgeInsets.fromLTRB(pad, 4, pad, pad),
+                                gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: columns,
+                                  mainAxisExtent: 64,
+                                  crossAxisSpacing: 8,
+                                  mainAxisSpacing: 8,
+                                ),
+                                itemCount: _slots.length,
+                                itemBuilder: (context, index) {
+                                  final slot = _slots[index];
+                                  final color = _slotColor(slot);
+                                  return Material(
+                                    color:
+                                        slot.past ? AppColors.disabled : color,
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadius.md),
+                                    child: InkWell(
+                                      borderRadius:
+                                          BorderRadius.circular(AppRadius.md),
+                                      onTap: () => slot.bookings.isEmpty
+                                          ? _showBookingDialog(slot)
+                                          : _showSlotDetail(slot),
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            slot.start,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${slot.used}/${slot.capacity}',
+                                            maxLines: 1,
+                                            style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                            ),
-                          );
-                        },
                       ),
-                    ),
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -968,6 +1061,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
   Widget _legend(Color color, String label) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           width: 14,
@@ -977,8 +1071,9 @@ class _BookingScreenState extends State<BookingScreen> {
             borderRadius: BorderRadius.circular(3),
           ),
         ),
-        const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 12)),
+        const SizedBox(width: 5),
+        Text(label,
+            style: const TextStyle(fontSize: 12, color: AppColors.muted)),
       ],
     );
   }

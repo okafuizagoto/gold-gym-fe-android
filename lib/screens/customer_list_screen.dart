@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/customer_api.dart';
 import '../utils/constants.dart';
+import '../utils/responsive.dart';
 import '../utils/storage.dart';
 import '../utils/toast.dart';
+import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
 
 /// Menu penjual: Daftar Customer. Menampilkan customer milik outlet penjual
@@ -59,24 +62,50 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       context: context,
       builder: (dc) => AlertDialog(
         title: const Text('Tambah Customer'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+        content: SizedBox(
+          width: dc.dialogMaxWidth(440),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
                   controller: nameC,
-                  decoration: const InputDecoration(labelText: 'Nama *')),
-              TextField(
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    labelText: 'Nama *',
+                    prefixIcon: Icon(Icons.person_outline_rounded),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
                   controller: tokoC,
-                  decoration: const InputDecoration(labelText: 'Nama Toko')),
-              TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'Nama Toko',
+                    prefixIcon: Icon(Icons.storefront_outlined),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
                   controller: phoneC,
                   keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Telepon')),
-              TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'Telepon',
+                    prefixIcon: Icon(Icons.phone_outlined),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
                   controller: addrC,
-                  decoration: const InputDecoration(labelText: 'Alamat')),
-            ],
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Alamat',
+                    prefixIcon: Icon(Icons.place_outlined),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
@@ -115,27 +144,39 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       context: context,
       builder: (dc) => AlertDialog(
         title: const Text('Tambah Massal'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Satu customer per baris. Format:\n'
-                'Nama | Telepon | Alamat\n'
-                '(Telepon & Alamat opsional)',
-                style: TextStyle(fontSize: 12),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: bulkC,
-                maxLines: 8,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  hintText: 'Budi | 08123 | Jl. Mawar\nSiti\nToko Jaya | 0899',
+        insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+        content: SizedBox(
+          width: dc.dialogMaxWidth(480),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.infoLight,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: const Text(
+                    'Satu customer per baris. Format:\n'
+                    'Nama | Telepon | Alamat\n'
+                    '(Telepon & Alamat opsional)',
+                    style: TextStyle(fontSize: 12, color: AppColors.infoDark),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 10),
+                TextField(
+                  controller: bulkC,
+                  maxLines: 8,
+                  decoration: const InputDecoration(
+                    hintText:
+                        'Budi | 08123 | Jl. Mawar\nSiti\nToko Jaya | 0899',
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
@@ -206,14 +247,19 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final pad = context.pagePadding;
+    final columns = context.columnsFor(minTileWidth: 320, max: 3);
     return PrivateRoute(
       sellerOnly: true,
       child: Scaffold(
-        backgroundColor: AppTheme.background,
-        appBar: AppBar(
-          title: const Text('Daftar Customer'),
+        appBar: AppBarCustom(
+          title: 'Daftar Customer',
           actions: [
-            IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+            IconButton(
+              tooltip: 'Muat ulang',
+              icon: const Icon(Icons.refresh_rounded),
+              onPressed: _load,
+            ),
           ],
         ),
         drawer: const AppDrawer(),
@@ -224,15 +270,15 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
             FloatingActionButton.extended(
               heroTag: 'bulk',
               onPressed: _addBulk,
-              backgroundColor: Colors.indigo,
-              icon: const Icon(Icons.playlist_add),
+              backgroundColor: AppColors.tealDark,
+              icon: const Icon(Icons.playlist_add_rounded),
               label: const Text('Massal'),
             ),
             const SizedBox(height: 10),
             FloatingActionButton.extended(
               heroTag: 'single',
               onPressed: _addSingle,
-              icon: const Icon(Icons.person_add),
+              icon: const Icon(Icons.person_add_rounded),
               label: const Text('Tambah'),
             ),
           ],
@@ -240,40 +286,114 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _customers.isEmpty
-                ? Center(
-                    child: Text('Belum ada customer',
-                        style: TextStyle(color: Colors.grey[600])))
+                ? ListView(
+                    children: const [
+                      EmptyState(
+                        icon: Icons.contacts_outlined,
+                        title: 'Belum ada customer',
+                        description:
+                            'Tambahkan customer satu per satu (Tambah) atau banyak sekaligus (Massal) lewat tombol di kanan bawah.',
+                      ),
+                    ],
+                  )
                 : RefreshIndicator(
                     onRefresh: _load,
-                    child: ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 140),
-                      itemCount: _customers.length,
-                      itemBuilder: (context, i) {
-                        final c = _customers[i];
-                        final name = (c['cust_name'] ?? '').toString();
-                        final toko = (c['cust_outlet_name'] ?? '').toString();
-                        final phone = (c['cust_phone'] ?? '').toString();
-                        return Card(
-                          margin: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 4),
-                          child: ListTile(
-                            leading: const CircleAvatar(
-                                child: Icon(Icons.person)),
-                            title: Text(name),
-                            subtitle: Text([
+                    child: ContentWidth(
+                      child: GridView.builder(
+                        padding: EdgeInsets.fromLTRB(pad, pad, pad, 150),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: columns,
+                          mainAxisExtent: 76,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                        ),
+                        itemCount: _customers.length,
+                        itemBuilder: (context, i) {
+                          final c = _customers[i];
+                          final name = (c['cust_name'] ?? '').toString();
+                          final toko = (c['cust_outlet_name'] ?? '').toString();
+                          final phone = (c['cust_phone'] ?? '').toString();
+                          final code = (c['cust_code'] ?? '').toString();
+                          return _CustomerTile(
+                            name: name,
+                            subtitle: [
                               if (toko.isNotEmpty) toko,
                               if (phone.isNotEmpty) phone,
-                            ].join(' • ')),
-                            trailing: Text(
-                              (c['cust_code'] ?? '').toString(),
-                              style: const TextStyle(
-                                  fontSize: 11, color: Colors.grey),
-                            ),
-                          ),
-                        );
-                      },
+                            ].join(' • '),
+                            code: code,
+                          );
+                        },
+                      ),
                     ),
                   ),
+      ),
+    );
+  }
+}
+
+class _CustomerTile extends StatelessWidget {
+  final String name;
+  final String subtitle;
+  final String code;
+
+  const _CustomerTile({
+    required this.name,
+    required this.subtitle,
+    required this.code,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: AppColors.blueLight,
+              child: Text(
+                initial,
+                style: const TextStyle(
+                  color: AppColors.blue,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name.isEmpty ? '-' : name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleSmall),
+                  if (subtitle.isNotEmpty)
+                    Text(subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodySmall),
+                ],
+              ),
+            ),
+            if (code.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 96),
+                child: Text(
+                  code,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.labelSmall,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

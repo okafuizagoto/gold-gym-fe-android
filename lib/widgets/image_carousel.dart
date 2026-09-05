@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import '../config/theme.dart';
 
 class ImageCarousel extends StatelessWidget {
   final List<String> images;
@@ -30,7 +31,8 @@ class ImageCarousel extends StatelessWidget {
               width: MediaQuery.of(context).size.width,
               margin: const EdgeInsets.symmetric(horizontal: 5.0),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.chipBg,
+                borderRadius: BorderRadius.circular(AppRadius.card),
                 image: DecorationImage(
                   image: AssetImage(imagePath),
                   fit: BoxFit.cover,
@@ -41,7 +43,8 @@ class ImageCarousel extends StatelessWidget {
               ),
               child: imagePath.isEmpty
                   ? const Center(
-                      child: Icon(Icons.image, size: 50, color: Colors.grey),
+                      child: Icon(Icons.image_outlined,
+                          size: 50, color: AppColors.muted),
                     )
                   : null,
             );

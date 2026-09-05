@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
+import '../config/theme.dart';
 
 /// Menampilkan nota PDF langsung di layar (setelah user memilih cetak struk).
 /// Dari sini user bisa lihat, print, atau share PDF-nya.
@@ -24,6 +25,12 @@ class ReceiptPreviewScreen extends StatelessWidget {
         canChangePageFormat: false,
         canDebug: false,
         pdfFileName: '$title.pdf',
+        scrollViewDecoration: const BoxDecoration(color: AppColors.background),
+        pdfPreviewPageDecoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          border: Border.all(color: AppColors.border),
+        ),
       ),
     );
   }

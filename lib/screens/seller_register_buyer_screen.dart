@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/core_api.dart';
 import '../utils/constants.dart';
+import '../utils/responsive.dart';
 import '../utils/storage.dart';
 import '../utils/toast.dart';
+import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/private_route.dart';
 
@@ -79,78 +81,86 @@ class _SellerRegisterBuyerScreenState extends State<SellerRegisterBuyerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return PrivateRoute(
       sellerOnly: true,
       child: Scaffold(
-        backgroundColor: AppTheme.background,
-        appBar: AppBar(title: const Text('Daftar Pembeli')),
+        appBar: const AppBarCustom(title: 'Daftar Pembeli'),
         drawer: const AppDrawer(),
-        body: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Container(
-                width: 380,
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _alreadyBuyer
-                          ? Icons.check_circle
-                          : Icons.shopping_bag_outlined,
-                      size: 56,
-                      color: _alreadyBuyer ? Colors.green : Colors.teal,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      _alreadyBuyer
-                          ? 'Anda sudah terdaftar sebagai pembeli'
-                          : 'Apakah Anda ingin mendaftar akun pembeli?',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _alreadyBuyer
-                          ? 'Gunakan menu "Mode Pembeli" di menu samping untuk '
-                              'mulai berbelanja di outlet penjual lain.'
-                          : 'Setelah terdaftar, menu "Mode Pembeli" akan muncul '
-                              'dan Anda bisa berbelanja di outlet penjual lain.',
-                      textAlign: TextAlign.center,
-                      style:
-                          const TextStyle(fontSize: 13, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 24),
-                    if (!_alreadyBuyer)
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _handleConfirm,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green.shade600,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text('YA, DAFTARKAN SAYA'),
-                        ),
+        body: PageBody(
+          maxWidth: 520,
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(context.isCompact ? 24 : 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 84,
+                      height: 84,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: _alreadyBuyer
+                            ? AppColors.successLight
+                            : AppColors.tealLight,
+                        shape: BoxShape.circle,
                       ),
+                      child: Icon(
+                        _alreadyBuyer
+                            ? Icons.check_circle_rounded
+                            : Icons.shopping_bag_outlined,
+                        size: 44,
+                        color: _alreadyBuyer
+                            ? AppColors.successDark
+                            : AppColors.tealDark,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    _alreadyBuyer
+                        ? 'Anda sudah terdaftar sebagai pembeli'
+                        : 'Apakah Anda ingin mendaftar akun pembeli?',
+                    textAlign: TextAlign.center,
+                    style: textTheme.headlineSmall?.copyWith(fontSize: 20),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _alreadyBuyer
+                        ? 'Gunakan menu "Mode Pembeli" di menu samping untuk '
+                            'mulai berbelanja di outlet penjual lain.'
+                        : 'Setelah terdaftar, menu "Mode Pembeli" akan muncul '
+                            'dan Anda bisa berbelanja di outlet penjual lain.',
+                    textAlign: TextAlign.center,
+                    style:
+                        textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+                  ),
+                  if (!_alreadyBuyer) ...[
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: _isLoading ? null : _handleConfirm,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.successDark,
+                        ),
+                        icon: _isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.how_to_reg_rounded, size: 20),
+                        label: const Text('YA, DAFTARKAN SAYA'),
+                      ),
+                    ),
                   ],
-                ),
+                ],
               ),
             ),
           ),

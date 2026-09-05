@@ -58,3 +58,6 @@ coverage/
 
 # Exceptions
 !.env.example
+
+# Tangkapan layar hasil test/screenshots_test.dart (artefak lokal, bukan source)
+test/goldens/

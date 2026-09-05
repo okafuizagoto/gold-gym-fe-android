@@ -1,9 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../config/theme.dart';
 import '../widgets/app_bar_custom.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/info_row.dart';
+import '../widgets/section_card.dart';
 import '../services/sales_api.dart';
 import '../models/sales_model.dart';
+import '../utils/responsive.dart';
 import '../utils/text_formatter.dart';
 
 class SalesDetailScreen extends StatefulWidget {
@@ -54,7 +59,19 @@ class _SalesDetailScreenState extends State<SalesDetailScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text(_error!))
+              ? ListView(
+                  children: [
+                    EmptyState(
+                      icon: Icons.error_outline_rounded,
+                      title: _error!,
+                      action: OutlinedButton.icon(
+                        onPressed: _load,
+                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                        label: const Text('Coba lagi'),
+                      ),
+                    ),
+                  ],
+                )
               : _buildBody(),
     );
   }
@@ -62,123 +79,129 @@ class _SalesDetailScreenState extends State<SalesDetailScreen> {
   Widget _buildBody() {
     final header = _detail!.header;
     final detail = _detail!.detail;
+    final textTheme = Theme.of(context).textTheme;
+    final paid = header.isPaid;
+    final pad = context.pagePadding;
+
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(header.saleTrancnum,
-                          style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
-                      Chip(
-                        label: Text(header.isPaid ? 'LUNAS' : 'BELUM LUNAS'),
-                        backgroundColor:
-                            header.isPaid ? Colors.green[100] : Colors.orange[100],
-                      ),
-                    ],
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.all(pad),
+        child: ContentWidth(
+          maxWidth: 760,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SectionCard(
+                icon: Icons.receipt_long_outlined,
+                title: header.saleTrancnum,
+                description: header.saleTransdate != null
+                    ? '${DateFormat('dd-MM-yyyy').format(header.saleTransdate!)} '
+                        '${TextFormatter.formatTimeHms(header.saleTranstime)}'
+                    : null,
+                action: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color:
+                        paid ? AppColors.successLight : AppColors.warningLight,
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
-                  const Divider(),
-                  _row('Tanggal',
-                      header.saleTransdate != null
-                          ? DateFormat('dd-MM-yyyy').format(header.saleTransdate!)
-                          : '-'),
-                  _row('Jam', TextFormatter.formatTimeHms(header.saleTranstime)),
-                  _row('Kasir', header.saleSalesperson),
-                  if (header.saleSalescustomer.isNotEmpty)
-                    _row('Customer', header.saleSalescustomer),
-                  if (header.hasMeja) _row('No Meja', header.saleMejaNames!),
-                  _row('Outlet', header.saleOutcode),
-                  const Divider(),
-                  if (header.hasTotalDiscount)
-                    _row(
-                      'Diskon Total (${header.saleTotalDiscountPercent!.toStringAsFixed(0)}%)',
-                      '-${TextFormatter.formatRupiah(header.saleTotalDiscountAmount!)}',
+                  child: Text(
+                    paid ? 'LUNAS' : 'BELUM LUNAS',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color:
+                          paid ? AppColors.successDark : AppColors.warningDark,
                     ),
-                  if (header.hasVoucher)
-                    _row(
-                      'Voucher ${header.saleVoucherCode ?? ''} (${header.saleVoucherPercent?.toStringAsFixed(0) ?? 0}%)',
-                      '-${TextFormatter.formatRupiah(header.saleVoucherAmount!)}',
-                    ),
-                  _row('Total', TextFormatter.formatRupiah(header.saleTranstotal),
-                      bold: true),
-                  _row('Bayar', TextFormatter.formatRupiah(header.saleTranspayment)),
-                  _row('Kembali', TextFormatter.formatRupiah(header.saleTranschange)),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text('Detail Item (${detail.length})',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          ...detail.map((d) => Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(d.saleStockname,
-                          style: const TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                              '${d.saleQty} ${d.salePack} x ${TextFormatter.formatRupiah(d.saleSalesprice)}'),
-                          Text(TextFormatter.formatRupiah(d.saleTotalsalesprice),
-                              style: const TextStyle(fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                      if (d.hasDiscount) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              d.saleDiscountType == 'PERCENT'
-                                  ? 'Diskon (${d.saleDiscountValue!.toStringAsFixed(0)}%)'
-                                  : 'Diskon',
-                              style: const TextStyle(
-                                  color: Colors.orange, fontSize: 12),
-                            ),
-                            Text(
-                              '-${TextFormatter.formatRupiah(d.saleDiscountAmount ?? 0)}',
-                              style: const TextStyle(
-                                  color: Colors.orange, fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
                   ),
                 ),
-              )),
-        ],
-      ),
-    );
-  }
-
-  Widget _row(String label, String value, {bool bold = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
-          Text(value,
-              style: TextStyle(
-                  fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
-        ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    InfoRow(label: 'Kasir', value: header.saleSalesperson),
+                    if (header.saleSalescustomer.isNotEmpty)
+                      InfoRow(
+                          label: 'Customer', value: header.saleSalescustomer),
+                    if (header.hasMeja)
+                      InfoRow(label: 'No Meja', value: header.saleMejaNames!),
+                    InfoRow(label: 'Outlet', value: header.saleOutcode),
+                    const Divider(height: 20),
+                    if (header.hasTotalDiscount)
+                      InfoRow(
+                        label:
+                            'Diskon Total (${header.saleTotalDiscountPercent!.toStringAsFixed(0)}%)',
+                        value:
+                            '-${TextFormatter.formatRupiah(header.saleTotalDiscountAmount!)}',
+                        color: AppColors.warningDark,
+                      ),
+                    if (header.hasVoucher)
+                      InfoRow(
+                        label:
+                            'Voucher ${header.saleVoucherCode ?? ''} (${header.saleVoucherPercent?.toStringAsFixed(0) ?? 0}%)',
+                        value:
+                            '-${TextFormatter.formatRupiah(header.saleVoucherAmount!)}',
+                        color: AppColors.warningDark,
+                      ),
+                    InfoRow(
+                      label: 'Total',
+                      value: TextFormatter.formatRupiah(header.saleTranstotal),
+                      bold: true,
+                    ),
+                    InfoRow(
+                      label: 'Bayar',
+                      value:
+                          TextFormatter.formatRupiah(header.saleTranspayment),
+                    ),
+                    InfoRow(
+                      label: 'Kembali',
+                      value: TextFormatter.formatRupiah(header.saleTranschange),
+                      highlight: true,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text('Detail Item (${detail.length})',
+                  style: textTheme.titleMedium),
+              const SizedBox(height: 8),
+              ...detail.map((d) => Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(d.saleStockname,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.titleSmall),
+                          const SizedBox(height: 4),
+                          InfoRow(
+                            label:
+                                '${d.saleQty} ${d.salePack} x ${TextFormatter.formatRupiah(d.saleSalesprice)}',
+                            value: TextFormatter.formatRupiah(
+                                d.saleTotalsalesprice),
+                            bold: true,
+                          ),
+                          if (d.hasDiscount)
+                            InfoRow(
+                              label: d.saleDiscountType == 'PERCENT'
+                                  ? 'Diskon (${d.saleDiscountValue!.toStringAsFixed(0)}%)'
+                                  : 'Diskon',
+                              value:
+                                  '-${TextFormatter.formatRupiah(d.saleDiscountAmount ?? 0)}',
+                              color: AppColors.warningDark,
+                            ),
+                        ],
+                      ),
+                    ),
+                  )),
+            ],
+          ),
+        ),
       ),
     );
   }

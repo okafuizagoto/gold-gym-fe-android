@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../config/theme.dart';
 import '../providers/buyer_cart_provider.dart';
 import '../utils/constants.dart';
 import '../utils/storage.dart';
@@ -38,22 +39,53 @@ class _BuyerOutletBarState extends State<BuyerOutletBar> {
   @override
   Widget build(BuildContext context) {
     final cart = Provider.of<BuyerCartProvider>(context);
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: ListTile(
-        dense: true,
-        leading: const Icon(Icons.store, color: Colors.teal),
-        title: Text(
-          cart.hasOutlet
-              ? 'Outlet: ${cart.outletName.toUpperCase()}'
-              : 'Belum pilih outlet',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        trailing: TextButton.icon(
-          icon: const Icon(Icons.swap_horiz, size: 18),
-          label: Text(cart.hasOutlet ? 'GANTI' : 'PILIH OUTLET'),
-          onPressed: () => Navigator.pushNamed(context, '/pilih-outlet'),
-        ),
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.tealLight,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: const Icon(Icons.storefront_rounded,
+                size: 20, color: AppColors.tealDark),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  cart.hasOutlet ? 'Outlet tujuan' : 'Belum pilih outlet',
+                  style: textTheme.bodySmall,
+                ),
+                Text(
+                  cart.hasOutlet ? cart.outletName.toUpperCase() : '-',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.titleSmall,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          TextButton.icon(
+            icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+            label: Text(cart.hasOutlet ? 'Ganti' : 'Pilih'),
+            onPressed: () => Navigator.pushNamed(context, '/pilih-outlet'),
+          ),
+        ],
       ),
     );
   }

@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import '../config/theme.dart';
 import '../models/storage_model.dart';
 import '../services/storage_api.dart';
 import '../utils/constants.dart';
+import '../utils/responsive.dart';
 import '../utils/storage.dart';
 import '../utils/toast.dart';
 import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
+import '../widgets/section_card.dart';
 
 /// Menu Storage: ringkasan pemakaian + daftar foto (item katalog & bukti
 /// pembayaran) milik user yang login, dengan aksi hapus per foto. TIDAK
@@ -36,7 +40,12 @@ class _StorageScreenState extends State<StorageScreen> {
   Future<void> _init() async {
     final role = await Storage.get(AppConstants.userRoleKey) ?? '';
     if (role == AppConstants.roleAdmin) {
-      if (mounted) setState(() { _isAdmin = true; _loading = false; });
+      if (mounted) {
+        setState(() {
+          _isAdmin = true;
+          _loading = false;
+        });
+      }
       return;
     }
     _photoHeaders = await _storageApi.getAuthHeaders();
@@ -54,7 +63,8 @@ class _StorageScreenState extends State<StorageScreen> {
     if (summary == null) {
       Toast.error(context, 'Gagal memuat data penyimpanan');
     } else if (summary.entries.isEmpty) {
-      Toast.info(context, 'Penyimpanan Anda masih kosong — belum ada foto yang tersimpan.');
+      Toast.info(context,
+          'Penyimpanan Anda masih kosong — belum ada foto yang tersimpan.');
     }
   }
 
@@ -71,7 +81,7 @@ class _StorageScreenState extends State<StorageScreen> {
             child: const Text('Batal'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Hapus'),
           ),
@@ -124,14 +134,11 @@ class _StorageScreenState extends State<StorageScreen> {
         appBar: const AppBarCustom(title: 'Storage'),
         drawer: const AppDrawer(),
         body: _isAdmin
-            ? const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Text(
-                    'Menu ini tidak tersedia untuk admin.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
+            ? const SingleChildScrollView(
+                child: EmptyState(
+                  icon: Icons.admin_panel_settings_outlined,
+                  title: 'Menu ini tidak tersedia untuk admin',
+                  description: 'Admin tidak memiliki kuota penyimpanan foto.',
                 ),
               )
             : _loading
@@ -144,100 +151,101 @@ class _StorageScreenState extends State<StorageScreen> {
   Widget _buildBody() {
     final summary = _summary;
     if (summary == null) {
-      return Center(
-        child: TextButton(
-          onPressed: _loadSummary,
-          child: const Text('Coba lagi'),
+      return SingleChildScrollView(
+        child: EmptyState(
+          icon: Icons.cloud_off_outlined,
+          title: 'Gagal memuat data penyimpanan',
+          description: 'Periksa koneksi internet Anda lalu coba lagi.',
+          action: ElevatedButton.icon(
+            onPressed: _loadSummary,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('Coba lagi'),
+          ),
         ),
       );
     }
     return RefreshIndicator(
       onRefresh: _loadSummary,
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: context.pageInsets,
         children: [
-          _buildSummaryCard(summary),
-          const SizedBox(height: 16),
-          if (summary.entries.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 40),
-              child: Center(
-                child: Text(
-                  'Belum ada foto tersimpan.',
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ),
-            )
-          else
-            ...summary.entries.map((e) => _buildEntryCard(e)),
+          ContentWidth(
+            maxWidth: 900,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildSummaryCard(summary),
+                const SizedBox(height: 16),
+                if (summary.entries.isEmpty)
+                  const EmptyState(
+                    icon: Icons.photo_library_outlined,
+                    title: 'Belum ada foto tersimpan',
+                    description:
+                        'Foto item katalog dan bukti pembayaran yang Anda unggah akan tampil di sini.',
+                  )
+                else
+                  ...summary.entries.map((e) => _buildEntryCard(e)),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildSummaryCard(StorageSummary summary) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Penyimpanan Terpakai',
-                    style:
-                        TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                Text(
-                  '${(summary.usedFraction * 100).toStringAsFixed(0)}%',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: summary.usedFraction >= 1
-                        ? Colors.red
-                        : summary.usedFraction >= 0.8
-                            ? Colors.orange
-                            : Colors.blue,
-                  ),
-                ),
-              ],
+    final textTheme = Theme.of(context).textTheme;
+    final fraction = summary.usedFraction;
+    final color = fraction >= 1
+        ? AppColors.error
+        : fraction >= 0.8
+            ? AppColors.warning
+            : AppColors.blue;
+    return SectionCard(
+      title: 'Penyimpanan Terpakai',
+      icon: Icons.sd_storage_outlined,
+      action: Text(
+        '${(fraction * 100).toStringAsFixed(0)}%',
+        style: textTheme.titleLarge?.copyWith(color: color),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            child: LinearProgressIndicator(
+              value: fraction.clamp(0.0, 1.0),
+              minHeight: 10,
+              backgroundColor: AppColors.chipBg,
+              color: color,
             ),
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: summary.usedFraction,
-                minHeight: 10,
-                backgroundColor: Colors.grey[200],
-                color: summary.usedFraction >= 1
-                    ? Colors.red
-                    : summary.usedFraction >= 0.8
-                        ? Colors.orange
-                        : Colors.blue,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '${summary.usedMb.toStringAsFixed(2)} MB dari ${summary.quotaMb.toStringAsFixed(0)} MB terpakai',
-              style: const TextStyle(color: Colors.grey, fontSize: 13),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${summary.usedMb.toStringAsFixed(2)} MB dari ${summary.quotaMb.toStringAsFixed(0)} MB terpakai',
+            style: textTheme.bodySmall,
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildEntryCard(StorageEntry entry) {
+    final textTheme = Theme.of(context).textTheme;
+    final sizeLabel = entry.sizeKb / 1024 < 1
+        ? '${entry.sizeKb} KB'
+        : '${(entry.sizeKb / 1024).toStringAsFixed(2)} MB';
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.fromLTRB(10, 10, 4, 10),
         child: Row(
           children: [
-            GestureDetector(
+            InkWell(
               onTap: () => _showPreview(entry),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
                 child: Image.network(
                   _storageApi.photoUrl(entry),
                   headers: _photoHeaders,
@@ -247,9 +255,9 @@ class _StorageScreenState extends State<StorageScreen> {
                   errorBuilder: (context, error, stack) => Container(
                     width: 56,
                     height: 56,
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.image_not_supported,
-                        color: Colors.grey),
+                    color: AppColors.chipBg,
+                    child: const Icon(Icons.image_not_supported_outlined,
+                        color: AppColors.muted),
                   ),
                 ),
               ),
@@ -259,28 +267,37 @@ class _StorageScreenState extends State<StorageScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(entry.label,
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text(
+                    entry.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleSmall,
+                  ),
                   const SizedBox(height: 2),
-                  Text(entry.contextText,
-                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
+                  Text(
+                    entry.contextText,
+                    style: textTheme.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: 2),
-                  Text('${entry.sizeKb / 1024 < 1 ? entry.sizeKb : (entry.sizeKb / 1024).toStringAsFixed(2)} '
-                      '${entry.sizeKb / 1024 < 1 ? "KB" : "MB"}',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                  Text(sizeLabel, style: textTheme.bodySmall),
                 ],
               ),
             ),
             _deletingSourceId == entry.sourceId
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
                   )
                 : IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    tooltip: 'Hapus',
+                    icon: const Icon(Icons.delete_outline_rounded,
+                        color: AppColors.error),
                     onPressed: () => _confirmDelete(entry),
                   ),
           ],

@@ -3,12 +3,16 @@ import 'package:provider/provider.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
+import '../config/theme.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/app_bar_custom.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
+import '../widgets/search_field.dart';
 import '../services/sales_api.dart';
 import '../models/sales_model.dart';
 import '../providers/language_provider.dart';
+import '../utils/responsive.dart';
 import '../utils/text_formatter.dart';
 import '../utils/toast.dart';
 import '../utils/debouncer.dart';
@@ -51,8 +55,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   }
 
   Future<void> _loadRole() async {
-    final role = await Storage.get(AppConstants.userRoleKey) ??
-        AppConstants.roleSeller;
+    final role =
+        await Storage.get(AppConstants.userRoleKey) ?? AppConstants.roleSeller;
     if (mounted) {
       setState(() => _isSeller = role != AppConstants.roleBuyer);
     }
@@ -212,6 +216,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final langProvider = Provider.of<LanguageProvider>(context);
+    final pad = context.pagePadding;
 
     return PrivateRoute(
       child: Scaffold(
@@ -219,180 +224,268 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           title: langProvider.get('Sales History', 'History Penjualan'),
         ),
         drawer: const AppDrawer(),
-        body: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: langProvider.get(
-                      'Search receipt no / customer', 'Cari no nota / pembeli'),
-                  prefixIcon: const Icon(Icons.search),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+        body: SafeArea(
+          top: false,
+          child: ContentWidth(
+            child: Column(
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(pad, 12, pad, 8),
+                  child: SearchField(
+                    controller: _searchController,
+                    hintText: langProvider.get('Search receipt no / customer',
+                        'Cari no nota / pembeli'),
+                    onChanged: (_) {
+                      _debouncer.run(() {
+                        _page = 1;
+                        _loadSales();
+                      });
+                    },
                   ),
                 ),
-                onChanged: (_) {
-                  _debouncer.run(() {
-                    _page = 1;
-                    _loadSales();
-                  });
-                },
-              ),
-            ),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: () async {
-                  _page = 1;
-                  await _loadSales();
-                },
-                child: _isLoading && _sales.isEmpty
-                    ? const Center(child: CircularProgressIndicator())
-                    : _sales.isEmpty
-                        ? ListView(
-                            children: [
-                              const SizedBox(height: 120),
-                              Center(
-                                child: Text(
-                                  langProvider.get('No transactions yet',
-                                      'Belum ada transaksi'),
-                                  style: TextStyle(color: Colors.grey[600]),
-                                ),
-                              ),
-                            ],
-                          )
-                        : ListView.builder(
-                            itemCount:
-                                _sales.length + (_page < _totalPage ? 1 : 0),
-                            itemBuilder: (context, index) {
-                              if (index == _sales.length) {
-                                return Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Center(
-                                    child: OutlinedButton(
-                                      onPressed: _isLoading
-                                          ? null
-                                          : () {
-                                              _page++;
-                                              _loadSales(append: true);
-                                            },
-                                      child: Text(langProvider.get(
-                                          'Load more', 'Muat lagi')),
-                                    ),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      _page = 1;
+                      await _loadSales();
+                    },
+                    child: _isLoading && _sales.isEmpty
+                        ? const Center(child: CircularProgressIndicator())
+                        : _sales.isEmpty
+                            ? ListView(
+                                children: [
+                                  EmptyState(
+                                    icon: Icons.receipt_long_outlined,
+                                    title: langProvider.get(
+                                        'No transactions yet',
+                                        'Belum ada transaksi'),
+                                    description: langProvider.get(
+                                        'Sales you save at the POS will appear here',
+                                        'Transaksi yang tersimpan dari POS akan tampil di sini'),
                                   ),
-                                );
-                              }
-                              return _buildSaleCard(
-                                  _sales[index], langProvider);
-                            },
-                          ),
-              ),
+                                ],
+                              )
+                            : ListView.builder(
+                                padding: EdgeInsets.fromLTRB(pad, 4, pad, 24),
+                                itemCount: _sales.length +
+                                    (_page < _totalPage ? 1 : 0),
+                                itemBuilder: (context, index) {
+                                  if (index == _sales.length) {
+                                    return Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Center(
+                                        child: OutlinedButton(
+                                          onPressed: _isLoading
+                                              ? null
+                                              : () {
+                                                  _page++;
+                                                  _loadSales(append: true);
+                                                },
+                                          child: Text(langProvider.get(
+                                              'Load more', 'Muat lagi')),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  return _buildSaleCard(
+                                      _sales[index], langProvider);
+                                },
+                              ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildSaleCard(SaleHistoryModel sale, LanguageProvider langProvider) {
+    final textTheme = Theme.of(context).textTheme;
     final dateStr = sale.saleTransdate == null
         ? '-'
         : DateFormat('dd-MM-yyyy').format(sale.saleTransdate!);
+    final paid = sale.isPaid;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor:
-              sale.isPaid ? Colors.green[100] : Colors.orange[100],
-          child: Icon(
-            sale.isPaid ? Icons.check : Icons.hourglass_bottom,
-            color: sale.isPaid ? Colors.green[800] : Colors.orange[800],
+    Widget spinner() => const Padding(
+          padding: EdgeInsets.all(10),
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        );
+
+    Widget action({
+      required IconData icon,
+      required Color color,
+      required String tooltip,
+      required VoidCallback onPressed,
+    }) =>
+        IconButton(
+          icon: Icon(icon, size: 20),
+          color: color,
+          tooltip: tooltip,
+          visualDensity: VisualDensity.compact,
+          onPressed: onPressed,
+        );
+
+    // Aksi dibungkus Wrap: di HP sempit tombol turun baris, bukan meluap.
+    final actions = <Widget>[
+      action(
+        icon: Icons.info_outline_rounded,
+        color: AppColors.blue,
+        tooltip: langProvider.get('Sale detail', 'Detail transaksi'),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SalesDetailScreen(saleId: sale.saleId),
           ),
         ),
-        title: Text(
-          sale.saleTrancnum,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('$dateStr ${TextFormatter.formatTimeHms(sale.saleTranstime)}'),
-            Text(TextFormatter.formatRupiah(sale.saleTranstotal)),
-            if (sale.saleSalescustomer.isNotEmpty)
-              Text('${langProvider.get('Customer', 'Pembeli')}: '
-                  '${sale.saleSalescustomer}'),
-            if (sale.hasMeja)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.table_bar, size: 14, color: Colors.grey[600]),
-                  const SizedBox(width: 4),
-                  Text('Meja: ${sale.saleMejaNames}',
-                      style: TextStyle(color: Colors.grey[700])),
-                ],
+      ),
+      // lihat & download foto bukti pembayaran transfer — disembunyikan
+      // jika admin menonaktifkan fitur ini (Akses Admin)
+      if (_proofFeatureEnabled)
+        _loadingProofSaleId == sale.saleId
+            ? spinner()
+            : action(
+                icon: Icons.image_outlined,
+                color: AppColors.tealDark,
+                tooltip: langProvider.get('Payment proof', 'Bukti transfer'),
+                onPressed: () => _viewProofs(sale),
               ),
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
+      if (_isSeller && !paid)
+        _markingSaleId == sale.saleId
+            ? spinner()
+            : action(
+                icon: Icons.price_check_rounded,
+                color: AppColors.successDark,
+                tooltip: langProvider.get('Mark as paid', 'Tandai lunas'),
+                onPressed: () => _markPaid(sale),
+              ),
+      _printingSaleId == sale.saleId
+          ? spinner()
+          : action(
+              icon: Icons.print_outlined,
+              color: AppColors.ink,
+              tooltip: langProvider.get('Print receipt', 'Cetak nota'),
+              onPressed: () => _printReceipt(sale),
+            ),
+    ];
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 8, 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            IconButton(
-              icon: const Icon(Icons.info_outline),
-              color: Colors.indigo[700],
-              tooltip: langProvider.get('Sale detail', 'Detail transaksi'),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => SalesDetailScreen(saleId: sale.saleId),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color:
+                        paid ? AppColors.successLight : AppColors.warningLight,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    paid ? Icons.check_rounded : Icons.hourglass_bottom_rounded,
+                    size: 20,
+                    color: paid ? AppColors.successDark : AppColors.warningDark,
+                  ),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              sale.saleTrancnum,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.titleSmall,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: paid
+                                  ? AppColors.successLight
+                                  : AppColors.warningLight,
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                            ),
+                            child: Text(
+                              paid ? 'LUNAS' : 'BELUM LUNAS',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: paid
+                                    ? AppColors.successDark
+                                    : AppColors.warningDark,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$dateStr ${TextFormatter.formatTimeHms(sale.saleTranstime)}',
+                        style: textTheme.bodySmall,
+                      ),
+                      Text(
+                        TextFormatter.formatRupiah(sale.saleTranstotal),
+                        style: textTheme.titleSmall
+                            ?.copyWith(color: AppColors.blueDark),
+                      ),
+                      if (sale.saleSalescustomer.isNotEmpty)
+                        Text(
+                          '${langProvider.get('Customer', 'Pembeli')}: ${sale.saleSalescustomer}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodySmall,
+                        ),
+                      if (sale.hasMeja)
+                        Row(
+                          children: [
+                            const Icon(Icons.table_bar,
+                                size: 14, color: AppColors.muted),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                'Meja: ${sale.saleMejaNames}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.bodySmall,
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Wrap(
+                spacing: 2,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: actions,
               ),
             ),
-            // lihat & download foto bukti pembayaran transfer — disembunyikan
-            // jika admin menonaktifkan fitur ini (Akses Admin)
-            if (_proofFeatureEnabled)
-              _loadingProofSaleId == sale.saleId
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : IconButton(
-                      icon: const Icon(Icons.image),
-                      color: Colors.teal[700],
-                      tooltip: langProvider.get(
-                          'Payment proof', 'Bukti transfer'),
-                      onPressed: () => _viewProofs(sale),
-                    ),
-            if (_isSeller && !sale.isPaid)
-              _markingSaleId == sale.saleId
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : IconButton(
-                      icon: const Icon(Icons.price_check),
-                      color: Colors.green[700],
-                      tooltip: langProvider.get('Mark as paid', 'Tandai lunas'),
-                      onPressed: () => _markPaid(sale),
-                    ),
-            _printingSaleId == sale.saleId
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : IconButton(
-                    icon: const Icon(Icons.print),
-                    color: Colors.blue[700],
-                    tooltip: langProvider.get('Print receipt', 'Cetak nota'),
-                    onPressed: () => _printReceipt(sale),
-                  ),
           ],
         ),
-        isThreeLine: true,
       ),
     );
   }

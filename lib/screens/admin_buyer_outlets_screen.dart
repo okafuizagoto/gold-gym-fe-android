@@ -4,9 +4,14 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../models/order_model.dart';
 import '../services/order_api.dart';
+import '../utils/responsive.dart';
 import '../utils/toast.dart';
+import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
+import '../widgets/search_field.dart';
+import '../widgets/segmented_tabs.dart';
 
 /// Layar ADMIN: mengatur outlet penjual mana yang boleh dilihat & dipesan
 /// oleh role pembeli. Pembeli hanya melihat outlet yang di-approve di sini.
@@ -60,9 +65,8 @@ class _AdminBuyerOutletsScreenState extends State<AdminBuyerOutletsScreen> {
         // buang seleksi centang yang outlet/penjualnya sudah tidak muncul lagi
         // di hasil filter/search terbaru, supaya "Simpan" tidak menyentuh data
         // yang sudah tidak terlihat di layar.
-        final presentKeys = _outlets
-            .map((o) => '${o.outletGoldId}|${o.outletCode}')
-            .toSet();
+        final presentKeys =
+            _outlets.map((o) => '${o.outletGoldId}|${o.outletCode}').toSet();
         _selectedOutletKeys.removeWhere((k) => !presentKeys.contains(k));
         final presentSellerIds = _outlets.map((o) => o.outletGoldId).toSet();
         _selectedSellerIds.removeWhere((id) => !presentSellerIds.contains(id));
@@ -87,8 +91,7 @@ class _AdminBuyerOutletsScreenState extends State<AdminBuyerOutletsScreen> {
       if (response.statusCode == 200 || response.statusCode == 201) {
         setState(() {
           final idx = _outlets.indexWhere((x) =>
-              x.outletGoldId == o.outletGoldId &&
-              x.outletCode == o.outletCode);
+              x.outletGoldId == o.outletGoldId && x.outletCode == o.outletCode);
           if (idx != -1) {
             _outlets[idx] = PublicOutlet(
               outletGoldId: o.outletGoldId,
@@ -306,7 +309,9 @@ class _AdminBuyerOutletsScreenState extends State<AdminBuyerOutletsScreen> {
       if (mounted) {
         Toast.success(
           context,
-          target ? '$changed outlet diaktifkan' : '$changed outlet dinonaktifkan',
+          target
+              ? '$changed outlet diaktifkan'
+              : '$changed outlet dinonaktifkan',
         );
       }
     } catch (e) {
@@ -334,9 +339,13 @@ class _AdminBuyerOutletsScreenState extends State<AdminBuyerOutletsScreen> {
           }
         }),
       ),
-      title: Text(o.outletName.toUpperCase()),
+      title: Text(o.outletName.toUpperCase(),
+          maxLines: 2, overflow: TextOverflow.ellipsis),
       subtitle: Text(
-          'Penjual: ${o.ownerName.isEmpty ? "-" : o.ownerName} • ${o.outletCode}'),
+        'Penjual: ${o.ownerName.isEmpty ? "-" : o.ownerName} • ${o.outletCode}',
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -345,8 +354,12 @@ class _AdminBuyerOutletsScreenState extends State<AdminBuyerOutletsScreen> {
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2))
-              : Icon(o.visible ? Icons.visibility : Icons.visibility_off,
-                  color: o.visible ? Colors.teal : Colors.grey),
+              : Icon(
+                  o.visible
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  size: 20,
+                  color: o.visible ? AppColors.tealDark : AppColors.disabled),
           Switch(
             value: o.visible,
             onChanged: _busyKey == key ? null : (v) => _toggle(o, v),
@@ -358,10 +371,11 @@ class _AdminBuyerOutletsScreenState extends State<AdminBuyerOutletsScreen> {
 
   // Daftar dikelompokkan per penjual: tiap penjual satu ExpansionTile berisi
   // master switch "aktifkan semua" + daftar outlet miliknya (bisa diatur satuan).
-  Widget _buildSellerList() {
+  Widget _buildSellerList(EdgeInsets padding) {
     final groups = _groupBySeller();
     final sellerIds = groups.keys.toList();
     return ListView.builder(
+      padding: padding,
       itemCount: sellerIds.length,
       itemBuilder: (context, index) {
         final goldId = sellerIds[index];
@@ -373,7 +387,7 @@ class _AdminBuyerOutletsScreenState extends State<AdminBuyerOutletsScreen> {
         final allActive = activeCount == outlets.length;
         final busy = _busyKey == 'seller|$goldId';
         return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          margin: const EdgeInsets.only(bottom: 8),
           child: ExpansionTile(
             leading: Row(
               mainAxisSize: MainAxisSize.min,
@@ -388,11 +402,14 @@ class _AdminBuyerOutletsScreenState extends State<AdminBuyerOutletsScreen> {
                     }
                   }),
                 ),
-                const Icon(Icons.person, color: Colors.teal),
+                const Icon(Icons.person_outline_rounded,
+                    color: AppColors.tealDark),
               ],
             ),
             title: Text(ownerName.toUpperCase(),
-                style: const TextStyle(fontWeight: FontWeight.bold)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700)),
             subtitle: Text(
                 '${outlets.length} outlet • aktif $activeCount/${outlets.length}'),
             childrenPadding: const EdgeInsets.only(bottom: 8),
@@ -404,7 +421,8 @@ class _AdminBuyerOutletsScreenState extends State<AdminBuyerOutletsScreen> {
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.done_all, color: Colors.teal),
+                    : const Icon(Icons.done_all_rounded,
+                        color: AppColors.tealDark),
                 value: allActive,
                 onChanged:
                     busy ? null : (v) => _toggleSeller(goldId, outlets, v),
@@ -420,155 +438,167 @@ class _AdminBuyerOutletsScreenState extends State<AdminBuyerOutletsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final pad = context.pagePadding;
+    final listPadding = EdgeInsets.fromLTRB(pad, 4, pad, pad);
     return PrivateRoute(
       sellerOnly: true,
       child: Scaffold(
-        backgroundColor: AppTheme.background,
-        appBar: AppBar(
-          title: const Text('Outlet untuk Pembeli'),
+        appBar: AppBarCustom(
+          title: 'Outlet untuk Pembeli',
           actions: [
             IconButton(
-                icon: const Icon(Icons.refresh),
+                tooltip: 'Muat ulang',
+                icon: const Icon(Icons.refresh_rounded),
                 onPressed: () => _load(_searchController.text)),
           ],
         ),
         drawer: const AppDrawer(),
-        body: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _searchController,
-                    decoration: const InputDecoration(
-                      labelText: 'Cari outlet',
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    onChanged: (v) {
-                      _debounce?.cancel();
-                      _debounce = Timer(
-                          const Duration(milliseconds: 400), () => _load(v));
-                    },
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Aktifkan outlet agar bisa dilihat & dipesan role pembeli.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 10),
-                  // pemilih mode: pilih per outlet, atau per penjual (toggle
-                  // satu penjual = semua outlet miliknya ikut aktif/nonaktif)
-                  SizedBox(
-                    width: double.infinity,
-                    child: SegmentedButton<bool>(
-                      segments: const [
-                        ButtonSegment(
-                            value: false,
-                            label: Text('Per Outlet'),
-                            icon: Icon(Icons.storefront)),
-                        ButtonSegment(
-                            value: true,
-                            label: Text('Per Penjual'),
-                            icon: Icon(Icons.person)),
-                      ],
-                      selected: {_bySeller},
-                      onSelectionChanged: (s) =>
-                          setState(() => _bySeller = s.first),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (!_loading && _outlets.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  children: [
-                    Checkbox(
-                      tristate: true,
-                      value: _bySeller
-                          ? _selectAllValueSeller()
-                          : _selectAllValueOutlet(),
-                      onChanged: (v) => setState(() {
-                        if (_bySeller) {
-                          if (v == true) {
-                            _selectedSellerIds
-                              ..clear()
-                              ..addAll(_groupBySeller().keys);
-                          } else {
-                            _selectedSellerIds.clear();
-                          }
-                        } else {
-                          if (v == true) {
-                            _selectedOutletKeys
-                              ..clear()
-                              ..addAll(_outlets
-                                  .map((o) => '${o.outletGoldId}|${o.outletCode}'));
-                          } else {
-                            _selectedOutletKeys.clear();
-                          }
-                        }
-                      }),
-                    ),
-                    Text(_bySeller ? 'Pilih semua penjual' : 'Pilih semua outlet'),
-                  ],
-                ),
-              ),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _outlets.isEmpty
-                      ? Center(
-                          child: Text('Tidak ada outlet',
-                              style: TextStyle(color: Colors.grey[600])))
-                      : _bySeller
-                          ? _buildSellerList()
-                          : ListView.builder(
-                              itemCount: _outlets.length,
-                              itemBuilder: (context, index) {
-                                return Card(
-                                  margin: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 4),
-                                  child: _outletTile(_outlets[index]),
-                                );
-                              },
-                            ),
-            ),
-            SafeArea(
-              top: false,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  border: Border(top: BorderSide(color: Colors.grey[300]!)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _bulkActionCaption(),
-                        style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+        body: SafeArea(
+          top: false,
+          child: ContentWidth(
+            child: Column(
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(pad, 12, pad, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SearchField(
+                        controller: _searchController,
+                        hintText: 'Cari outlet...',
+                        onChanged: (v) {
+                          _debounce?.cancel();
+                          _debounce = Timer(const Duration(milliseconds: 400),
+                              () => _load(v));
+                        },
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    ElevatedButton(
-                      onPressed: _canSave ? _saveBulk : null,
-                      child: _saving
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white))
-                          : const Text('Simpan'),
-                    ),
-                  ],
+                      if (!context.isShort) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          'Aktifkan outlet agar bisa dilihat & dipesan role pembeli.',
+                          style: textTheme.bodySmall,
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      // pemilih mode: pilih per outlet, atau per penjual (toggle
+                      // satu penjual = semua outlet miliknya ikut aktif/nonaktif)
+                      SegmentedTabs<bool>(
+                        value: _bySeller,
+                        onChanged: (v) => setState(() => _bySeller = v),
+                        tabs: const [
+                          SegmentedTab(
+                              value: false,
+                              label: 'Per Outlet',
+                              icon: Icons.storefront_outlined),
+                          SegmentedTab(
+                              value: true,
+                              label: 'Per Penjual',
+                              icon: Icons.person_outline_rounded),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                if (!_loading && _outlets.isNotEmpty)
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: pad),
+                    child: Row(
+                      children: [
+                        Checkbox(
+                          tristate: true,
+                          value: _bySeller
+                              ? _selectAllValueSeller()
+                              : _selectAllValueOutlet(),
+                          onChanged: (v) => setState(() {
+                            if (_bySeller) {
+                              if (v == true) {
+                                _selectedSellerIds
+                                  ..clear()
+                                  ..addAll(_groupBySeller().keys);
+                              } else {
+                                _selectedSellerIds.clear();
+                              }
+                            } else {
+                              if (v == true) {
+                                _selectedOutletKeys
+                                  ..clear()
+                                  ..addAll(_outlets.map((o) =>
+                                      '${o.outletGoldId}|${o.outletCode}'));
+                              } else {
+                                _selectedOutletKeys.clear();
+                              }
+                            }
+                          }),
+                        ),
+                        Expanded(
+                          child: Text(
+                            _bySeller
+                                ? 'Pilih semua penjual'
+                                : 'Pilih semua outlet',
+                            style: textTheme.bodyMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                Expanded(
+                  child: _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _outlets.isEmpty
+                          ? SingleChildScrollView(
+                              child: EmptyState(
+                                icon: Icons.storefront_outlined,
+                                title: 'Tidak ada outlet',
+                                compact: context.isShort,
+                              ),
+                            )
+                          : _bySeller
+                              ? _buildSellerList(listPadding)
+                              : ListView.builder(
+                                  padding: listPadding,
+                                  itemCount: _outlets.length,
+                                  itemBuilder: (context, index) {
+                                    return Card(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      child: _outletTile(_outlets[index]),
+                                    );
+                                  },
+                                ),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: pad, vertical: 10),
+                  decoration: const BoxDecoration(
+                    color: AppColors.surface,
+                    border: Border(top: BorderSide(color: AppColors.border)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _bulkActionCaption(),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodySmall,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        onPressed: _canSave ? _saveBulk : null,
+                        child: _saving
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))
+                            : const Text('Simpan'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

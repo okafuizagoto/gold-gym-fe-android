@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import '../config/theme.dart';
 import '../utils/storage.dart';
 import '../utils/constants.dart';
-import '../providers/language_provider.dart';
 import '../services/core_api.dart';
 import '../utils/toast.dart';
+import 'brand_logo.dart';
 
+/// Menu samping (web: Sidebar): latar putih, logo bergradasi, item aktif
+/// disorot biru muda, grup menu bisa dibuka-tutup, Logout merah di bawah.
+/// Daftar menu & aturan role/outlet/mode di [_loadMenuItems] TIDAK berubah.
 class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
 
@@ -274,6 +278,7 @@ class _AppDrawerState extends State<AppDrawer> {
       );
     }).toList();
 
+    if (!mounted) return;
     setState(() {
       menuItems = [...staticRoutes, ...customRoutes];
     });
@@ -335,114 +340,214 @@ class _AppDrawerState extends State<AppDrawer> {
     }
   }
 
-  // Future<void> _logout() async {
-  //   await Storage.clear();
-  //   if (mounted) {
-  //     Navigator.pushReplacementNamed(context, '/login');
-  //   }
-  // }
+  bool _isActive(String currentRoute, String route) {
+    if (route.isEmpty) return false;
+    if (route == '/') return currentRoute == '/';
+    return currentRoute == route || currentRoute.startsWith('$route/');
+  }
 
   @override
   Widget build(BuildContext context) {
+    final currentRoute = ModalRoute.of(context)?.settings.name ?? '';
+    final textTheme = Theme.of(context).textTheme;
+
     return Drawer(
-      backgroundColor: const Color(0xFF6DBAB9), // primaryTeal
-      child: Column(
-        children: [
-          // Header
-          DrawerHeader(
-            decoration: const BoxDecoration(
-              color: Color(0xFF6DBAB9),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Image.asset(
-                  'assets/images/logo.png',
-                  width: 100,
-                  height: 100,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(
-                      Icons.storefront,
-                      size: 100,
-                      color: Colors.white,
-                    );
-                  },
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${AppConstants.appName} v${AppConstants.version}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Menu Items
-          Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.zero,
-              itemCount: menuItems.length,
-              itemBuilder: (context, index) {
-                final item = menuItems[index];
-                // Menu grup (punya children) -> tampil sebagai ExpansionTile
-                // yang bisa di-show/hide. Contoh: "Akses Admin".
-                if (item.children != null && item.children!.isNotEmpty) {
-                  return Theme(
-                    // hilangkan garis pemisah bawaan ExpansionTile
-                    data: Theme.of(context)
-                        .copyWith(dividerColor: Colors.transparent),
-                    child: ExpansionTile(
-                      leading: Icon(item.icon, color: Colors.white),
-                      title: Text(
-                        item.title,
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                      iconColor: Colors.white,
-                      collapsedIconColor: Colors.white,
-                      childrenPadding: const EdgeInsets.only(left: 16),
-                      children: item.children!
-                          .map(
-                            (child) => ListTile(
-                              leading: Icon(child.icon, color: Colors.white),
-                              title: Text(
-                                child.title,
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                              onTap: () => _onMenuTap(child),
-                            ),
-                          )
-                          .toList(),
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Header logo (web: Sidebar header)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+              child: Column(
+                children: [
+                  const BrandLogo(size: 64),
+                  const SizedBox(height: 10),
+                  Text(
+                    AppConstants.appName,
+                    style: textTheme.titleLarge?.copyWith(
+                      color: AppColors.blue,
+                      letterSpacing: 0.3,
                     ),
-                  );
-                }
-                return ListTile(
-                  leading: Icon(item.icon, color: Colors.white),
-                  title: Text(
-                    item.title,
-                    style: const TextStyle(color: Colors.white),
                   ),
-                  onTap: () => _onMenuTap(item),
-                );
-              },
+                  Text(
+                    'v${AppConstants.version}',
+                    style: textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
-          ),
+            const Divider(),
 
-          // Logout Button
-          const Divider(color: Colors.white54),
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.white),
-            title: const Text(
-              'Logout',
-              style: TextStyle(color: Colors.white),
+            // Menu Items
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: menuItems.length,
+                itemBuilder: (context, index) {
+                  final item = menuItems[index];
+                  // Menu grup (punya children) -> tampil sebagai ExpansionTile
+                  // yang bisa di-show/hide. Contoh: "Akses Admin".
+                  if (item.children != null && item.children!.isNotEmpty) {
+                    final childActive = item.children!
+                        .any((c) => _isActive(currentRoute, c.route));
+                    return _DrawerGroup(
+                      item: item,
+                      initiallyExpanded: childActive,
+                      childActive: childActive,
+                      isActive: (route) => _isActive(currentRoute, route),
+                      onTap: _onMenuTap,
+                    );
+                  }
+                  return _DrawerTile(
+                    icon: item.icon,
+                    title: item.title,
+                    active: _isActive(currentRoute, item.route),
+                    onTap: () => _onMenuTap(item),
+                  );
+                },
+              ),
             ),
-            onTap: _logout,
-          ),
-          const SizedBox(height: 20),
-        ],
+
+            // Logout Button
+            const Divider(),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: _DrawerTile(
+                icon: Icons.logout_rounded,
+                title: 'Logout',
+                color: AppColors.error,
+                onTap: _logout,
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _DrawerTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final bool active;
+  final Color? color;
+  final double indent;
+  final VoidCallback onTap;
+
+  const _DrawerTile({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+    this.active = false,
+    this.color,
+    this.indent = 0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = color ?? (active ? AppColors.blue : AppColors.ink);
+    final iconColor = color ?? (active ? AppColors.blue : AppColors.muted);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(12 + indent, 2, 12, 2),
+      child: ListTile(
+        dense: true,
+        minLeadingWidth: 22,
+        horizontalTitleGap: 12,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+        selected: active,
+        selectedTileColor: AppColors.blue.withValues(alpha: 0.10),
+        leading: Icon(icon, color: iconColor, size: 22),
+        title: Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+            color: fg,
+          ),
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
+class _DrawerGroup extends StatefulWidget {
+  final MenuItem item;
+  final bool initiallyExpanded;
+  final bool childActive;
+  final bool Function(String route) isActive;
+  final Future<void> Function(MenuItem item) onTap;
+
+  const _DrawerGroup({
+    required this.item,
+    required this.initiallyExpanded,
+    required this.childActive,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  @override
+  State<_DrawerGroup> createState() => _DrawerGroupState();
+}
+
+class _DrawerGroupState extends State<_DrawerGroup> {
+  late bool _open = widget.initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = widget.childActive ? AppColors.blue : AppColors.ink;
+    final iconColor = widget.childActive ? AppColors.blue : AppColors.muted;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 2, 12, 2),
+          child: ListTile(
+            dense: true,
+            minLeadingWidth: 22,
+            horizontalTitleGap: 12,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+            leading: Icon(widget.item.icon, color: iconColor, size: 22),
+            title: Text(
+              widget.item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: fg,
+              ),
+            ),
+            trailing: Icon(
+              _open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+              size: 20,
+              color: AppColors.muted,
+            ),
+            onTap: () => setState(() => _open = !_open),
+          ),
+        ),
+        AnimatedCrossFade(
+          duration: const Duration(milliseconds: 180),
+          crossFadeState:
+              _open ? CrossFadeState.showFirst : CrossFadeState.showSecond,
+          firstChild: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final child in widget.item.children!)
+                _DrawerTile(
+                  icon: child.icon,
+                  title: child.title,
+                  active: widget.isActive(child.route),
+                  indent: 16,
+                  onTap: () => widget.onTap(child),
+                ),
+            ],
+          ),
+          secondChild: const SizedBox(width: double.infinity),
+        ),
+      ],
     );
   }
 }

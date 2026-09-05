@@ -8,6 +8,7 @@ import '../utils/toast.dart';
 import '../utils/constants.dart';
 import '../providers/user_provider.dart';
 import '../config/theme.dart';
+import '../widgets/auth_card.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -20,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _userController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordFocus = FocusNode();
   final _coreApi = CoreApi();
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -28,33 +30,31 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _userController.dispose();
     _passwordController.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
   bool get _canSubmit {
-    return _userController.text.isNotEmpty &&
+    return _userController.text.trim().isNotEmpty &&
         _passwordController.text.isNotEmpty;
   }
 
   Future<void> _handleLogin() async {
-    if (!_canSubmit) return;
+    if (!_canSubmit || _isLoading) return;
 
     setState(() => _isLoading = true);
 
     try {
       final response = await _coreApi.login(
-        _userController.text,
+        _userController.text.trim(),
         _passwordController.text,
       );
-      print("responses = ${response.body}");
       final rawCookie = response.headers['set-cookie'];
 
-      // final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
         final loginResponse = LoginResponseModel.fromJson(
           jsonDecode(response.body),
         );
-        // print("masok2",   );
 
         // Save to storage
         await Storage.set(
@@ -62,7 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
         await Storage.set(
             AppConstants.expiresAtKey, loginResponse.expiresAt.toString());
         await Storage.set(AppConstants.userNIPKey, loginResponse.username);
-        await Storage.set(AppConstants.userEmail, _userController.text);
+        await Storage.set(AppConstants.userEmail, _userController.text.trim());
         await Storage.set(AppConstants.userRoleKey, loginResponse.role);
         await Storage.set(
             AppConstants.userGoldIdKey, loginResponse.goldId.toString());
@@ -102,12 +102,13 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       } else {
         if (mounted) {
-          Toast.error(context, 'Login failed.');
+          Toast.error(context,
+              'Login gagal. Periksa kembali email dan password Anda.');
         }
       }
     } catch (e) {
       if (mounted) {
-        Toast.error(context, 'Login failed.');
+        Toast.error(context, 'Login gagal. Periksa koneksi internet Anda.');
       }
     } finally {
       if (mounted) {
@@ -118,168 +119,118 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+    final textTheme = Theme.of(context).textTheme;
+    return AuthCard(
+      title: 'Masuk',
+      subtitle: 'Silakan masuk untuk mulai menggunakan aplikasi',
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _userController,
+              decoration: const InputDecoration(
+                labelText: 'Email / Username',
+                hintText: 'contoh: nama@email.com',
+                prefixIcon: Icon(Icons.person_outline_rounded),
+              ),
+              keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.username],
+              textInputAction: TextInputAction.next,
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) => _passwordFocus.requestFocus(),
             ),
-            child: Container(
-              width: 380,
-              padding: const EdgeInsets.all(40),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Logo Okejual (mengikuti warna & desain app icon)
-                    Container(
-                      width: 100,
-                      height: 100,
-                      padding: const EdgeInsets.all(22),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Color(0xFFFF7A3D),
-                            Color(0xFFFF4F81),
-                          ],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color:
-                                const Color(0xFFFF4F81).withValues(alpha: 0.35),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Image.asset(
-                        'assets/images/logo.png',
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(
-                            Icons.storefront,
-                            size: 56,
-                            color: Colors.white,
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Nama aplikasi
-                    const Text(
-                      'Okejual',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.primaryBlue,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Title
-                    const Text(
-                      'Login',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    // User field
-                    TextField(
-                      controller: _userController,
-                      decoration: const InputDecoration(
-                        labelText: 'USER',
-                        border: OutlineInputBorder(),
-                      ),
-                      textInputAction: TextInputAction.next,
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Password field
-                    TextField(
-                      controller: _passwordController,
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        border: const OutlineInputBorder(),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                        ),
-                      ),
-                      obscureText: _obscurePassword,
-                      textInputAction: TextInputAction.done,
-                      onChanged: (_) => setState(() {}),
-                      onSubmitted: (_) => _handleLogin(),
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Login button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed:
-                            _isLoading || !_canSubmit ? null : _handleLogin,
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text('LOGIN'),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Back button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.pushReplacementNamed(context, '/');
-                        },
-                        child: const Text('BACK'),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Register buyer link
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pushNamed(context, '/register');
-                      },
-                      child: const Text(
-                          'Belum punya akun? Daftarkan akunmu segera'),
-                    ),
-                  ],
+            const SizedBox(height: 14),
+            TextField(
+              controller: _passwordController,
+              focusNode: _passwordFocus,
+              decoration: InputDecoration(
+                labelText: 'Password',
+                prefixIcon: const Icon(Icons.lock_outline_rounded),
+                suffixIcon: IconButton(
+                  tooltip: _obscurePassword
+                      ? 'Tampilkan password'
+                      : 'Sembunyikan password',
+                  icon: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
                 ),
               ),
+              obscureText: _obscurePassword,
+              autofillHints: const [AutofillHints.password],
+              textInputAction: TextInputAction.done,
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) => _handleLogin(),
             ),
-          ),
+            const SizedBox(height: 20),
+            SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _isLoading || !_canSubmit ? null : _handleLogin,
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('MASUK'),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 48,
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.pushReplacementNamed(context, '/');
+                },
+                child: const Text('KEMBALI'),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  'Belum punya akun? ',
+                  style: textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+                ),
+                InkWell(
+                  onTap: () => Navigator.pushNamed(context, '/register'),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 2, vertical: 4),
+                    child: Text(
+                      'Daftarkan akunmu segera',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppColors.blue,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${AppConstants.appName} v${AppConstants.version}',
+              textAlign: TextAlign.center,
+              style: textTheme.bodySmall?.copyWith(color: AppColors.disabled),
+            ),
+          ],
         ),
       ),
     );

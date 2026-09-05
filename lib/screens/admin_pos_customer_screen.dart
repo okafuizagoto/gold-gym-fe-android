@@ -3,9 +3,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/sales_api.dart';
+import '../utils/responsive.dart';
 import '../utils/toast.dart';
+import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
+import '../widgets/search_field.dart';
+import '../widgets/segmented_tabs.dart';
 
 class _PosOutlet {
   final int goldId;
@@ -145,40 +150,51 @@ class _AdminPosCustomerScreenState extends State<AdminPosCustomerScreen> {
     return CheckboxListTile(
       value: _checked[o.key] ?? false,
       onChanged: (v) => setState(() => _checked[o.key] = v ?? false),
-      title: Text(o.name.toUpperCase()),
+      controlAffinity: ListTileControlAffinity.leading,
+      title: Text(o.name.toUpperCase(),
+          maxLines: 2, overflow: TextOverflow.ellipsis),
       subtitle: Text(
-          '${o.owner.isEmpty ? "-" : o.owner} • ${o.address.isEmpty ? "-" : o.address}'),
+        '${o.owner.isEmpty ? "-" : o.owner} • ${o.address.isEmpty ? "-" : o.address}',
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
     );
   }
 
   // Daftar dikelompokkan per penjual: master checkbox "centang semua" +
   // daftar outlet miliknya (bisa diatur satuan saat di-expand).
-  Widget _buildSellerList() {
+  Widget _buildSellerList(EdgeInsets padding) {
     final groups = _groupBySeller();
     final sellerIds = groups.keys.toList();
     return ListView.builder(
+      padding: padding,
       itemCount: sellerIds.length,
       itemBuilder: (context, index) {
         final goldId = sellerIds[index];
         final outlets = groups[goldId]!;
-        final ownerName =
-            outlets.first.owner.isEmpty ? 'Penjual #$goldId' : outlets.first.owner;
+        final ownerName = outlets.first.owner.isEmpty
+            ? 'Penjual #$goldId'
+            : outlets.first.owner;
         final checkedCount =
             outlets.where((o) => _checked[o.key] ?? false).length;
         final allChecked = checkedCount == outlets.length;
         return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          margin: const EdgeInsets.only(bottom: 8),
           child: ExpansionTile(
-            leading: const Icon(Icons.person, color: Colors.teal),
+            leading: const Icon(Icons.person_outline_rounded,
+                color: AppColors.tealDark),
             title: Text(ownerName.toUpperCase(),
-                style: const TextStyle(fontWeight: FontWeight.bold)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700)),
             subtitle: Text(
                 '${outlets.length} outlet • dicentang $checkedCount/${outlets.length}'),
             childrenPadding: const EdgeInsets.only(bottom: 8),
             children: [
               CheckboxListTile(
                 title: const Text('Centang semua outlet penjual ini'),
-                secondary: const Icon(Icons.done_all, color: Colors.teal),
+                secondary: const Icon(Icons.done_all_rounded,
+                    color: AppColors.tealDark),
                 value: allChecked,
                 onChanged: (v) => _setSeller(outlets, v ?? false),
               ),
@@ -193,109 +209,114 @@ class _AdminPosCustomerScreenState extends State<AdminPosCustomerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final pad = context.pagePadding;
+    final listPadding = EdgeInsets.fromLTRB(pad, 4, pad, pad);
     return PrivateRoute(
       sellerOnly: true,
       child: Scaffold(
-        backgroundColor: AppTheme.background,
-        appBar: AppBar(title: const Text('POS Tanpa Customer')),
+        appBar: const AppBarCustom(title: 'POS Tanpa Customer'),
         drawer: const AppDrawer(),
-        body: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _searchController,
-                    decoration: const InputDecoration(
-                      labelText: 'Cari nama / alamat outlet (mis. "pasar")',
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    onChanged: (v) {
-                      _debounce?.cancel();
-                      _debounce = Timer(
-                          const Duration(milliseconds: 450), () => _load(v));
-                    },
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Default: semua outlet BOLEH transaksi tanpa customer '
-                    '(tercentang). Hilangkan centang outlet yang WAJIB mengisi '
-                    'customer. Simpan hanya berlaku untuk outlet yang tampil.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 10),
-                  // pemilih mode: per outlet, atau per penjual (centang satu
-                  // penjual = semua outlet miliknya ikut tercentang)
-                  SizedBox(
-                    width: double.infinity,
-                    child: SegmentedButton<bool>(
-                      segments: const [
-                        ButtonSegment(
-                            value: false,
-                            label: Text('Per Outlet'),
-                            icon: Icon(Icons.storefront)),
-                        ButtonSegment(
-                            value: true,
-                            label: Text('Per Penjual'),
-                            icon: Icon(Icons.person)),
-                      ],
-                      selected: {_bySeller},
-                      onSelectionChanged: (s) =>
-                          setState(() => _bySeller = s.first),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _outlets.isEmpty
-                      ? Center(
-                          child: Text('Tidak ada outlet',
-                              style: TextStyle(color: Colors.grey[600])))
-                      : _bySeller
-                          ? _buildSellerList()
-                          : ListView.builder(
-                              itemCount: _outlets.length,
-                              itemBuilder: (context, i) {
-                                return Card(
-                                  margin: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 4),
-                                  child: _outletCheckTile(_outlets[i]),
-                                );
-                              },
-                            ),
-            ),
-            if (_outlets.isNotEmpty)
-              SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      icon: _saving
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white))
-                          : const Icon(Icons.save),
-                      label: Text(_saving ? 'Menyimpan...' : 'SIMPAN'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade600,
-                        foregroundColor: Colors.white,
+        body: SafeArea(
+          top: false,
+          child: ContentWidth(
+            child: Column(
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(pad, 12, pad, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SearchField(
+                        controller: _searchController,
+                        hintText: 'Cari nama / alamat outlet (mis. "pasar")',
+                        onChanged: (v) {
+                          _debounce?.cancel();
+                          _debounce = Timer(const Duration(milliseconds: 450),
+                              () => _load(v));
+                        },
                       ),
-                      onPressed: _saving ? null : _save,
-                    ),
+                      if (!context.isShort) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          'Default: semua outlet BOLEH transaksi tanpa customer '
+                          '(tercentang). Hilangkan centang outlet yang WAJIB mengisi '
+                          'customer. Simpan hanya berlaku untuk outlet yang tampil.',
+                          style: textTheme.bodySmall,
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      // pemilih mode: per outlet, atau per penjual (centang satu
+                      // penjual = semua outlet miliknya ikut tercentang)
+                      SegmentedTabs<bool>(
+                        value: _bySeller,
+                        onChanged: (v) => setState(() => _bySeller = v),
+                        tabs: const [
+                          SegmentedTab(
+                              value: false,
+                              label: 'Per Outlet',
+                              icon: Icons.storefront_outlined),
+                          SegmentedTab(
+                              value: true,
+                              label: 'Per Penjual',
+                              icon: Icons.person_outline_rounded),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              ),
-          ],
+                Expanded(
+                  child: _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _outlets.isEmpty
+                          ? EmptyState(
+                              icon: Icons.storefront_outlined,
+                              title: 'Tidak ada outlet',
+                              compact: context.isShort,
+                            )
+                          : _bySeller
+                              ? _buildSellerList(listPadding)
+                              : ListView.builder(
+                                  padding: listPadding,
+                                  itemCount: _outlets.length,
+                                  itemBuilder: (context, i) {
+                                    return Card(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      child: _outletCheckTile(_outlets[i]),
+                                    );
+                                  },
+                                ),
+                ),
+                if (_outlets.isNotEmpty)
+                  Container(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: pad, vertical: 10),
+                    decoration: const BoxDecoration(
+                      color: AppColors.surface,
+                      border: Border(top: BorderSide(color: AppColors.border)),
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        icon: _saving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.save_outlined, size: 20),
+                        label: Text(_saving ? 'Menyimpan...' : 'SIMPAN'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.successDark,
+                        ),
+                        onPressed: _saving ? null : _save,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );

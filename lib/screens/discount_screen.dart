@@ -2,14 +2,20 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import '../config/theme.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/app_bar_custom.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
+import '../widgets/section_card.dart';
+import '../widgets/segmented_tabs.dart';
 import '../services/discount_api.dart';
 import '../models/discount_model.dart';
 import '../providers/language_provider.dart';
+import '../utils/responsive.dart';
 import '../utils/storage.dart';
 import '../utils/constants.dart';
+import '../utils/toast.dart';
 import 'discount_history_screen.dart';
 import 'discount_voucher_tab.dart';
 
@@ -39,6 +45,12 @@ class _DiscountScreenState extends State<DiscountScreen> {
   void initState() {
     super.initState();
     _init();
+  }
+
+  @override
+  void dispose() {
+    _valueController.dispose();
+    super.dispose();
   }
 
   Future<void> _init() async {
@@ -78,10 +90,11 @@ class _DiscountScreenState extends State<DiscountScreen> {
   }
 
   void _showMessage(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(message),
-      backgroundColor: isError ? Colors.red : Colors.green,
-    ));
+    if (isError) {
+      Toast.error(context, message);
+    } else {
+      Toast.success(context, message);
+    }
   }
 
   Future<void> _insertDiscount() async {
@@ -138,31 +151,42 @@ class _DiscountScreenState extends State<DiscountScreen> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
-          title: Text('Edit Diskon — ${d.discountItemName}'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                value: type,
-                items: const [
-                  DropdownMenuItem(value: 'PERCENT', child: Text('Persen (%)')),
-                  DropdownMenuItem(
-                      value: 'NOMINAL', child: Text('Nominal (Rp)')),
-                ],
-                onChanged: (v) => setDialogState(() => type = v ?? 'PERCENT'),
-              ),
-              TextField(
-                controller: valueCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Nilai'),
-              ),
-              SwitchListTile(
-                title: const Text('Aktif'),
-                value: status == 'ACTIVE',
-                onChanged: (v) =>
-                    setDialogState(() => status = v ? 'ACTIVE' : 'NONACTIVE'),
-              ),
-            ],
+          title: Text(
+            'Edit Diskon — ${d.discountItemName}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: type,
+                  decoration: const InputDecoration(labelText: 'Tipe'),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'PERCENT', child: Text('Persen (%)')),
+                    DropdownMenuItem(
+                        value: 'NOMINAL', child: Text('Nominal (Rp)')),
+                  ],
+                  onChanged: (v) => setDialogState(() => type = v ?? 'PERCENT'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: valueCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Nilai'),
+                ),
+                const SizedBox(height: 4),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Aktif'),
+                  value: status == 'ACTIVE',
+                  onChanged: (v) =>
+                      setDialogState(() => status = v ? 'ACTIVE' : 'NONACTIVE'),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -210,7 +234,7 @@ class _DiscountScreenState extends State<DiscountScreen> {
               child: const Text('BATAL')),
           ElevatedButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
               child: const Text('HAPUS')),
         ],
       ),
@@ -240,28 +264,28 @@ class _DiscountScreenState extends State<DiscountScreen> {
             child: Scaffold(
               appBar: AppBarCustom(
                 title: langProvider.get('Discount', 'Diskon'),
+                bottom: TabBar(
+                  isScrollable: context.isCompact,
+                  tabAlignment: context.isCompact
+                      ? TabAlignment.start
+                      : TabAlignment.fill,
+                  tabs: [
+                    Tab(
+                        text:
+                            langProvider.get('Add Discount', 'Tambah Diskon')),
+                    Tab(
+                        text:
+                            langProvider.get('Discount List', 'Daftar Diskon')),
+                    Tab(text: langProvider.get('Voucher', 'Voucher')),
+                  ],
+                ),
               ),
               drawer: const AppDrawer(),
-              body: Column(
+              body: TabBarView(
                 children: [
-                  TabBar(
-                    labelColor: Theme.of(context).primaryColor,
-                    isScrollable: true,
-                    tabs: [
-                      Tab(text: langProvider.get('Add Discount', 'Tambah Diskon')),
-                      Tab(text: langProvider.get('Discount List', 'Daftar Diskon')),
-                      Tab(text: langProvider.get('Voucher', 'Voucher')),
-                    ],
-                  ),
-                  Expanded(
-                    child: TabBarView(
-                      children: [
-                        _buildInsertTab(langProvider),
-                        _buildListTab(langProvider),
-                        VoucherTab(outcode: _outcode),
-                      ],
-                    ),
-                  ),
+                  _buildInsertTab(langProvider),
+                  _buildListTab(langProvider),
+                  VoucherTab(outcode: _outcode),
                 ],
               ),
             ),
@@ -272,103 +296,122 @@ class _DiscountScreenState extends State<DiscountScreen> {
   }
 
   Widget _buildInsertTab(LanguageProvider langProvider) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(langProvider.get('Discount Scope', 'Jenis Diskon'),
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
+    final textTheme = Theme.of(context).textTheme;
+    return PageBody(
+      maxWidth: 720,
+      child: SectionCard(
+        title: langProvider.get('Add Discount', 'Tambah Diskon'),
+        description: langProvider.get('Discount per product or per total sale',
+            'Diskon per produk atau per total penjualan'),
+        icon: Icons.percent_rounded,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(langProvider.get('Discount Scope', 'Jenis Diskon'),
+                style: textTheme.titleSmall),
+            const SizedBox(height: 8),
+            SegmentedTabs<String>(
+              value: _discountScope,
+              onChanged: (s) => setState(() {
+                _discountScope = s;
+                if (_discountScope == 'TOTAL') _discountType = 'PERCENT';
+              }),
+              tabs: [
+                SegmentedTab(
+                    value: 'ITEM',
+                    icon: Icons.inventory_2_outlined,
+                    label: langProvider.get('Per Product', 'Per Produk')),
+                SegmentedTab(
+                    value: 'TOTAL',
+                    icon: Icons.receipt_long_outlined,
+                    label: langProvider.get(
+                        'Per Total Sale', 'Per Total Penjualan')),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_discountScope == 'ITEM') ...[
+              Text(langProvider.get('Item', 'Item'),
+                  style: textTheme.titleSmall),
               const SizedBox(height: 8),
-              SegmentedButton<String>(
-                segments: [
-                  ButtonSegment(
-                      value: 'ITEM',
-                      label: Text(langProvider.get('Per Product', 'Per Produk'))),
-                  ButtonSegment(
-                      value: 'TOTAL',
-                      label:
-                          Text(langProvider.get('Per Total Sale', 'Per Total Penjualan'))),
-                ],
-                selected: {_discountScope},
-                onSelectionChanged: (s) => setState(() {
-                  _discountScope = s.first;
-                  if (_discountScope == 'TOTAL') _discountType = 'PERCENT';
-                }),
+              DropdownButtonFormField<ItemForOutlet>(
+                key: ValueKey('item-${_selectedItem?.itemId ?? 'none'}'),
+                initialValue: _selectedItem,
+                isExpanded: true,
+                items: _items
+                    .map((it) => DropdownMenuItem(
+                          value: it,
+                          child: Text(
+                            '${it.itemName} (Rp${it.itemPrice})',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ))
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedItem = v),
+                decoration: const InputDecoration(
+                  hintText: 'Pilih item',
+                  prefixIcon: Icon(Icons.inventory_2_outlined),
+                ),
               ),
               const SizedBox(height: 16),
-              if (_discountScope == 'ITEM') ...[
-                Text(langProvider.get('Item', 'Item'),
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<ItemForOutlet>(
-                  value: _selectedItem,
-                  isExpanded: true,
-                  items: _items
-                      .map((it) => DropdownMenuItem(
-                            value: it,
-                            child: Text('${it.itemName} (Rp${it.itemPrice})'),
-                          ))
-                      .toList(),
-                  onChanged: (v) => setState(() => _selectedItem = v),
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    hintText: 'Pilih item',
+            ] else
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.infoLight,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
-                ),
-                const SizedBox(height: 16),
-              ] else
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
                   child: Text(
                     langProvider.get(
                         'Applies automatically to the total of every sale in this outlet.',
                         'Otomatis berlaku ke total setiap penjualan di outlet ini.'),
-                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                    style: textTheme.bodySmall
+                        ?.copyWith(color: AppColors.infoDark),
                   ),
                 ),
-              Text(langProvider.get('Discount Type', 'Tipe Diskon'),
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _discountType,
-                items: [
+              ),
+            Text(langProvider.get('Discount Type', 'Tipe Diskon'),
+                style: textTheme.titleSmall),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              key: ValueKey('type-$_discountScope-$_discountType'),
+              initialValue: _discountType,
+              items: [
+                const DropdownMenuItem(
+                    value: 'PERCENT', child: Text('Persen (%)')),
+                if (_discountScope == 'ITEM')
                   const DropdownMenuItem(
-                      value: 'PERCENT', child: Text('Persen (%)')),
-                  if (_discountScope == 'ITEM')
-                    const DropdownMenuItem(
-                        value: 'NOMINAL', child: Text('Nominal (Rp)')),
-                ],
-                onChanged: _discountScope == 'TOTAL'
-                    ? null
-                    : (v) => setState(() => _discountType = v ?? 'PERCENT'),
-                decoration: const InputDecoration(border: OutlineInputBorder()),
+                      value: 'NOMINAL', child: Text('Nominal (Rp)')),
+              ],
+              onChanged: _discountScope == 'TOTAL'
+                  ? null
+                  : (v) => setState(() => _discountType = v ?? 'PERCENT'),
+            ),
+            const SizedBox(height: 16),
+            Text(langProvider.get('Value', 'Nilai'),
+                style: textTheme.titleSmall),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _valueController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                hintText:
+                    _discountType == 'PERCENT' ? 'contoh: 10' : 'contoh: 5000',
+                suffixText: _discountType == 'PERCENT' ? '%' : 'Rp',
               ),
-              const SizedBox(height: 16),
-              Text(langProvider.get('Value', 'Nilai'),
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _valueController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  border: const OutlineInputBorder(),
-                  suffixText: _discountType == 'PERCENT' ? '%' : 'Rp',
-                ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _insertDiscount,
+                icon: const Icon(Icons.save_outlined, size: 18),
+                label: Text(langProvider.get('Save', 'Simpan')),
               ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _insertDiscount,
-                  child: Text(langProvider.get('Save', 'Simpan')),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -380,64 +423,174 @@ class _DiscountScreenState extends State<DiscountScreen> {
     }
     final rows = _pagination?.data ?? [];
     if (rows.isEmpty) {
-      return Center(
-          child: Text(langProvider.get('No discounts yet', 'Belum ada diskon')));
+      return SingleChildScrollView(
+        child: EmptyState(
+          icon: Icons.percent_rounded,
+          title: langProvider.get('No discounts yet', 'Belum ada diskon'),
+          description: langProvider.get(
+              'Create one from the "Add Discount" tab.',
+              'Buat lewat tab "Tambah Diskon".'),
+        ),
+      );
     }
     return RefreshIndicator(
       onRefresh: _loadDiscounts,
       child: ListView.builder(
-        padding: const EdgeInsets.all(12),
+        padding: context.pageInsets,
         itemCount: rows.length,
         itemBuilder: (context, index) {
           final d = rows[index];
           final valueLabel = d.discountType == 'PERCENT'
               ? '${d.discountValue.toStringAsFixed(0)}%'
               : 'Rp${NumberFormat('#,###', 'id_ID').format(d.discountValue)}';
-          return Card(
-            margin: const EdgeInsets.only(bottom: 10),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor:
-                    d.discountStatus == 'ACTIVE' ? Colors.green : Colors.grey,
-                child: const Icon(Icons.percent, color: Colors.white),
+          return ContentWidth(
+            maxWidth: 900,
+            child: _DiscountTile(
+              title: d.isTotalScope ? 'Total Penjualan' : d.discountItemName,
+              valueLabel: valueLabel,
+              status: d.discountStatus,
+              scopeLabel: d.isTotalScope ? 'Per Total' : 'Per Produk',
+              onHistory: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      DiscountHistoryScreen(discountId: d.discountId),
+                ),
               ),
-              title: Text(
-                  d.isTotalScope ? 'Total Penjualan' : d.discountItemName,
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text(
-                  '$valueLabel • ${d.discountStatus} • ${d.isTotalScope ? 'Per Total' : 'Per Produk'}'),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
+              onEdit: () => _editDiscount(d),
+              onDelete: () => _deleteDiscount(d),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _DiscountTile extends StatelessWidget {
+  final String title;
+  final String valueLabel;
+  final String status;
+  final String scopeLabel;
+  final VoidCallback onHistory;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _DiscountTile({
+    required this.title,
+    required this.valueLabel,
+    required this.status,
+    required this.scopeLabel,
+    required this.onHistory,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final active = status == 'ACTIVE';
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: active ? AppColors.successLight : AppColors.chipBg,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: Icon(Icons.percent_rounded,
+                  color: active ? AppColors.successDark : AppColors.muted),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.history),
-                    color: Colors.indigo,
-                    tooltip: 'Riwayat',
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            DiscountHistoryScreen(discountId: d.discountId),
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      _MiniPill(
+                        label: valueLabel,
+                        background: AppColors.blueLight,
+                        foreground: AppColors.blueDark,
                       ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.edit),
-                    color: Colors.blue,
-                    tooltip: 'Edit',
-                    onPressed: () => _editDiscount(d),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete),
-                    color: Colors.red,
-                    tooltip: 'Hapus',
-                    onPressed: () => _deleteDiscount(d),
+                      _MiniPill(
+                        label: status,
+                        background:
+                            active ? AppColors.successLight : AppColors.chipBg,
+                        foreground:
+                            active ? AppColors.successDark : AppColors.muted,
+                      ),
+                      _MiniPill(label: scopeLabel),
+                    ],
                   ),
                 ],
               ),
             ),
-          );
-        },
+            IconButton(
+              icon: const Icon(Icons.history_rounded),
+              color: AppColors.info,
+              tooltip: 'Riwayat',
+              visualDensity: VisualDensity.compact,
+              onPressed: onHistory,
+            ),
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              color: AppColors.blue,
+              tooltip: 'Edit',
+              visualDensity: VisualDensity.compact,
+              onPressed: onEdit,
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline_rounded),
+              color: AppColors.error,
+              tooltip: 'Hapus',
+              visualDensity: VisualDensity.compact,
+              onPressed: onDelete,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniPill extends StatelessWidget {
+  final String label;
+  final Color? background;
+  final Color? foreground;
+
+  const _MiniPill({required this.label, this.background, this.foreground});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: background ?? AppColors.chipBg,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: foreground ?? AppColors.ink,
+        ),
       ),
     );
   }

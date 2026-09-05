@@ -4,12 +4,18 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import '../config/theme.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/app_bar_custom.dart';
 import '../widgets/private_route.dart';
 import '../widgets/modal_wrapper.dart';
 import '../widgets/currency_input.dart';
 import '../widgets/meja_picker_sheet.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/info_row.dart';
+import '../widgets/search_field.dart';
+import '../widgets/segmented_tabs.dart';
+import '../utils/responsive.dart';
 import '../services/meja_api.dart';
 import '../services/stock_api.dart';
 import '../services/sales_api.dart';
@@ -31,10 +37,10 @@ import '../utils/storage.dart';
 import '../extensions/string_extension.dart';
 import 'payment_success_screen.dart';
 
-// Warna brand aplikasi (samakan dengan lib/config/theme.dart: primaryBlue &
-// primaryTeal) supaya layar ini tetap satu bahasa visual dengan layar lain.
-const Color _kBrandBlue = Color(0xFF267BE4);
-const Color _kBrandTeal = Color(0xFF6DBAB9);
+// Warna brand aplikasi -- alias token tema (lib/config/theme.dart) supaya
+// layar ini tetap satu bahasa visual dengan layar lain & web.
+const Color _kBrandBlue = AppColors.blue;
+const Color _kBrandTeal = AppColors.tealDark;
 
 class PenjualanScreen extends StatefulWidget {
   const PenjualanScreen({super.key});
@@ -76,6 +82,11 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
 
   // 0 = Katalog, 1 = Manual, 2 = Pesanan (tab tampilan POS)
   int _activeTab = 0;
+
+  // Kartu info transaksi bisa dilipat supaya daftar produk tetap kelihatan
+  // di layar pendek (HP landscape). null = ikuti default: terbuka di
+  // portrait, terlipat di layar pendek.
+  bool? _headerExpanded;
 
   // Input harga bebas di tab Manual (digit mentah, tanpa pemisah ribuan)
   String _manualPriceDigits = '';
@@ -302,16 +313,15 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
           style: const TextStyle(fontSize: 13),
           onTap: manual
               ? null
-              : () => _customerMode == 'PESERTA' ? _pickPeserta() : _pickCustomer(),
+              : () =>
+                  _customerMode == 'PESERTA' ? _pickPeserta() : _pickCustomer(),
           decoration: InputDecoration(
             isDense: true,
             labelText: (_customerRequired && !isTherapy)
                 ? '${langProvider.get('Customer Name', 'Nama Customer')} *'
                 : langProvider.get('Customer Name', 'Nama Customer'),
-            border: const OutlineInputBorder(),
-            suffixIcon: manual
-                ? null
-                : const Icon(Icons.search),
+            prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
+            suffixIcon: manual ? null : const Icon(Icons.search_rounded),
           ),
         ),
         if (isTherapy) ...[
@@ -399,8 +409,11 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
           if (loading && items.isEmpty && searchCtl.text.isEmpty) {
             run('');
           }
+          final listHeight =
+              (MediaQuery.sizeOf(ctx).height * 0.4).clamp(140.0, 260.0);
           return AlertDialog(
             title: Text(title),
+            scrollable: true,
             content: SizedBox(
               width: double.maxFinite,
               child: Column(
@@ -410,14 +423,14 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                     controller: searchCtl,
                     decoration: const InputDecoration(
                       labelText: 'Cari',
-                      prefixIcon: Icon(Icons.search),
+                      prefixIcon: Icon(Icons.search_rounded),
                       isDense: true,
                     ),
                     onSubmitted: run,
                   ),
                   const SizedBox(height: 8),
                   SizedBox(
-                    height: 260,
+                    height: listHeight,
                     child: loading
                         ? const Center(child: CircularProgressIndicator())
                         : items.isEmpty
@@ -430,8 +443,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                                   subtitle: items[i].sub.isEmpty
                                       ? null
                                       : Text(items[i].sub),
-                                  onTap: () =>
-                                      Navigator.pop(dialogContext, items[i].name),
+                                  onTap: () => Navigator.pop(
+                                      dialogContext, items[i].name),
                                 ),
                               ),
                   ),
@@ -467,9 +480,11 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
             child: Row(
               children: [
                 Icon(Icons.access_time,
-                    color: _customTransAt == null ? Colors.teal : Colors.grey),
+                    color: _customTransAt == null
+                        ? AppColors.tealDark
+                        : AppColors.muted),
                 const SizedBox(width: 8),
-                const Text('Sekarang (live)'),
+                const Expanded(child: Text('Sekarang (live)')),
               ],
             ),
           ),
@@ -478,9 +493,11 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
             child: Row(
               children: [
                 Icon(Icons.edit_calendar,
-                    color: _customTransAt != null ? Colors.teal : Colors.grey),
+                    color: _customTransAt != null
+                        ? AppColors.tealDark
+                        : AppColors.muted),
                 const SizedBox(width: 8),
-                const Text('Pilih tanggal & jam'),
+                const Expanded(child: Text('Pilih tanggal & jam')),
               ],
             ),
           ),
@@ -579,21 +596,11 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
         // auto-apply saat item ditambah ke keranjang (lihat _addToCart).
         _loadActiveDiscounts(outcode);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Failed to fetch items"),
-            backgroundColor: Colors.red,
-          ),
-        );
+        Toast.error(context, "Failed to fetch items");
       }
     } catch (e) {
       print("ERROR: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Error fetching items"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      Toast.error(context, "Error fetching items");
     }
   }
 
@@ -615,8 +622,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
       if (!mounted) return;
       Provider.of<CartProvider>(context, listen: false)
           .setActiveTotalDiscount(totalDiscount);
-      Provider.of<CartProvider>(context, listen: false)
-          .setActiveDiscounts(map);
+      Provider.of<CartProvider>(context, listen: false).setActiveDiscounts(map);
     } catch (_) {
       // gagal muat diskon aktif -- POS tetap jalan tanpa auto-apply diskon
     }
@@ -682,7 +688,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     }
     final stock = _findTherapyStock(b.therapyType, b.duration);
     if (stock == null && b.therapyType.isEmpty) {
-      Toast.error(context, 'Booking lama tanpa tipe terapi — bayar dari menu Booking');
+      Toast.error(
+          context, 'Booking lama tanpa tipe terapi — bayar dari menu Booking');
       return false;
     }
     if (stock == null) {
@@ -691,12 +698,11 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
       return false;
     }
 
-    double price = b.price > 0
-        ? b.price.toDouble()
-        : stock.stock_price.toDouble();
+    double price =
+        b.price > 0 ? b.price.toDouble() : stock.stock_price.toDouble();
     if (price <= 0) {
-      price = (_defaultTherapyPrices[b.therapyType]?[b.duration] ?? 0)
-          .toDouble();
+      price =
+          (_defaultTherapyPrices[b.therapyType]?[b.duration] ?? 0).toDouble();
     }
     final label =
         '${stock.stock_name} (Booking ${DateFormat('dd-MM').format(date)} ${b.start} - ${b.custName})';
@@ -743,22 +749,25 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       builder: (sheetContext) {
         return StatefulBuilder(builder: (context, setSheetState) {
           future ??= _fetchBookingsFor(pickerDate);
-          return SafeArea(
+          return ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                   child: Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'Booking Terapi',
-                          style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold),
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ),
                       // pilih tanggal booking (default hari ini)
@@ -792,8 +801,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                   child: FutureBuilder<List<SlotBookingModel>>(
                     future: future,
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState ==
-                          ConnectionState.waiting) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Padding(
                           padding: EdgeInsets.all(40),
                           child: Center(child: CircularProgressIndicator()),
@@ -807,11 +815,12 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                       }
                       final bookings = snapshot.data ?? [];
                       if (bookings.isEmpty) {
-                        return Padding(
-                          padding: const EdgeInsets.all(40),
-                          child: Center(
-                              child: Text('Belum ada booking tanggal '
-                                  '${DateFormat('dd-MM-yyyy').format(pickerDate)}')),
+                        return EmptyState(
+                          icon: Icons.event_busy_rounded,
+                          title: 'Belum ada booking',
+                          description: 'Tidak ada booking pada tanggal '
+                              '${DateFormat('dd-MM-yyyy').format(pickerDate)}',
+                          compact: true,
                         );
                       }
                       return SingleChildScrollView(
@@ -825,13 +834,14 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                                     horizontal: 16, vertical: 4),
                                 decoration: BoxDecoration(
                                   color: b.isPaid
-                                      ? Colors.red.shade100
-                                      : Colors.amber.shade100,
-                                  borderRadius: BorderRadius.circular(8),
+                                      ? AppColors.errorLight
+                                      : AppColors.warningLight,
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.md),
                                   border: Border.all(
                                       color: b.isPaid
-                                          ? Colors.red.shade400
-                                          : Colors.amber.shade400),
+                                          ? AppColors.error
+                                          : AppColors.warning),
                                 ),
                                 child: ListTile(
                                   dense: true,
@@ -840,11 +850,13 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                                         ? Icons.check_circle
                                         : Icons.hourglass_bottom,
                                     color: b.isPaid
-                                        ? Colors.red.shade700
-                                        : Colors.amber.shade800,
+                                        ? AppColors.errorDark
+                                        : AppColors.warningDark,
                                   ),
                                   title: Text(
                                     '${b.custName} • ${b.start}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                         fontWeight: FontWeight.bold),
                                   ),
@@ -863,6 +875,11 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                                                   'Booking masuk keranjang');
                                             }
                                           },
+                                    style: ElevatedButton.styleFrom(
+                                      minimumSize: const Size(0, 36),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12),
+                                    ),
                                     child: Text(inCart ? 'SUDAH' : 'TAMBAH'),
                                   ),
                                 ),
@@ -897,6 +914,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
 
     showModalDialog(
       context: context,
+      scrollable: true,
       child: StatefulBuilder(
         builder: (context, setModalState) {
           return Column(
@@ -905,10 +923,9 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
             children: [
               Text(
                 langProvider.get('Add Product', 'Tambah Produk'),
-                style:
-                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.titleLarge,
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               // Autocomplete cari produk
               Row(
@@ -926,9 +943,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                             if (textEditingValue.text.isEmpty) {
                               return items;
                             }
-                            return items.where((item) => item.stock_name
-                                .toLowerCase()
-                                .contains(query));
+                            return items.where((item) =>
+                                item.stock_name.toLowerCase().contains(query));
                           },
                           displayStringForOption: (option) => option.stock_name,
                           optionsViewBuilder: (context, onSelected, options) {
@@ -936,8 +952,13 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                               alignment: Alignment.topLeft,
                               child: Material(
                                 elevation: 4.0,
+                                borderRadius:
+                                    BorderRadius.circular(AppRadius.md),
+                                clipBehavior: Clip.antiAlias,
                                 child: Container(
-                                  width: 500,
+                                  // ikut lebar dialog (dulu 500 tetap ->
+                                  // meluap di HP)
+                                  width: context.dialogMaxWidth() - 56,
                                   constraints:
                                       const BoxConstraints(maxHeight: 200),
                                   child: _isLoadingSuggestions
@@ -970,7 +991,11 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                                                   leading: const Icon(
                                                       Icons.inventory_2),
                                                   title: Text(
-                                                      suggestion.stock_name),
+                                                    suggestion.stock_name,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
                                                   subtitle: Text(
                                                     suggestion.isTherapy
                                                         ? 'Jasa | ${TextFormatter.formatRupiah(suggestion.stock_price.toDouble())}'
@@ -990,8 +1015,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                               _selectedStock = selection;
                               _itemNameController.text = selection.stock_name;
                               _salesNameController.text = selection.stock_name;
-                              _salesStockIDController.text =
-                                  selection.stock_id;
+                              _salesStockIDController.text = selection.stock_id;
                             });
                             _autoCompleteController?.text =
                                 selection.stock_name;
@@ -1007,11 +1031,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                               decoration: InputDecoration(
                                 hintText: langProvider.get(
                                     'Enter name', 'Masukkan nama'),
-                                filled: true,
-                                fillColor: Colors.white,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
+                                prefixIcon:
+                                    const Icon(Icons.search_rounded, size: 20),
                               ),
                               onChanged: (value) {
                                 _debouncer
@@ -1033,21 +1054,21 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                 enabled: false,
                 decoration: InputDecoration(
                   labelText: langProvider.get('Item Name', 'Nama Barang'),
-                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 16),
 
               // Harga (informasi) + opsi harga custom
               if (_selectedStock != null) ...[
-                Text(
-                  '${langProvider.get('Price', 'Harga')}: ${TextFormatter.formatRupiah(_selectedStock!.stock_price.toDouble())}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                InfoRow(
+                  label: langProvider.get('Price', 'Harga'),
+                  value: TextFormatter.formatRupiah(
+                      _selectedStock!.stock_price.toDouble()),
+                  bold: true,
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text(
-                      langProvider.get('Custom price', 'Harga custom')),
+                  title: Text(langProvider.get('Custom price', 'Harga custom')),
                   subtitle: Text(_useCustomPrice
                       ? langProvider.get(
                           'Enter your own price', 'Input harga sendiri')
@@ -1065,7 +1086,6 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                       decoration: InputDecoration(
                         labelText: langProvider.get(
                             'Custom price (Rp)', 'Harga custom (Rp)'),
-                        border: const OutlineInputBorder(),
                         isDense: true,
                       ),
                     ),
@@ -1081,10 +1101,9 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                 onChanged: (_) => setModalState(() {}),
                 decoration: InputDecoration(
                   labelText: langProvider.get('Quantity', 'Jumlah'),
-                  border: const OutlineInputBorder(),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               // Buttons
               Row(
@@ -1221,8 +1240,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
   /// tetap otomatis diterapkan lewat _buildSalesItem).
   void _quickAdd(StockResponse stock) {
     final cart = Provider.of<CartProvider>(context, listen: false);
-    final idx =
-        cart.items.indexWhere((i) => i.stockId == stock.stock_id && !i.isBooking);
+    final idx = cart.items
+        .indexWhere((i) => i.stockId == stock.stock_id && !i.isBooking);
     if (idx != -1) {
       final newQty = cart.items[idx].stockQty + 1;
       if (!stock.isTherapy && newQty > stock.stock_qty) {
@@ -1239,8 +1258,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
   /// Kurangi cepat dari katalog: qty - 1, atau hapus baris kalau sudah 1.
   void _quickRemove(StockResponse stock) {
     final cart = Provider.of<CartProvider>(context, listen: false);
-    final idx =
-        cart.items.indexWhere((i) => i.stockId == stock.stock_id && !i.isBooking);
+    final idx = cart.items
+        .indexWhere((i) => i.stockId == stock.stock_id && !i.isBooking);
     if (idx == -1) return;
     final currentQty = cart.items[idx].stockQty;
     if (currentQty <= 1) {
@@ -1252,8 +1271,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
 
   /// Dialog ketik jumlah persis untuk satu baris keranjang (tab Pesanan) --
   /// pengganti input inline lama, jumlah 0 = hapus baris.
-  Future<void> _editQtyDialog(
-      BuildContext context, CartProvider cart, int index, int currentQty) async {
+  Future<void> _editQtyDialog(BuildContext context, CartProvider cart,
+      int index, int currentQty) async {
     final ctl = TextEditingController(text: '$currentQty');
     final result = await showDialog<int>(
       context: context,
@@ -1322,6 +1341,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
 
     showModalDialog(
       context: context,
+      scrollable: true,
       child: StatefulBuilder(builder: (context, setModalState) {
         final isBank = cart.paymentType == AppConstants.paymentBank;
         // Transfer Bank wajib melampirkan foto bukti pembayaran — KECUALI
@@ -1335,16 +1355,23 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
           children: [
             Text(
               langProvider.get('Payment', 'Pembayaran'),
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 6),
+            InfoRow(
+              label: langProvider.get('Total to pay', 'Total tagihan'),
+              value: TextFormatter.formatRupiah(cart.grandTotal),
+              bold: true,
+            ),
+            const SizedBox(height: 12),
 
             // Jenis pembayaran: Tunai atau Transfer Bank
             DropdownButtonFormField<String>(
-              value: cart.paymentType.isEmpty ? null : cart.paymentType,
+              key: ValueKey(cart.paymentType),
+              initialValue: cart.paymentType.isEmpty ? null : cart.paymentType,
               decoration: InputDecoration(
                 labelText: langProvider.get('Payment Type', 'Jenis Pembayaran'),
-                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.payments_outlined, size: 20),
               ),
               items: [
                 DropdownMenuItem(
@@ -1379,29 +1406,45 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                       decoration: InputDecoration(
                         labelText:
                             langProvider.get('Voucher code', 'Kode Voucher'),
-                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(
+                            Icons.confirmation_number_outlined,
+                            size: 20),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () => _applyVoucher(cart, setModalState),
-                    child: Text(langProvider.get('Apply', 'Terapkan')),
+                  SizedBox(
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () => _applyVoucher(cart, setModalState),
+                      child: Text(langProvider.get('Apply', 'Terapkan')),
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
             ] else
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+                decoration: BoxDecoration(
+                  color: AppColors.successLight,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
                 child: Row(
                   children: [
-                    Icon(Icons.confirmation_number,
-                        size: 18, color: Colors.green[700]),
-                    const SizedBox(width: 6),
+                    const Icon(Icons.confirmation_number,
+                        size: 18, color: AppColors.successDark),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                          '${cart.voucherCode} (${cart.voucherPercent!.toStringAsFixed(0)}%) diterapkan'),
+                        '${cart.voucherCode} (${cart.voucherPercent!.toStringAsFixed(0)}%) diterapkan',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: AppColors.successDark,
+                            fontWeight: FontWeight.w600),
+                      ),
                     ),
                     TextButton(
                       onPressed: () {
@@ -1429,39 +1472,58 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
             // Transfer Bank: upload foto bukti pembayaran (maks 5 MB) —
             // disembunyikan jika admin menonaktifkan fitur ini
             if (isBank && _proofFeatureEnabled) ...[
-              OutlinedButton.icon(
-                icon: Icon(_proofImage == null
-                    ? Icons.upload_file
-                    : Icons.check_circle),
-                label: Text(_proofImage == null
-                    ? 'UPLOAD FOTO BUKTI PEMBAYARAN (maks 5 MB)'
-                    : 'Bukti terpilih — ganti foto'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor:
-                      _proofImage == null ? Colors.teal : Colors.green,
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: Icon(_proofImage == null
+                      ? Icons.upload_file_outlined
+                      : Icons.check_circle_rounded),
+                  label: Text(
+                    _proofImage == null
+                        ? 'Upload foto bukti pembayaran'
+                        : 'Bukti terpilih — ganti foto',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _proofImage == null
+                        ? AppColors.tealDark
+                        : AppColors.successDark,
+                    side: BorderSide(
+                        color: (_proofImage == null
+                                ? AppColors.tealDark
+                                : AppColors.successDark)
+                            .withValues(alpha: 0.5)),
+                  ),
+                  onPressed: () async {
+                    final file = await _pickProofImage();
+                    if (file != null) {
+                      setModalState(() => _proofImage = file);
+                    }
+                  },
                 ),
-                onPressed: () async {
-                  final file = await _pickProofImage();
-                  if (file != null) {
-                    setModalState(() => _proofImage = file);
-                  }
-                },
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 4, left: 4),
+                child: Text('Wajib untuk transfer bank, maksimal 5 MB',
+                    style: Theme.of(context).textTheme.bodySmall),
               ),
               if (_proofImage != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     child: Image.file(
                       _proofImage!,
                       height: 120,
+                      width: double.infinity,
                       fit: BoxFit.cover,
                     ),
                   ),
                 ),
             ],
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
             // Buttons
             Row(
@@ -1478,8 +1540,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                 ),
                 const SizedBox(width: 16),
                 ElevatedButton(
-                  onPressed:
-                      canConfirm ? () => Navigator.pop(context) : null,
+                  onPressed: canConfirm ? () => Navigator.pop(context) : null,
                   child: Text(langProvider.get('OK', 'OK')),
                 ),
               ],
@@ -1496,35 +1557,62 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
       sellerOnly: true,
       child: Consumer2<CartProvider, LanguageProvider>(
         builder: (context, cart, langProvider, child) {
+          // Tablet (>= 900dp): dua panel -- katalog/manual di kiri, pesanan
+          // & pembayaran selalu terlihat di kanan. HP: tab seperti biasa.
+          final twoPane = context.isExpanded;
+          final leftTab = twoPane ? _activeTab.clamp(0, 1) : _activeTab;
+          final pad = context.pagePadding;
+
+          final leftColumn = Column(
+            children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(pad, 12, pad, 0),
+                child: _buildHeaderInfo(langProvider),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(pad, 10, pad, 0),
+                child: _buildTabSelector(cart, langProvider, twoPane: twoPane),
+              ),
+              const SizedBox(height: 4),
+              Expanded(
+                child: IndexedStack(
+                  index: leftTab,
+                  children: [
+                    _buildKatalogTab(cart, langProvider),
+                    _buildManualTab(cart, langProvider),
+                    if (!twoPane) _buildPesananTab(context, cart, langProvider),
+                  ],
+                ),
+              ),
+              if (!twoPane && _activeTab != 2)
+                _buildMiniSummaryBar(cart, langProvider),
+            ],
+          );
+
           return Scaffold(
-            backgroundColor: Colors.white,
             appBar: AppBarCustom(
               title: langProvider.get('Point of Sale', 'Penjualan'),
             ),
             drawer: const AppDrawer(),
-            body: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: _buildHeaderInfo(langProvider),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: _buildTabSelector(cart, langProvider),
-                ),
-                const SizedBox(height: 4),
-                Expanded(
-                  child: IndexedStack(
-                    index: _activeTab,
-                    children: [
-                      _buildKatalogTab(cart, langProvider),
-                      _buildManualTab(cart, langProvider),
-                      _buildPesananTab(context, cart, langProvider),
-                    ],
-                  ),
-                ),
-                if (_activeTab != 2) _buildMiniSummaryBar(cart, langProvider),
-              ],
+            body: SafeArea(
+              top: false,
+              child: twoPane
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(flex: 3, child: leftColumn),
+                        const VerticalDivider(width: 1),
+                        SizedBox(
+                          width: (context.screenWidth * 0.4).clamp(360, 460),
+                          child: ColoredBox(
+                            color: AppColors.surface,
+                            child:
+                                _buildPesananTab(context, cart, langProvider),
+                          ),
+                        ),
+                      ],
+                    )
+                  : leftColumn,
             ),
           );
         },
@@ -1534,80 +1622,129 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
 
   // ---------- Info transaksi (waktu, customer, kasir) ----------
 
+  bool _headerIsExpanded(BuildContext context) =>
+      _headerExpanded ?? !context.isShort;
+
   Widget _buildHeaderInfo(LanguageProvider langProvider) {
+    final textTheme = Theme.of(context).textTheme;
+    final expanded = _headerIsExpanded(context);
+    final customer = _receiptController.text.trim();
+    final summary = [
+      customer.isEmpty
+          ? langProvider.get('No customer', 'Tanpa customer')
+          : customer,
+      _salesPersonController.text,
+      _customTransAt == null
+          ? langProvider.get('Live', 'Live')
+          : DateFormat('dd-MM HH:mm').format(_customTransAt!),
+    ].join(' · ');
+
     return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: BorderSide(color: Colors.grey[200]!),
-      ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ADMIN: ketuk field waktu (atau ikon kalender) untuk memilih
-            // live / tanggal & jam sendiri
-            GestureDetector(
-              onTap: _isAdmin ? _showTransTimePicker : null,
-              child: AbsorbPointer(
-                child: TextField(
-                  controller: _transactionDateController,
-                  enabled: false,
-                  style: const TextStyle(fontSize: 13),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    labelText: _customTransAt == null
-                        ? langProvider.get('Now (live)', 'Sekarang (live)')
-                        : langProvider.get(
-                            'Custom transaction time', 'Waktu transaksi (custom)'),
-                    border: const OutlineInputBorder(),
-                    helperStyle: const TextStyle(fontSize: 10),
-                    helperText: _isAdmin
-                        ? langProvider.get('Tap to choose: live / custom',
-                            'Ketuk utk pilih: live / custom')
-                        : null,
-                    suffixIcon: _isAdmin
-                        ? Icon(Icons.edit_calendar,
-                            size: 18,
-                            color: _customTransAt == null ? Colors.grey : _kBrandBlue)
-                        : null,
+            // baris judul + tombol lipat: di layar pendek (HP landscape)
+            // kartu ini terlipat supaya daftar produk tetap kelihatan
+            InkWell(
+              onTap: () => setState(() => _headerExpanded = !expanded),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              child: Row(
+                children: [
+                  const Icon(Icons.receipt_long_outlined,
+                      size: 18, color: AppColors.blue),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: expanded
+                        ? Text(
+                            langProvider.get(
+                                'Transaction info', 'Info Transaksi'),
+                            style: textTheme.titleSmall,
+                          )
+                        : Text(
+                            summary,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.bodySmall
+                                ?.copyWith(color: AppColors.ink),
+                          ),
+                  ),
+                  Icon(
+                    expanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    size: 20,
+                    color: AppColors.muted,
+                  ),
+                ],
+              ),
+            ),
+            if (expanded) ...[
+              const SizedBox(height: 10),
+              // ADMIN: ketuk field waktu (atau ikon kalender) untuk memilih
+              // live / tanggal & jam sendiri
+              GestureDetector(
+                onTap: _isAdmin ? _showTransTimePicker : null,
+                child: AbsorbPointer(
+                  child: TextField(
+                    controller: _transactionDateController,
+                    enabled: false,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      labelText: _customTransAt == null
+                          ? langProvider.get('Now (live)', 'Sekarang (live)')
+                          : langProvider.get('Custom transaction time',
+                              'Waktu transaksi (custom)'),
+                      prefixIcon: const Icon(Icons.schedule_rounded, size: 20),
+                      helperStyle: const TextStyle(fontSize: 10),
+                      helperText: _isAdmin
+                          ? langProvider.get('Tap to choose: live / custom',
+                              'Ketuk utk pilih: live / custom')
+                          : null,
+                      suffixIcon: _isAdmin
+                          ? Icon(Icons.edit_calendar,
+                              size: 18,
+                              color: _customTransAt == null
+                                  ? AppColors.muted
+                                  : _kBrandBlue)
+                          : null,
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-            _buildCustomerField(langProvider),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    enabled: false,
-                    controller: _salesPersonController,
-                    style: const TextStyle(fontSize: 13),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      labelText: langProvider.get('Sales Person', 'Kasir'),
-                      border: const OutlineInputBorder(),
+              const SizedBox(height: 10),
+              _buildCustomerField(langProvider),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      enabled: false,
+                      controller: _salesPersonController,
+                      style: const TextStyle(fontSize: 13),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        labelText: langProvider.get('Sales Person', 'Kasir'),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _typeController,
-                    enabled: false,
-                    style: const TextStyle(fontSize: 13),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      labelText: langProvider.get('Type', 'Tipe'),
-                      border: const OutlineInputBorder(),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _typeController,
+                      enabled: false,
+                      style: const TextStyle(fontSize: 13),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        labelText: langProvider.get('Type', 'Tipe'),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -1616,98 +1753,50 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
 
   // ---------- Pill segmented tab: Katalog / Manual / Pesanan ----------
 
-  Widget _buildTabSelector(CartProvider cart, LanguageProvider langProvider) {
+  Widget _buildTabSelector(CartProvider cart, LanguageProvider langProvider,
+      {bool twoPane = false}) {
     final qtyCount = cart.items.fold<int>(0, (s, i) => s + i.stockQty);
-    final tabs = <_TabDef>[
-      _TabDef(Icons.grid_view_rounded, langProvider.get('Catalog', 'Katalog')),
-      _TabDef(Icons.edit_note, langProvider.get('Manual', 'Manual')),
-      _TabDef(Icons.receipt_long,
-          langProvider.get('Order', 'Pesanan')),
-    ];
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F2F5),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Row(
-        children: List.generate(tabs.length, (i) {
-          final selected = _activeTab == i;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _activeTab = i),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: selected ? _kBrandBlue : Colors.transparent,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(tabs[i].icon,
-                        size: 16,
-                        color: selected ? Colors.white : Colors.grey[700]),
-                    const SizedBox(width: 6),
-                    Text(
-                      tabs[i].label,
-                      style: TextStyle(
-                        color: selected ? Colors.white : Colors.grey[700],
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                    if (i == 2 && qtyCount > 0) ...[
-                      const SizedBox(width: 6),
-                      CircleAvatar(
-                        radius: 9,
-                        backgroundColor:
-                            selected ? Colors.white : _kBrandBlue,
-                        child: Text(
-                          '$qtyCount',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: selected ? _kBrandBlue : Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          );
-        }),
-      ),
+    return SegmentedTabs<int>(
+      value: twoPane ? _activeTab.clamp(0, 1) : _activeTab,
+      onChanged: (i) => setState(() => _activeTab = i),
+      tabs: [
+        SegmentedTab(
+          value: 0,
+          icon: Icons.grid_view_rounded,
+          label: langProvider.get('Catalog', 'Katalog'),
+        ),
+        SegmentedTab(
+          value: 1,
+          icon: Icons.edit_note,
+          label: langProvider.get('Manual', 'Manual'),
+        ),
+        if (!twoPane)
+          SegmentedTab(
+            value: 2,
+            icon: Icons.receipt_long,
+            label: langProvider.get('Order', 'Pesanan'),
+            badge: qtyCount,
+          ),
+      ],
     );
   }
 
   // ---------- Tab Katalog: cari & tambah produk cepat ----------
 
   Widget _buildKatalogTab(CartProvider cart, LanguageProvider langProvider) {
+    final pad = context.pagePadding;
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          padding: EdgeInsets.fromLTRB(pad, 8, pad, 8),
           child: Row(
             children: [
               Expanded(
-                child: TextField(
+                child: SearchField(
                   controller: _catalogSearchController,
-                  decoration: InputDecoration(
-                    isDense: true,
-                    hintText: langProvider.get('Search product', 'Cari produk'),
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    filled: true,
-                    fillColor: Colors.grey[100],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  onChanged: (v) => _debouncer.run(() => getAllStock(v, 1, 200)),
+                  hintText: langProvider.get('Search product', 'Cari produk'),
+                  onChanged: (v) =>
+                      _debouncer.run(() => getAllStock(v, 1, 200)),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1716,39 +1805,40 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                 icon: const Icon(Icons.tune, size: 18),
                 label: Text(langProvider.get('Options', 'Opsi')),
               ),
+              if (_outletType == AppConstants.outletTherapy) ...[
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: () =>
+                      _showBookingPickerModal(context, langProvider, cart),
+                  icon: const Icon(Icons.event_available, size: 18),
+                  label: const Text('Booking'),
+                ),
+              ],
             ],
           ),
         ),
-        if (_outletType == AppConstants.outletTherapy)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: OutlinedButton.icon(
-                onPressed: () =>
-                    _showBookingPickerModal(context, langProvider, cart),
-                icon: const Icon(Icons.event_available, size: 18),
-                label: const Text('Booking'),
-              ),
-            ),
-          ),
         Expanded(
           child: ValueListenableBuilder<StockPagination?>(
             valueListenable: stockPaginationNotifier,
             builder: (context, pagination, _) {
               final items = pagination?.data ?? [];
               if (items.isEmpty) {
-                return Center(
-                  child: Text(
-                    langProvider.get('No products found', 'Produk tidak ditemukan'),
-                    style: TextStyle(color: Colors.grey[600]),
+                return SingleChildScrollView(
+                  child: EmptyState(
+                    icon: Icons.inventory_2_outlined,
+                    title: langProvider.get(
+                        'No products found', 'Produk tidak ditemukan'),
+                    description: langProvider.get(
+                        'Try another keyword or add stock first',
+                        'Coba kata kunci lain atau tambah stok dulu'),
+                    compact: true,
                   ),
                 );
               }
               return ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                padding: EdgeInsets.fromLTRB(pad, 0, pad, 16),
                 itemCount: items.length,
-                separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey[200]),
+                separatorBuilder: (_, __) => const Divider(height: 1),
                 itemBuilder: (context, i) =>
                     _buildCatalogRow(cart, items[i], langProvider),
               );
@@ -1773,9 +1863,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: stock.isTherapy
-                    ? _kBrandTeal.withOpacity(0.15)
-                    : _kBrandBlue.withOpacity(0.1),
+                color:
+                    stock.isTherapy ? AppColors.tealLight : AppColors.blueLight,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: stock.stock_photo.isEmpty
@@ -1790,7 +1879,9 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                         headers: _photoHeaders,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Icon(
-                          stock.isTherapy ? Icons.spa : Icons.inventory_2_outlined,
+                          stock.isTherapy
+                              ? Icons.spa
+                              : Icons.inventory_2_outlined,
                           color: stock.isTherapy ? _kBrandTeal : _kBrandBlue,
                         ),
                       ),
@@ -1804,7 +1895,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
               children: [
                 Text(
                   stock.stock_name,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 14),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1813,7 +1905,9 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                   stock.isTherapy
                       ? '${langProvider.get('Service', 'Jasa')} • ${TextFormatter.formatRupiah(stock.stock_price.toDouble())}'
                       : '${langProvider.get('Stock', 'Stok')}: ${stock.stock_qty} • ${TextFormatter.formatRupiah(stock.stock_price.toDouble())}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: AppColors.muted),
                 ),
               ],
             ),
@@ -1848,7 +1942,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     );
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey[300]!),
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -1860,7 +1955,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
             child: Padding(
               padding: const EdgeInsets.all(8),
               child: Icon(Icons.remove,
-                  size: 16, color: qty > 0 ? Colors.black87 : Colors.grey[300]),
+                  size: 16, color: qty > 0 ? AppColors.ink : AppColors.border),
             ),
           ),
           onTapQty != null
@@ -1882,39 +1977,48 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
   // ---------- Tab Manual: harga bebas via keypad ----------
 
   Widget _buildManualTab(CartProvider cart, LanguageProvider langProvider) {
-    final displayPrice = _manualPriceDigits.isEmpty ? 0 : int.parse(_manualPriceDigits);
+    final displayPrice =
+        _manualPriceDigits.isEmpty ? 0 : int.parse(_manualPriceDigits);
+    final short = context.isShort;
     return Column(
       children: [
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+            padding: EdgeInsets.fromLTRB(24, short ? 8 : 24, 24, 8),
             child: Column(
               children: [
                 Text(langProvider.get('Unit Price', 'Harga Satuan'),
-                    style: TextStyle(color: Colors.grey[600])),
-                const SizedBox(height: 8),
-                Text(
-                  TextFormatter.formatRupiah(displayPrice.toDouble()),
-                  style: TextStyle(
-                    fontSize: 40,
-                    fontWeight: FontWeight.bold,
-                    color: displayPrice == 0 ? Colors.grey[350] : Colors.black87,
+                    style: const TextStyle(color: AppColors.muted)),
+                const SizedBox(height: 4),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    TextFormatter.formatRupiah(displayPrice.toDouble()),
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: short ? 28 : 40,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.5,
+                      color: displayPrice == 0
+                          ? AppColors.disabled
+                          : AppColors.ink,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: short ? 4 : 12),
                 if (!_manualShowNote)
                   TextButton.icon(
                     onPressed: () => setState(() => _manualShowNote = true),
                     icon: const Icon(Icons.add),
-                    label: Text(langProvider.get('Add Note', 'Tambah Keterangan')),
+                    label:
+                        Text(langProvider.get('Add Note', 'Tambah Keterangan')),
                   )
                 else
                   TextField(
                     controller: _manualNoteController,
                     decoration: InputDecoration(
-                      labelText:
-                          langProvider.get('Note (item name)', 'Keterangan (nama item)'),
-                      border: const OutlineInputBorder(),
+                      labelText: langProvider.get(
+                          'Note (item name)', 'Keterangan (nama item)'),
                       isDense: true,
                     ),
                   ),
@@ -1934,9 +2038,15 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
           onTap: onTap,
           child: Container(
             alignment: Alignment.center,
-            decoration: BoxDecoration(border: Border.all(color: Colors.grey[200]!)),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              border: Border.all(color: AppColors.border, width: 0.5),
+            ),
             child: Text(label,
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w500)),
+                style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.ink)),
           ),
         ),
       );
@@ -1953,10 +2063,13 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
         });
     void clearAll() => setState(() => _manualPriceDigits = '');
     void confirmAdd() {
-      final price = _manualPriceDigits.isEmpty ? 0 : int.parse(_manualPriceDigits);
+      final price =
+          _manualPriceDigits.isEmpty ? 0 : int.parse(_manualPriceDigits);
       if (price <= 0) {
         Toast.error(
-            context, langProvider.get('Enter a price first', 'Isi harga terlebih dahulu'));
+            context,
+            langProvider.get(
+                'Enter a price first', 'Isi harga terlebih dahulu'));
         return;
       }
       final name = _manualNoteController.text.trim();
@@ -1966,7 +2079,9 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
         // sama seperti item jasa THERAPY (lihat catatan di sales_master.go).
         stockId: 'MANUAL-${DateTime.now().millisecondsSinceEpoch}',
         stockCode: '-',
-        stockName: name.isEmpty ? langProvider.get('Manual Item', 'Item Manual') : name,
+        stockName: name.isEmpty
+            ? langProvider.get('Manual Item', 'Item Manual')
+            : name,
         qty: 1,
         stockPack: 'PCS',
         price: price.toDouble(),
@@ -1976,11 +2091,13 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
         _manualNoteController.clear();
         _manualShowNote = false;
       });
-      Toast.success(context, langProvider.get('Added to order', 'Ditambahkan ke pesanan'));
+      Toast.success(context,
+          langProvider.get('Added to order', 'Ditambahkan ke pesanan'));
     }
 
+    // keypad lebih pendek di HP landscape supaya tampilan harga tetap muat
     return SizedBox(
-      height: 240,
+      height: context.isShort ? 176 : 240,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -2028,9 +2145,12 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                     onTap: backspace,
                     child: Container(
                       alignment: Alignment.center,
-                      decoration:
-                          BoxDecoration(border: Border.all(color: Colors.grey[200]!)),
-                      child: const Icon(Icons.backspace_outlined),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        border: Border.all(color: AppColors.border, width: 0.5),
+                      ),
+                      child: const Icon(Icons.backspace_outlined,
+                          color: AppColors.ink),
                     ),
                   ),
                 ),
@@ -2041,7 +2161,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                     child: Container(
                       alignment: Alignment.center,
                       color: _kBrandBlue,
-                      child: const Icon(Icons.add, color: Colors.white, size: 28),
+                      child:
+                          const Icon(Icons.add, color: Colors.white, size: 28),
                     ),
                   ),
                 ),
@@ -2057,14 +2178,15 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
 
   Widget _buildPesananTab(
       BuildContext context, CartProvider cart, LanguageProvider langProvider) {
+    final pad = context.pagePadding;
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: EdgeInsets.fromLTRB(pad, 12, pad, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             langProvider.get('Order Items', 'Item Pesanan'),
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           _buildOrderList(cart, langProvider),
@@ -2083,15 +2205,14 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
 
   Widget _buildOrderList(CartProvider cart, LanguageProvider langProvider) {
     if (cart.items.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(32),
-        decoration:
-            BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(8)),
-        child: Center(
-          child: Text(
-            langProvider.get('No items in cart', 'Tidak ada item di keranjang'),
-            style: TextStyle(color: Colors.grey[600]),
-          ),
+      return Card(
+        child: EmptyState(
+          icon: Icons.shopping_cart_outlined,
+          title: langProvider.get('No items in cart', 'Keranjang masih kosong'),
+          description: langProvider.get(
+              'Add products from the Catalog or Manual tab',
+              'Tambah produk dari tab Katalog atau Manual'),
+          compact: true,
         ),
       );
     }
@@ -2104,8 +2225,9 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey[200]!),
-            borderRadius: BorderRadius.circular(10),
+            color: AppColors.surface,
+            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2119,7 +2241,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                         if (item.hasDiscount)
                           const Padding(
                             padding: EdgeInsets.only(right: 4),
-                            child: Icon(Icons.local_offer, size: 14, color: Colors.orange),
+                            child: Icon(Icons.local_offer,
+                                size: 14, color: AppColors.warning),
                           ),
                         Expanded(
                           child: Text(
@@ -2132,25 +2255,30 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                       ],
                     ),
                     Text(
-                      langProvider.get('Code', 'Kode') + ': ${item.stockCode}',
-                      style: TextStyle(fontSize: 10, color: Colors.grey[400]),
+                      '${langProvider.get('Code', 'Kode')}: ${item.stockCode}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 10, color: AppColors.disabled),
                     ),
                     const SizedBox(height: 4),
-                    Row(
+                    Wrap(
+                      spacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        if (item.hasDiscount) ...[
+                        if (item.hasDiscount)
                           Text(
-                            TextFormatter.formatRupiah(item.originalStockPrice ?? 0),
+                            TextFormatter.formatRupiah(
+                                item.originalStockPrice ?? 0),
                             style: const TextStyle(
                                 decoration: TextDecoration.lineThrough,
-                                color: Colors.grey,
+                                color: AppColors.disabled,
                                 fontSize: 12),
                           ),
-                          const SizedBox(width: 6),
-                        ],
                         Text(
                           '${TextFormatter.formatRupiah(item.stockPrice)} / ${item.stockPack}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          style: const TextStyle(
+                              fontSize: 12, color: AppColors.muted),
                         ),
                       ],
                     ),
@@ -2168,8 +2296,10 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                   if (item.isBooking)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text('${langProvider.get('Qty', 'Jumlah')}: ${item.stockQty}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                      child: Text(
+                          '${langProvider.get('Qty', 'Jumlah')}: ${item.stockQty}',
+                          style: const TextStyle(
+                              fontSize: 12, color: AppColors.muted)),
                     )
                   else
                     _buildQtyStepper(
@@ -2178,7 +2308,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                       onRemove: () => item.stockQty <= 1
                           ? cart.removeItem(i)
                           : cart.updateItemQty(i, item.stockQty - 1),
-                      onTapQty: () => _editQtyDialog(context, cart, i, item.stockQty),
+                      onTapQty: () =>
+                          _editQtyDialog(context, cart, i, item.stockQty),
                     ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
@@ -2186,13 +2317,16 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                       if (item.hasDiscount)
                         IconButton(
                           icon: const Icon(Icons.cancel, size: 18),
-                          color: Colors.orange,
-                          tooltip: langProvider.get('Cancel discount', 'Batalkan diskon'),
+                          color: AppColors.warning,
+                          visualDensity: VisualDensity.compact,
+                          tooltip: langProvider.get(
+                              'Cancel discount', 'Batalkan diskon'),
                           onPressed: () => cart.cancelDiscountForLine(i),
                         ),
                       IconButton(
                         icon: const Icon(Icons.delete_outline, size: 18),
-                        color: Colors.red,
+                        color: AppColors.error,
+                        visualDensity: VisualDensity.compact,
                         onPressed: () => cart.removeItem(i),
                       ),
                     ],
@@ -2208,75 +2342,65 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
 
   Widget _buildPaymentSummary(
       CartProvider cart, LanguageProvider langProvider) {
-    return Card(
-      color: Colors.blue[50],
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              langProvider.get('PAYMENT DETAIL', 'RINCIAN PEMBAYARAN'),
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const Divider(),
-            _buildSummaryRow(
-              langProvider.get('Subtotal:', 'Subtotal:'),
-              TextFormatter.formatRupiah(cart.total),
-            ),
-            if (cart.activeTotalDiscount != null)
-              _buildSummaryRow(
-                langProvider.get('Total discount:', 'Diskon Total:') +
-                    ' (${cart.activeTotalDiscount!.discountValue.toStringAsFixed(0)}%)',
-                '-${TextFormatter.formatRupiah(cart.totalDiscountAmount)}',
-              ),
-            if (cart.voucherCode != null)
-              _buildSummaryRow(
-                '${langProvider.get('Voucher:', 'Voucher:')} ${cart.voucherCode}',
-                '-${TextFormatter.formatRupiah(cart.voucherDiscountAmount)}',
-              ),
-            _buildSummaryRow(
-              langProvider.get('Total:', 'Total:'),
-              TextFormatter.formatRupiah(cart.grandTotal),
-            ),
-            _buildSummaryRow(
-              langProvider.get('Payment:', 'Pembayaran:'),
-              TextFormatter.formatRupiah(cart.cashAmount),
-            ),
-            _buildSummaryRow(
-              langProvider.get('Change:', 'Kembalian:'),
-              TextFormatter.formatRupiah(cart.change),
-              highlight: true,
-            ),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.blueLight,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: AppColors.blue.withValues(alpha: 0.15)),
       ),
-    );
-  }
-
-  Widget _buildSummaryRow(String label, String value,
-      {bool highlight = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: highlight ? FontWeight.bold : FontWeight.normal,
-            ),
+          Row(
+            children: [
+              const Icon(Icons.receipt_outlined,
+                  size: 18, color: AppColors.blueDark),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  langProvider.get('Payment detail', 'Rincian Pembayaran'),
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall
+                      ?.copyWith(color: AppColors.blueDark),
+                ),
+              ),
+            ],
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: highlight ? FontWeight.bold : FontWeight.normal,
-              color: highlight ? Colors.green[700] : null,
+          const Divider(height: 16),
+          InfoRow(
+            label: langProvider.get('Subtotal', 'Subtotal'),
+            value: TextFormatter.formatRupiah(cart.total),
+          ),
+          if (cart.activeTotalDiscount != null)
+            InfoRow(
+              label:
+                  '${langProvider.get('Total discount', 'Diskon Total')} (${cart.activeTotalDiscount!.discountValue.toStringAsFixed(0)}%)',
+              value: '-${TextFormatter.formatRupiah(cart.totalDiscountAmount)}',
+              color: AppColors.warningDark,
             ),
+          if (cart.voucherCode != null)
+            InfoRow(
+              label:
+                  '${langProvider.get('Voucher', 'Voucher')} ${cart.voucherCode}',
+              value:
+                  '-${TextFormatter.formatRupiah(cart.voucherDiscountAmount)}',
+              color: AppColors.warningDark,
+            ),
+          InfoRow(
+            label: langProvider.get('Total', 'Total'),
+            value: TextFormatter.formatRupiah(cart.grandTotal),
+            bold: true,
+          ),
+          InfoRow(
+            label: langProvider.get('Payment', 'Pembayaran'),
+            value: TextFormatter.formatRupiah(cart.cashAmount),
+          ),
+          InfoRow(
+            label: langProvider.get('Change', 'Kembalian'),
+            value: TextFormatter.formatRupiah(cart.change),
+            highlight: true,
           ),
         ],
       ),
@@ -2286,30 +2410,35 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
   Widget _buildMejaSelector(CartProvider cart) {
     return InkWell(
       onTap: () => _pickMeja(cart),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300),
-          borderRadius: BorderRadius.circular(8),
+          color: AppColors.surface,
+          border: Border.all(
+              color: cart.hasMeja ? AppColors.blue : AppColors.border),
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         child: Row(
           children: [
             Icon(Icons.table_bar,
-                color: cart.hasMeja ? _kBrandBlue : Colors.grey[600]),
+                color: cart.hasMeja ? _kBrandBlue : AppColors.muted),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 cart.hasMeja
                     ? 'Meja: ${cart.mejaNames.join(', ')}'
                     : '+ Pilih Meja',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: cart.hasMeja ? Colors.black : Colors.grey[600],
-                  fontWeight: cart.hasMeja ? FontWeight.w600 : FontWeight.normal,
+                  color: cart.hasMeja ? AppColors.ink : AppColors.muted,
+                  fontWeight:
+                      cart.hasMeja ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
             ),
-            Icon(Icons.chevron_right, color: Colors.grey[400]),
+            const Icon(Icons.chevron_right, color: AppColors.disabled),
           ],
         ),
       ),
@@ -2375,85 +2504,115 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
 
   Widget _buildBottomButtons(
       BuildContext context, CartProvider cart, LanguageProvider langProvider) {
+    final payButton = ElevatedButton.icon(
+      onPressed: cart.hasItems
+          ? () => _showPaymentModal(context, langProvider, cart)
+          : null,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.tealDark,
+        minimumSize: const Size(0, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+      ),
+      icon: const Icon(Icons.payments_outlined, size: 18),
+      label: Text(langProvider.get('PAYMENT', 'BAYAR'),
+          maxLines: 1, overflow: TextOverflow.ellipsis),
+    );
+
+    final cancelButton = OutlinedButton.icon(
+      onPressed: cart.hasItems
+          ? () async {
+              if (cart.hasMeja) {
+                final outcode = await Storage.get(AppConstants.outcode) ?? '';
+                if (outcode.isNotEmpty) {
+                  // best-effort, tidak menghalangi BATAL kalau gagal
+                  await _mejaApi.releaseMeja(outcode, cart.mejaIds);
+                }
+              }
+              cart.clear();
+              if (!context.mounted) return;
+              Toast.info(context,
+                  langProvider.get('Cart cleared', 'Keranjang dikosongkan'));
+            }
+          : null,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.error,
+        side: BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
+        minimumSize: const Size(0, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+      ),
+      icon: const Icon(Icons.close_rounded, size: 18),
+      label: Text(langProvider.get('CANCEL', 'BATAL'),
+          maxLines: 1, overflow: TextOverflow.ellipsis),
+    );
+
+    final saveButton = ElevatedButton.icon(
+      onPressed: cart.canSave && !_isSaving
+          ? () => _saveTransaction(context, cart, langProvider)
+          : null,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.successDark,
+        minimumSize: const Size(0, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+      ),
+      icon: _isSaving
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: Colors.white),
+            )
+          : const Icon(Icons.check_rounded, size: 18),
+      label: Text(langProvider.get('SAVE', 'SIMPAN'),
+          maxLines: 1, overflow: TextOverflow.ellipsis),
+    );
+
+    // HP sempit: SIMPAN lebar penuh di baris sendiri supaya label tiga
+    // tombol tidak saling berebut ruang.
+    if (context.screenWidth < 420) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(child: payButton),
+              const SizedBox(width: 10),
+              Expanded(child: cancelButton),
+            ],
+          ),
+          const SizedBox(height: 10),
+          saveButton,
+        ],
+      );
+    }
+
     return Row(
       children: [
-        Expanded(
-          child: ElevatedButton(
-            onPressed: cart.hasItems
-                ? () => _showPaymentModal(context, langProvider, cart)
-                : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF21b6ae),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            child: Text(langProvider.get('PAYMENT', 'BAYAR')),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: ElevatedButton(
-            onPressed: cart.hasItems
-                ? () async {
-                    if (cart.hasMeja) {
-                      final outcode =
-                          await Storage.get(AppConstants.outcode) ?? '';
-                      if (outcode.isNotEmpty) {
-                        // best-effort, tidak menghalangi BATAL kalau gagal
-                        await _mejaApi.releaseMeja(outcode, cart.mejaIds);
-                      }
-                    }
-                    cart.clear();
-                    if (!context.mounted) return;
-                    Toast.info(
-                        context,
-                        langProvider.get(
-                            'Cart cleared', 'Keranjang dikosongkan'));
-                  }
-                : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD2042D),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            child: Text(langProvider.get('CANCEL', 'BATAL')),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: ElevatedButton(
-            onPressed: cart.canSave && !_isSaving
-                ? () => _saveTransaction(context, cart, langProvider)
-                : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2cae6b),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            child: _isSaving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
-                  )
-                : Text(langProvider.get('SAVE', 'SIMPAN')),
-          ),
-        ),
+        Expanded(child: payButton),
+        const SizedBox(width: 12),
+        Expanded(child: cancelButton),
+        const SizedBox(width: 12),
+        Expanded(child: saveButton),
       ],
     );
   }
 
   // ---------- Bar total ringkas (tab Katalog & Manual) ----------
 
-  Widget _buildMiniSummaryBar(CartProvider cart, LanguageProvider langProvider) {
+  Widget _buildMiniSummaryBar(
+      CartProvider cart, LanguageProvider langProvider) {
     final qtyCount = cart.items.fold<int>(0, (s, i) => s + i.stockQty);
+    final short = context.isShort;
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      padding: EdgeInsets.fromLTRB(context.pagePadding, short ? 8 : 12,
+          context.pagePadding, short ? 8 : 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
+        border: const Border(top: BorderSide(color: AppColors.border)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, offset: const Offset(0, -2)),
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, -2)),
         ],
       ),
       child: Row(
@@ -2461,11 +2620,17 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(langProvider.get('Total Order', 'Total Pesanan'),
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                    style:
+                        const TextStyle(color: AppColors.muted, fontSize: 12)),
                 Text(TextFormatter.formatRupiah(cart.grandTotal),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: short ? 16 : 18)),
               ],
             ),
           ),
@@ -2476,9 +2641,11 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
               borderRadius: BorderRadius.circular(24),
               child: InkWell(
                 borderRadius: BorderRadius.circular(24),
-                onTap: cart.hasItems ? () => setState(() => _activeTab = 2) : null,
+                onTap:
+                    cart.hasItems ? () => setState(() => _activeTab = 2) : null,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  padding: EdgeInsets.symmetric(
+                      horizontal: 18, vertical: short ? 10 : 14),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -2488,12 +2655,16 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                           backgroundColor: Colors.white,
                           child: Text('$qtyCount',
                               style: const TextStyle(
-                                  fontSize: 11, color: _kBrandBlue, fontWeight: FontWeight.bold)),
+                                  fontSize: 11,
+                                  color: _kBrandBlue,
+                                  fontWeight: FontWeight.bold)),
                         ),
                         const SizedBox(width: 8),
                       ],
                       Text(langProvider.get('View Order', 'Lihat Pesanan'),
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
@@ -2523,7 +2694,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
         outcode: outcode,
         salesPerson: _salesPersonController.text,
         salesCustomer: _receiptController.text,
-        customerSource: _receiptController.text.trim().isEmpty ? '' : _customerMode,
+        customerSource:
+            _receiptController.text.trim().isEmpty ? '' : _customerMode,
         customerShow: _customerShow ? 'Y' : 'N',
         // waktu transaksi manual (khusus ADMIN); kosong = live
         transDate: _isAdmin && _customTransAt != null
@@ -2541,8 +2713,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
         final saleId = body['sale_id']?.toString() ?? '';
         // simpan info pembayaran & total SEBELUM cart di-reset (cart.total
         // jadi 0 setelah cart.clear())
-        final wasBankTransfer =
-            cart.paymentType == AppConstants.paymentBank;
+        final wasBankTransfer = cart.paymentType == AppConstants.paymentBank;
         final proofToUpload = _proofImage;
         final savedTotal = cart.grandTotal;
 
@@ -2597,15 +2768,14 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
       if (mounted) {
         Toast.error(
           context,
-          langProvider.get('Failed to save transaction',
-              'Gagal menyimpan transaksi'),
+          langProvider.get(
+              'Failed to save transaction', 'Gagal menyimpan transaksi'),
         );
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
-
 }
 
 /// Item hasil pencarian customer (nama + subjudul) untuk dialog pemilih.
@@ -2613,11 +2783,4 @@ class _CustPick {
   final String name;
   final String sub;
   _CustPick(this.name, this.sub);
-}
-
-/// Definisi satu segmen pill tab (ikon + label).
-class _TabDef {
-  final IconData icon;
-  final String label;
-  _TabDef(this.icon, this.label);
 }

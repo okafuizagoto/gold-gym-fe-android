@@ -1,13 +1,16 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../config/theme.dart';
 import '../models/sales_report_model.dart';
 import '../services/sales_api.dart';
 import '../utils/constants.dart';
+import '../utils/responsive.dart';
 import '../utils/storage.dart';
 import '../utils/text_formatter.dart';
 import '../utils/toast.dart';
+import '../widgets/empty_state.dart';
 
 /// Tab laporan PER HARI: pilih tanggal → tabel item terjual.
 /// Baris dengan customer sama ditampilkan tanpa garis pemisah di kolom customer
@@ -80,9 +83,14 @@ class _LaporanHarianViewState extends State<LaporanHarianView>
           child: _loading
               ? const Center(child: CircularProgressIndicator())
               : (_report == null || _report!.items.isEmpty)
-                  ? Center(
-                      child: Text('Tidak ada penjualan di tanggal ini',
-                          style: TextStyle(color: Colors.grey[600])))
+                  ? const SingleChildScrollView(
+                      child: EmptyState(
+                      icon: Icons.receipt_long_outlined,
+                      title: 'Tidak ada penjualan',
+                      description:
+                          'Belum ada transaksi di tanggal ini. Coba pilih tanggal lain.',
+                      compact: true,
+                    ))
                   : _table(),
         ),
         if (!_loading && _report != null && _report!.items.isNotEmpty)
@@ -92,27 +100,32 @@ class _LaporanHarianViewState extends State<LaporanHarianView>
   }
 
   Widget _dateBar() {
+    final pad = context.pagePadding;
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.fromLTRB(pad, 8, pad, 8),
       child: Row(
         children: [
           Expanded(
             child: InkWell(
               onTap: _pickDate,
+              borderRadius: BorderRadius.circular(AppRadius.md),
               child: InputDecorator(
                 decoration: const InputDecoration(
                   labelText: 'Tanggal',
-                  prefixIcon: Icon(Icons.calendar_today),
-                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.calendar_today_rounded),
                   isDense: true,
                 ),
                 child: Text(
-                    DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(_date)),
+                  DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(_date),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
           ),
+          const SizedBox(width: 6),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Muat ulang',
             onPressed: _load,
           ),
@@ -121,109 +134,134 @@ class _LaporanHarianViewState extends State<LaporanHarianView>
     );
   }
 
-  // Lebar kolom tetap supaya rapi; tabel bisa digeser horizontal di HP.
-  static const _wCust = 120.0;
-  static const _wItem = 130.0;
-  static const _wQty = 46.0;
-  static const _wTotal = 100.0;
-  static const _wSisa = 56.0;
-  static const _wSales = 100.0;
+  // Lebar kolom minimum supaya rapi; tabel bisa digeser horizontal di HP,
+  // dan di tablet kolom dilebarkan proporsional memenuhi layar.
+  static const _minWidths = [120.0, 130.0, 46.0, 100.0, 56.0, 100.0];
+
+  List<double> _colWidths(double available) {
+    final sum = _minWidths.fold(0.0, (a, b) => a + b);
+    final total = math.max(sum, available);
+    final scale = total / sum;
+    return _minWidths.map((w) => w * scale).toList();
+  }
 
   Widget _table() {
     final items = _report!.items;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: _wCust + _wItem + _wQty + _wTotal + _wSisa + _wSales,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _headerRow(),
-            Expanded(
-              child: ListView.builder(
-                itemCount: items.length,
-                itemBuilder: (context, i) {
-                  final it = items[i];
-                  // baris pertama dari grup customer (customer berubah dari atas)
-                  final firstOfGroup =
-                      i == 0 || items[i - 1].customer != it.customer;
-                  return _bodyRow(it, firstOfGroup, i == items.length - 1);
-                },
+    final pad = context.pagePadding;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(pad, 4, pad, 8),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final widths = _colWidths(constraints.maxWidth);
+            final total = widths.fold(0.0, (a, b) => a + b);
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: total,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _headerRow(widths),
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: items.length,
+                        itemBuilder: (context, i) {
+                          final it = items[i];
+                          // baris pertama dari grup customer (customer berubah dari atas)
+                          final firstOfGroup =
+                              i == 0 || items[i - 1].customer != it.customer;
+                          return _bodyRow(
+                              widths, it, firstOfGroup, i == items.length - 1);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _headerRow() {
-    TextStyle s = const TextStyle(fontWeight: FontWeight.bold, fontSize: 12);
+  Widget _headerRow(List<double> w) {
+    final s = Theme.of(context).textTheme.labelSmall;
     return Container(
-      color: AppTheme.primaryTeal.withValues(alpha: 0.18),
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+      color: AppColors.tableHead,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       child: Row(
         children: [
-          SizedBox(width: _wCust, child: Text('Customer', style: s)),
-          SizedBox(width: _wItem, child: Text('Item', style: s)),
+          SizedBox(width: w[0], child: Text('CUSTOMER', style: s)),
+          SizedBox(width: w[1], child: Text('ITEM', style: s)),
           SizedBox(
-              width: _wQty,
-              child: Text('Qty', style: s, textAlign: TextAlign.center)),
+              width: w[2],
+              child: Text('QTY', style: s, textAlign: TextAlign.center)),
           SizedBox(
-              width: _wTotal,
-              child: Text('Total/Item', style: s, textAlign: TextAlign.right)),
+              width: w[3],
+              child: Text('TOTAL/ITEM', style: s, textAlign: TextAlign.right)),
           SizedBox(
-              width: _wSisa,
-              child: Text('Sisa', style: s, textAlign: TextAlign.center)),
-          SizedBox(width: _wSales, child: Text('Sales', style: s)),
+              width: w[4],
+              child: Text('SISA', style: s, textAlign: TextAlign.center)),
+          SizedBox(width: w[5], child: Text('SALES', style: s)),
         ],
       ),
     );
   }
 
-  Widget _bodyRow(ReportItem it, bool firstOfGroup, bool isLast) {
-    const cell = TextStyle(fontSize: 12);
+  Widget _bodyRow(
+      List<double> w, ReportItem it, bool firstOfGroup, bool isLast) {
+    const cell = TextStyle(fontSize: 12, color: AppColors.ink);
     return Container(
       decoration: BoxDecoration(
         // garis pemisah hanya di ATAS baris pertama tiap grup customer →
         // baris dengan customer sama tampak menyatu (tanpa garis di dalamnya)
         border: Border(
           top: firstOfGroup
-              ? BorderSide(color: Colors.grey.shade400)
+              ? const BorderSide(color: AppColors.border)
               : BorderSide.none,
           bottom: isLast
-              ? BorderSide(color: Colors.grey.shade400)
+              ? const BorderSide(color: AppColors.border)
               : BorderSide.none,
         ),
       ),
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: _wCust,
+            width: w[0],
             // tampilkan nama customer hanya di baris pertama grup
             child: firstOfGroup
                 ? Text(it.customer.isEmpty ? '-' : it.customer,
                     style: const TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w600))
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ink))
                 : const SizedBox.shrink(),
           ),
-          SizedBox(width: _wItem, child: Text(it.itemName, style: cell)),
+          SizedBox(width: w[1], child: Text(it.itemName, style: cell)),
           SizedBox(
-              width: _wQty,
-              child: Text('${it.qty}',
-                  style: cell, textAlign: TextAlign.center)),
+              width: w[2],
+              child:
+                  Text('${it.qty}', style: cell, textAlign: TextAlign.center)),
           SizedBox(
-              width: _wTotal,
+              width: w[3],
               child: Text(TextFormatter.formatRupiah(it.subtotal),
                   style: cell, textAlign: TextAlign.right)),
           SizedBox(
-              width: _wSisa,
+              width: w[4],
               child: Text('${it.remaining}',
                   style: cell, textAlign: TextAlign.center)),
           SizedBox(
-              width: _wSales,
+              width: w[5],
               child: Text(it.salesperson.isEmpty ? '-' : it.salesperson,
                   style: cell)),
         ],
@@ -232,23 +270,37 @@ class _LaporanHarianViewState extends State<LaporanHarianView>
   }
 
   Widget _grandTotalBar() {
-    return SafeArea(
-      top: false,
-      child: Container(
-        width: double.infinity,
-        color: AppTheme.primaryTeal.withValues(alpha: 0.15),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Total Keseluruhan (${_report!.count} nota)',
-                style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text(TextFormatter.formatRupiah(_report!.grandTotal),
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: AppTheme.primaryBlue)),
-          ],
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+              horizontal: context.pagePadding, vertical: 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Total Keseluruhan (${_report!.count} nota)',
+                  style: textTheme.titleSmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                TextFormatter.formatRupiah(_report!.grandTotal),
+                style: textTheme.titleMedium?.copyWith(
+                  color: AppColors.blue,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

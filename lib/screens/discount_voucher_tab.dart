@@ -1,8 +1,13 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../config/theme.dart';
 import '../services/discount_api.dart';
 import '../models/discount_model.dart';
+import '../utils/responsive.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/section_card.dart';
+import '../utils/toast.dart';
 import 'discount_voucher_history_screen.dart';
 
 /// Tab "Voucher" di layar Diskon: buat kode voucher (ketik manual atau
@@ -32,11 +37,19 @@ class _VoucherTabState extends State<VoucherTab> {
     _loadVouchers();
   }
 
+  @override
+  void dispose() {
+    _codeController.dispose();
+    _percentController.dispose();
+    super.dispose();
+  }
+
   void _showMessage(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(message),
-      backgroundColor: isError ? Colors.red : Colors.green,
-    ));
+    if (isError) {
+      Toast.error(context, message);
+    } else {
+      Toast.success(context, message);
+    }
   }
 
   Future<void> _loadVouchers() async {
@@ -82,7 +95,8 @@ class _VoucherTabState extends State<VoucherTab> {
   }
 
   Future<void> _insertVoucher() async {
-    final percent = double.tryParse(_percentController.text.replaceAll(',', '.'));
+    final percent =
+        double.tryParse(_percentController.text.replaceAll(',', '.'));
     if (percent == null || percent <= 0 || percent > 100) {
       _showMessage('Persentase voucher harus 1-100', isError: true);
       return;
@@ -130,14 +144,15 @@ class _VoucherTabState extends State<VoucherTab> {
               child: const Text('BATAL')),
           ElevatedButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
               child: const Text('HAPUS')),
         ],
       ),
     );
     if (confirm != true) return;
     try {
-      final resp = await _discountApi.deleteVoucher(v.voucherId, widget.outcode);
+      final resp =
+          await _discountApi.deleteVoucher(v.voucherId, widget.outcode);
       if (resp.statusCode == 200) {
         _showMessage('Voucher berhasil dihapus');
         await _loadVouchers();
@@ -151,17 +166,21 @@ class _VoucherTabState extends State<VoucherTab> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
+    final textTheme = Theme.of(context).textTheme;
+    final vouchers = _pagination?.data ?? [];
+    return PageBody(
+      maxWidth: 720,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SectionCard(
+            title: 'Buat Voucher',
+            description: 'Kode voucher untuk potongan persen di kasir',
+            icon: Icons.confirmation_number_outlined,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('Kode Voucher',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
+                Text('Kode Voucher', style: textTheme.titleSmall),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -170,7 +189,6 @@ class _VoucherTabState extends State<VoucherTab> {
                         controller: _codeController,
                         textCapitalization: TextCapitalization.characters,
                         decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
                           hintText: 'Ketik sendiri atau Generate',
                         ),
                         onChanged: (v) {
@@ -186,38 +204,41 @@ class _VoucherTabState extends State<VoucherTab> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    OutlinedButton(
-                      onPressed: _generating ? null : _generateCode,
-                      child: _generating
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Text('Generate'),
+                    SizedBox(
+                      height: 48,
+                      child: OutlinedButton(
+                        onPressed: _generating ? null : _generateCode,
+                        child: _generating
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
+                            : const Text('Generate'),
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                const Text('Persentase Diskon (%)',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
+                Text('Persentase Diskon (%)', style: textTheme.titleSmall),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _percentController,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
+                    hintText: 'contoh: 10',
                     suffixText: '%',
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text('Kedaluwarsa (opsional)',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
+                Text('Kedaluwarsa (opsional)', style: textTheme.titleSmall),
                 const SizedBox(height: 8),
                 InkWell(
                   onTap: _pickExpiry,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   child: InputDecorator(
                     decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.event_outlined),
                       suffixIcon: Icon(Icons.calendar_today, size: 18),
                     ),
                     child: Text(_expiredAt == null
@@ -227,65 +248,118 @@ class _VoucherTabState extends State<VoucherTab> {
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
+                  height: 48,
+                  child: ElevatedButton.icon(
                     onPressed: _insertVoucher,
-                    child: const Text('Simpan Voucher'),
+                    icon: const Icon(Icons.save_outlined, size: 18),
+                    label: const Text('Simpan Voucher'),
                   ),
                 ),
               ],
             ),
           ),
-        ),
-        const SizedBox(height: 20),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Voucher Aktif',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            IconButton(
-              icon: const Icon(Icons.history),
-              tooltip: 'Riwayat voucher',
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      DiscountVoucherHistoryScreen(outcode: widget.outcode),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: Text('Voucher Aktif', style: textTheme.titleLarge),
+              ),
+              TextButton.icon(
+                icon: const Icon(Icons.history_rounded, size: 18),
+                label: const Text('Riwayat'),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        DiscountVoucherHistoryScreen(outcode: widget.outcode),
+                  ),
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (vouchers.isEmpty)
+            const EmptyState(
+              icon: Icons.confirmation_number_outlined,
+              title: 'Belum ada voucher aktif',
+              description: 'Voucher yang dibuat akan tampil di sini sampai '
+                  'terpakai atau kedaluwarsa.',
+              compact: true,
+            )
+          else
+            ...vouchers.map((v) => _VoucherTile(
+                  voucher: v,
+                  onDelete: () => _deleteVoucher(v),
+                )),
+        ],
+      ),
+    );
+  }
+}
+
+class _VoucherTile extends StatelessWidget {
+  final VoucherResponse voucher;
+  final VoidCallback onDelete;
+
+  const _VoucherTile({required this.voucher, required this.onDelete});
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final expiry = voucher.voucherExpiredAt != null
+        ? 'kedaluwarsa ${DateFormat('dd-MM-yyyy').format(voucher.voucherExpiredAt!)}'
+        : 'tanpa batas waktu';
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.warningLight,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: const Icon(Icons.confirmation_number_outlined,
+                  color: AppColors.warningDark),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    voucher.voucherCode,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleSmall?.copyWith(letterSpacing: 1),
+                  ),
+                  Text(
+                    '${voucher.voucherPercent.toStringAsFixed(0)}% • $expiry',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline_rounded,
+                  color: AppColors.error),
+              tooltip: 'Hapus',
+              onPressed: onDelete,
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        if (_loading)
-          const Center(child: CircularProgressIndicator())
-        else if ((_pagination?.data ?? []).isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Belum ada voucher aktif'),
-          )
-        else
-          ...(_pagination!.data.map((v) => Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Colors.orange,
-                    child: Icon(Icons.confirmation_number, color: Colors.white),
-                  ),
-                  title: Text(v.voucherCode,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, letterSpacing: 1)),
-                  subtitle: Text(
-                    '${v.voucherPercent.toStringAsFixed(0)}%'
-                    '${v.voucherExpiredAt != null ? ' • kedaluwarsa ${DateFormat('dd-MM-yyyy').format(v.voucherExpiredAt!)}' : ' • tanpa batas waktu'}',
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => _deleteVoucher(v),
-                  ),
-                ),
-              ))),
-      ],
+      ),
     );
   }
 }

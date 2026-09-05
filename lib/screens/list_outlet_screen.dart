@@ -1,14 +1,14 @@
-import 'package:flutter/material.dart';
-import 'package:gold_gym_fe_android/services/outlet_api.dart';
-import 'package:provider/provider.dart';
+import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/material.dart';
+import '../config/theme.dart';
 import '../services/outlet_api.dart';
 import '../models/outlet_model.dart';
-import '../utils/storage.dart';
 import '../utils/toast.dart';
-import '../utils/constants.dart';
-import '../providers/user_provider.dart';
-import '../config/theme.dart';
+import '../widgets/auth_card.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/pagination_bar.dart';
+import '../widgets/search_field.dart';
 
 class ListOutletScreen extends StatefulWidget {
   const ListOutletScreen({super.key});
@@ -18,24 +18,20 @@ class ListOutletScreen extends StatefulWidget {
 }
 
 class _OutletScreenState extends State<ListOutletScreen> {
-  final _formKey = GlobalKey<FormState>();
   final outletsApi = OutletsApi();
-  final outletsArrNotifier = ValueNotifier<List<Outlet>>([]);
   final _outletAddressController = TextEditingController();
-  final _outletNameController = TextEditingController();
   final _outletSearchListController = TextEditingController();
 
   final ValueNotifier<String> statusEditNotifier = ValueNotifier("ACTIVE");
 
-  bool _isLoading = false;
-  int lengths = 0;
-  int pages = 0;
-  int editingIndex = -1;
+  bool _isLoading = true;
+  int lengths = 5;
+  int pages = 1;
+  Timer? _searchDebounce;
 
   ValueNotifier<OutletPagination?> outletsPaginationNotifier =
       ValueNotifier(null);
   ValueNotifier<int> editingIndexNotifier = ValueNotifier(-1);
-  ValueNotifier<bool> isActiveOutlet = ValueNotifier(true);
 
   @override
   void initState() {
@@ -46,11 +42,16 @@ class _OutletScreenState extends State<ListOutletScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _outletAddressController.dispose();
+    _outletSearchListController.dispose();
+    statusEditNotifier.dispose();
+    outletsPaginationNotifier.dispose();
+    editingIndexNotifier.dispose();
     super.dispose();
   }
 
   Future<void> loadItemsOnStart() async {
-    print("outletsPaginationNotifier: $outletsPaginationNotifier");
     if (outletsPaginationNotifier.value == null ||
         outletsPaginationNotifier.value!.data.isEmpty) {
       await getAllOutlet("", 1, 5);
@@ -58,50 +59,32 @@ class _OutletScreenState extends State<ListOutletScreen> {
   }
 
   Future<void> getAllOutlet(String name, int page, int length) async {
+    setState(() => _isLoading = true);
     try {
-      // final email = await Storage.get('userEmail') ?? "";
-
-      final outletsApi = OutletsApi();
-      print("testMASOK: $name, $page, $length}");
       final response = await outletsApi.getAllOutlet(name, "", page, length);
-      print("testMASOK2: ${response.body.toString()}");
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // final List items = data["data"];
-        print("testMASOK3");
-
         pages = page;
         lengths = length;
-        print("testMASOK4");
 
-        final pagination = OutletPagination.fromJson(data);
-        print("testsssss : ${pagination.totalData}");
-        print("testssssss : ${pagination.totalPage}");
-        print("testsssssss : ${pagination.page}");
-        print("testssssssss : ${pagination.limit}");
-        print("testsssssssss : ${pagination}");
-        // print("itemsGet: $items");
-        // print("data: $data");
-        outletsPaginationNotifier.value = pagination;
-        // print("test");
-        print("testMASOK5");
+        outletsPaginationNotifier.value = OutletPagination.fromJson(data);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Failed to fetch items"),
-            backgroundColor: Colors.red,
-          ),
-        );
+        Toast.error(context, 'Gagal memuat daftar outlet');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Error fetching itemss"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) Toast.error(context, 'Gagal memuat daftar outlet');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      getAllOutlet(value, 1, lengths);
+    });
   }
 
   Future<void> updateOutletRow(OutletResponse item) async {
@@ -116,166 +99,35 @@ class _OutletScreenState extends State<ListOutletScreen> {
     };
 
     try {
-      final outletsApi = OutletsApi();
-      print("body: $body");
       final response = await outletsApi.updateOutlets(body);
-
+      if (!mounted) return;
       if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Item updated successfully"),
-            backgroundColor: Colors.green,
-          ),
-        );
+        Toast.success(context, 'Outlet berhasil diperbarui');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Failed to update item"),
-            backgroundColor: Colors.red,
-          ),
-        );
+        Toast.error(context, 'Gagal memperbarui outlet');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Error updating item"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) Toast.error(context, 'Gagal memperbarui outlet');
     }
   }
 
-  Future<void> addItem() async {
-    if (outletsArrNotifier.value.isNotEmpty ||
-        (_outletNameController.text != "" &&
-            _outletAddressController.text != "")) {
-      final outlet = Outlet(
-        outlet_name: _outletNameController.text,
-        outlet_address: _outletAddressController.text,
-        outlet_status: isActiveOutlet.value,
-      );
-
-      outletsArrNotifier.value = [
-        ...outletsArrNotifier.value,
-        outlet,
-      ];
-
-      _outletNameController.clear();
-      _outletAddressController.clear();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Please fill out all required fields"),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+  void _startEdit(int index, OutletResponse item) {
+    editingIndexNotifier.value = index;
+    _outletAddressController.text = item.outlet_address;
+    statusEditNotifier.value =
+        item.outlet_status.isEmpty ? "ACTIVE" : item.outlet_status;
   }
 
-  void deleteItem(int index) {
-    final updatedList = List<Outlet>.from(outletsArrNotifier.value);
-    updatedList.removeAt(index);
-
-    outletsArrNotifier.value = updatedList;
+  Future<void> _saveEdit(OutletResponse item) async {
+    await updateOutletRow(item);
+    editingIndexNotifier.value = -1;
+    await getAllOutlet(_outletSearchListController.text, pages, lengths);
+    _outletAddressController.clear();
   }
 
-  Future<void> _handleOutlet() async {
-    List<Outlet> arrayOneOutlet = [];
-    Map<String, dynamic> bodyData;
-
-    if (outletsArrNotifier.value.isEmpty) {
-      final outlet = Outlet(
-        outlet_name: _outletNameController.text,
-        outlet_address: _outletAddressController.text,
-        outlet_status: isActiveOutlet.value,
-      );
-      arrayOneOutlet = [
-        ...arrayOneOutlet,
-        outlet,
-      ];
-      bodyData = {
-        "data": arrayOneOutlet
-            .map((item) => {
-                  "outlet_name": item.outlet_name,
-                  "outlet_address": item.outlet_address,
-                  "outlet_status": item.outlet_status,
-                })
-            .toList()
-      };
-    } else {
-      bodyData = {
-        "data": outletsArrNotifier.value
-            .map((item) => {
-                  "outlet_name": item.outlet_name,
-                  "outlet_address": item.outlet_address,
-                  "outlet_status": item.outlet_status,
-                })
-            .toList()
-      };
-    }
-
-    try {
-      if (outletsArrNotifier.value.isNotEmpty ||
-          (_outletNameController.text != "" &&
-              _outletAddressController.text != "")) {
-        final outletsApi = OutletsApi();
-        final response = await outletsApi.insertOutlet(bodyData);
-        print("response: ${response.body}");
-        if (response.statusCode == 200) {
-          arrayOneOutlet = [];
-          outletsArrNotifier.value = [];
-          _outletNameController.clear();
-          _outletAddressController.clear();
-          // showToast("Item successfully saved");
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Item successfully saved"),
-              backgroundColor: Colors.green,
-            ),
-          );
-          Navigator.pushReplacementNamed(context, '/outlet');
-
-          // getAllItems("", 1, 5);
-          // await getAllOutlet("", pages, lengths);
-          // Future.microtask(() => getAllItems("", 1, 5));
-        } else {
-          outletsArrNotifier.value = [];
-          // showToast("Failed to save item", isError: true);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Failed to save outlet"),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Please fill out all required fields"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      // showToast("Failed to save item", isError: true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Failed to save item"),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Future<void> _handleNewOutlet() async {
-    Navigator.pushReplacementNamed(context, '/new-outlet');
-  }
-
-  void deleteOutlet(int index) {
-    final updatedList = List<Outlet>.from(outletsArrNotifier.value);
-    updatedList.removeAt(index);
-
-    outletsArrNotifier.value = updatedList;
+  void _cancelEdit() {
+    editingIndexNotifier.value = -1;
+    _outletAddressController.clear();
   }
 
   Future<void> _confirmDeleteOutlet(OutletResponse item) async {
@@ -291,7 +143,8 @@ class _OutletScreenState extends State<ListOutletScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Hapus', style: TextStyle(color: Colors.red)),
+            child: const Text('Hapus',
+                style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -303,12 +156,7 @@ class _OutletScreenState extends State<ListOutletScreen> {
       final response = await outletsApi.deleteOutlet(item.outlet_code);
       if (!mounted) return;
       if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Outlet berhasil dihapus"),
-            backgroundColor: Colors.green,
-          ),
-        );
+        Toast.success(context, 'Outlet berhasil dihapus');
         await getAllOutlet(_outletSearchListController.text, pages, lengths);
       } else {
         String message = "Gagal menghapus outlet";
@@ -316,461 +164,313 @@ class _OutletScreenState extends State<ListOutletScreen> {
           final body = jsonDecode(response.body);
           if (body['error'] != null) message = body['error'];
         } catch (_) {}
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message), backgroundColor: Colors.red),
-        );
+        Toast.error(context, message);
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Error menghapus outlet"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      Toast.error(context, 'Error menghapus outlet');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Container(
-              width: 380,
-              padding: const EdgeInsets.all(40),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // // Logo
-                    // Image.asset(
-                    //   'assets/images/logo.png',
-                    //   width: 100,
-                    //   height: 100,
-                    //   errorBuilder: (context, error, stackTrace) {
-                    //     return const Icon(
-                    //       Icons.fitness_center,
-                    //       size: 100,
-                    //       color: AppTheme.primaryBlue,
-                    //     );
-                    //   },
-                    // ),
-                    // const SizedBox(height: 32),
+    return AuthCard(
+      title: 'Daftar Outlet',
+      subtitle: 'Ubah alamat/status, atau hapus outlet yang tidak dipakai',
+      maxWidth: 720,
+      showLogo: false,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SearchField(
+            controller: _outletSearchListController,
+            hintText: 'Cari nama outlet...',
+            onChanged: _onSearchChanged,
+            onSubmitted: (v) => getAllOutlet(v, 1, lengths),
+          ),
+          const SizedBox(height: 16),
 
-                    // Title
-                    const Text(
-                      'List Outlet',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
+          ValueListenableBuilder<OutletPagination?>(
+            valueListenable: outletsPaginationNotifier,
+            builder: (context, pagination, child) {
+              if (_isLoading && pagination == null) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (pagination == null || pagination.data.isEmpty) {
+                return const EmptyState(
+                  icon: Icons.storefront_outlined,
+                  title: 'Belum ada outlet',
+                  description:
+                      'Outlet yang Anda buat akan tampil di sini. Buat lewat '
+                      'tombol NEW OUTLET di halaman Pilih Outlet.',
+                  compact: true,
+                );
+              }
 
-                    TextField(
-                      controller: _outletSearchListController,
-                      decoration: InputDecoration(
-                        hintText: "Search...",
-                        prefixIcon: const Icon(Icons.search),
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide.none,
+              final items = pagination.data;
+
+              // listen editing index tanpa refresh seluruh halaman
+              return ValueListenableBuilder<int>(
+                valueListenable: editingIndexNotifier,
+                builder: (context, editingIndex, _) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < items.length; i++)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _OutletTile(
+                            number: ((pagination.page - 1) * pagination.limit) +
+                                i +
+                                1,
+                            item: items[i],
+                            isEditing: editingIndex == i,
+                            addressController: _outletAddressController,
+                            statusNotifier: statusEditNotifier,
+                            onEdit: () => _startEdit(i, items[i]),
+                            onSave: () => _saveEdit(items[i]),
+                            onCancel: _cancelEdit,
+                            onDelete: () => _confirmDeleteOutlet(items[i]),
+                          ),
                         ),
+                      const SizedBox(height: 4),
+                      PaginationBar(
+                        page: pagination.page,
+                        totalPage: pagination.totalPage,
+                        limit: pagination.limit,
+                        totalData: pagination.totalData,
+                        shownCount: pagination.data.length,
+                        onPageChanged: (p) => getAllOutlet(
+                            _outletSearchListController.text,
+                            p,
+                            pagination.limit),
+                        onLimitChanged: (l) => getAllOutlet(
+                            _outletSearchListController.text, 1, l),
                       ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+
+          const SizedBox(height: 20),
+          const Divider(),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.pushReplacementNamed(context, '/outlet');
+              },
+              icon: const Icon(Icons.arrow_back_rounded, size: 20),
+              label: const Text('KEMBALI'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OutletTile extends StatelessWidget {
+  final int number;
+  final OutletResponse item;
+  final bool isEditing;
+  final TextEditingController addressController;
+  final ValueNotifier<String> statusNotifier;
+  final VoidCallback onEdit;
+  final VoidCallback onSave;
+  final VoidCallback onCancel;
+  final VoidCallback onDelete;
+
+  const _OutletTile({
+    required this.number,
+    required this.item,
+    required this.isEditing,
+    required this.addressController,
+    required this.statusNotifier,
+    required this.onEdit,
+    required this.onSave,
+    required this.onCancel,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final status = item.outlet_status.isEmpty
+        ? '-'
+        : (item.outlet_status == 'INACTIVE' ? 'NONACTIVE' : item.outlet_status);
+    final active = item.outlet_status == 'ACTIVE';
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+            color: isEditing ? AppColors.blue : AppColors.border,
+            width: isEditing ? 1.5 : 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 14,
+                backgroundColor: AppColors.blueLight,
+                child: Text(
+                  '$number',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.blue,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.outlet_name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleSmall,
                     ),
-                    // // User field
-                    // TextField(
-                    //   controller: _outletNameController,
-                    //   decoration: const InputDecoration(
-                    //     labelText: 'Outlet Name',
-                    //     border: OutlineInputBorder(),
-                    //   ),
-                    //   textInputAction: TextInputAction.next,
-                    //   onChanged: (_) => setState(() {}),
-                    // ),
-                    // DropdownButtonFormField<String>(
-                    //   value: _selectedType,
-                    //   decoration: const InputDecoration(
-                    //     labelText: 'Type',
-                    //     border: OutlineInputBorder(),
-                    //   ),
-                    //   items: _types.map((type) {
-                    //     return DropdownMenuItem<String>(
-                    //       value: type,
-                    //       child: Text(type.toUpperCase()),
-                    //     );
-                    //   }).toList(),
-                    //   onChanged: (value) {
-                    //     setState(() {
-                    //       _selectedType = value;
-                    //     });
-                    //   },
-                    // ),
-                    const SizedBox(height: 16),
-
-                    // // Password field
-                    // TextField(
-                    //   controller: _passwordController,
-                    //   decoration: const InputDecoration(
-                    //     labelText: 'Password',
-                    //     border: OutlineInputBorder(),
-                    //   ),
-                    //   obscureText: true,
-                    //   textInputAction: TextInputAction.done,
-                    //   onChanged: (_) => setState(() {}),
-                    //   onSubmitted: (_) => _handleLogin(),
-                    // ),
-
-                    // TextField(
-                    //   maxLines: 5,
-                    //   controller: _outletAddressController,
-                    //   decoration: InputDecoration(
-                    //     hintText: 'Enter outlet address...',
-                    //     filled: true,
-                    //     fillColor: Colors.white,
-                    //     border: OutlineInputBorder(
-                    //       borderRadius: BorderRadius.circular(8),
-                    //     ),
-                    //     contentPadding: const EdgeInsets.all(16),
-                    //   ),
-                    // ),
-
-                    ValueListenableBuilder<OutletPagination?>(
-                      valueListenable: outletsPaginationNotifier,
-                      builder: (context, pagination, child) {
-                        if (pagination == null || pagination.data.isEmpty) {
-                          return Container(
-                            height: 150,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text(
-                              "No data available",
-                              style:
-                                  TextStyle(fontSize: 16, color: Colors.grey),
-                            ),
-                          );
-                        }
-
-                        final items = pagination.data;
-
-                        /// 🔧 FIX: listen editing index tanpa refresh seluruh halaman
-                        return ValueListenableBuilder<int>(
-                          valueListenable: editingIndexNotifier,
-                          builder: (context, editingIndex, _) {
-                            return Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: DataTable(
-                                  columnSpacing: 20,
-                                  headingRowColor: MaterialStateProperty.all(
-                                      Colors.grey.shade200),
-                                  columns: const [
-                                    DataColumn(label: Text("No.")),
-                                    DataColumn(label: Text("Name")),
-                                    DataColumn(label: Text("Address")),
-                                    DataColumn(label: Text("Status")),
-                                    DataColumn(label: Text("Action")),
-                                  ],
-                                  rows: items.asMap().entries.map((entry) {
-                                    final index = entry.key;
-                                    final item = entry.value;
-
-                                    final isEditing = editingIndex == index;
-
-                                    return DataRow(
-                                      cells: [
-                                        DataCell(Text("${entry.key + 1}")),
-
-                                        /// NAME
-                                        DataCell(
-                                          Text(item.outlet_name),
-                                        ),
-
-                                        /// TYPE
-                                        DataCell(
-                                          isEditing
-                                              ? SizedBox(
-                                                  width: 125,
-                                                  child: TextField(
-                                                    controller:
-                                                        _outletAddressController,
-                                                  ),
-                                                )
-                                              : Text(item.outlet_address),
-                                        ),
-
-                                        /// STATUS
-                                        DataCell(
-                                          isEditing
-                                              ? ValueListenableBuilder<String>(
-                                                  valueListenable:
-                                                      statusEditNotifier,
-                                                  builder: (context, value, _) {
-                                                    return DropdownButton<
-                                                        String>(
-                                                      value: value,
-                                                      items: const [
-                                                        DropdownMenuItem(
-                                                          value: "ACTIVE",
-                                                          child: Text("ACTIVE"),
-                                                        ),
-                                                        DropdownMenuItem(
-                                                          value: "INACTIVE",
-                                                          child:
-                                                              Text("NONACTIVE"),
-                                                        ),
-                                                      ],
-                                                      onChanged: (val) {
-                                                        statusEditNotifier
-                                                            .value = val!;
-                                                      },
-                                                    );
-                                                  },
-                                                )
-                                              : Text(item.outlet_status.isEmpty
-                                                  ? "-"
-                                                  : item.outlet_status == "INACTIVE" ? "NONACTIVE" : item.outlet_status),
-                                        ),
-
-                                        /// ACTION
-                                        DataCell(
-                                          Row(
-                                            children: [
-                                              ElevatedButton.icon(
-                                                icon: Icon(
-                                                  isEditing
-                                                      ? Icons.save
-                                                      : Icons.edit,
-                                                  size: 16,
-                                                ),
-                                                label: Text(isEditing
-                                                    ? "Save"
-                                                    : "Edit"),
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: isEditing
-                                                      ? Colors.green
-                                                      : Colors.blue,
-                                                ),
-                                                onPressed: () async {
-                                                  if (!isEditing) {
-                                                    /// 🔧 FIX: hanya update notifier
-                                                    editingIndexNotifier.value =
-                                                        index;
-
-                                                    _outletNameController.text =
-                                                        item.outlet_name;
-                                                    _outletAddressController
-                                                            .text =
-                                                        item.outlet_address;
-
-                                                    statusEditNotifier
-                                                        .value = item
-                                                            .outlet_status
-                                                            .isEmpty
-                                                        ? "ACTIVE"
-                                                        : item.outlet_status;
-                                                  } else {
-                                                    /// SAVE
-                                                    await updateOutletRow(item);
-
-                                                    /// 🔧 FIX: keluar dari mode edit
-                                                    editingIndexNotifier.value =
-                                                        -1;
-
-                                                    await getAllOutlet(
-                                                        "", pages, lengths);
-
-                                                    _outletNameController
-                                                        .clear();
-                                                    _outletAddressController
-                                                        .clear();
-                                                  }
-                                                },
-                                              ),
-                                              const SizedBox(width: 8),
-                                              if (!isEditing)
-                                                ElevatedButton.icon(
-                                                  icon: const Icon(Icons.delete,
-                                                      size: 16),
-                                                  label: const Text("Delete"),
-                                                  style:
-                                                      ElevatedButton.styleFrom(
-                                                    backgroundColor: Colors.red,
-                                                  ),
-                                                  onPressed: () =>
-                                                      _confirmDeleteOutlet(
-                                                          item),
-                                                ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  }).toList(),
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-
-                    // FOOTER
-                    ValueListenableBuilder<OutletPagination?>(
-                      valueListenable: outletsPaginationNotifier,
-                      builder: (context, pagination, child) {
-                        if (pagination == null) {
-                          return const SizedBox();
-                        }
-
-                        final start =
-                            ((pagination.page - 1) * pagination.limit) + 1;
-                        final end = start + pagination.data.length - 1;
-
-                        return Column(
-                          children: [
-                            /// SHOWING
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  "Showing $start to $end of ${pagination.totalData} entries",
-                                  style: const TextStyle(color: Colors.grey),
-                                ),
-
-                                /// LIMIT DROPDOWN
-                                DropdownButton<int>(
-                                  value: pagination.limit,
-                                  items: const [5, 10, 20, 50]
-                                      .map(
-                                        (e) => DropdownMenuItem(
-                                          value: e,
-                                          child: Text("$e"),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (value) {
-                                    getAllOutlet(
-                                        _outletSearchListController.text,
-                                        1,
-                                        value!);
-                                  },
-                                ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 10),
-
-                            /// PAGINATION
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.chevron_left),
-                                  onPressed: pagination.page > 1
-                                      ? () {
-                                          getAllOutlet(
-                                            _outletSearchListController.text,
-                                            pagination.page - 1,
-                                            pagination.limit,
-                                          );
-                                        }
-                                      : null,
-                                ),
-                                Text(
-                                  "${pagination.page} / ${pagination.totalPage}",
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.chevron_right),
-                                  onPressed: pagination.page <
-                                          pagination.totalPage
-                                      ? () {
-                                          getAllOutlet(
-                                            _outletSearchListController.text,
-                                            pagination.page + 1,
-                                            pagination.limit,
-                                          );
-                                        }
-                                      : null,
-                                ),
-                              ],
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: 5),
-                    const Divider(),
-                    const SizedBox(height: 20),
-
-                    // // Login button
-                    // SizedBox(
-                    //   width: double.infinity,
-                    //   height: 48,
-                    //   child: ElevatedButton(
-                    //     // onPressed:
-                    //     //     _isLoading || !_canSubmit ? null : _handleLogin,
-                    //     onPressed: _handleOutlet,
-                    //     style: ElevatedButton.styleFrom(
-                    //       backgroundColor: Colors
-                    //           .green.shade600, // button background, #43A047
-                    //       foregroundColor: Colors.white, // text & icon color
-                    //       disabledBackgroundColor:
-                    //           Colors.grey.shade300, // when onPressed is null
-                    //       disabledForegroundColor: Colors.grey.shade500,
-                    //     ),
-                    //     child: _isLoading
-                    //         ? const SizedBox(
-                    //             width: 20,
-                    //             height: 20,
-                    //             child: CircularProgressIndicator(
-                    //               strokeWidth: 2,
-                    //               color: Colors.white,
-                    //             ),
-                    //           )
-                    //         : const Text('SAVE'),
-                    //   ),
-                    // ),
-                    // const SizedBox(height: 16),
-
-                    // Back button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.pushReplacementNamed(context, '/outlet');
-                        },
-                        child: const Text('BACK'),
-                      ),
+                    Text(
+                      item.outlet_code,
+                      style: textTheme.bodySmall,
                     ),
                   ],
                 ),
               ),
-            ),
+              const SizedBox(width: 8),
+              if (!isEditing)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: active ? AppColors.successLight : AppColors.chipBg,
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                  child: Text(
+                    status,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: active ? AppColors.successDark : AppColors.muted,
+                    ),
+                  ),
+                ),
+            ],
           ),
-        ),
+          const SizedBox(height: 8),
+          if (isEditing) ...[
+            TextField(
+              controller: addressController,
+              maxLines: 3,
+              minLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Alamat',
+                alignLabelWithHint: true,
+              ),
+            ),
+            const SizedBox(height: 10),
+            ValueListenableBuilder<String>(
+              valueListenable: statusNotifier,
+              builder: (context, value, _) {
+                final current =
+                    value == 'ACTIVE' || value == 'INACTIVE' ? value : 'ACTIVE';
+                return DropdownButtonFormField<String>(
+                  key: ValueKey(current),
+                  initialValue: current,
+                  decoration: const InputDecoration(labelText: 'Status'),
+                  items: const [
+                    DropdownMenuItem(value: "ACTIVE", child: Text("ACTIVE")),
+                    DropdownMenuItem(
+                        value: "INACTIVE", child: Text("NONACTIVE")),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) statusNotifier.value = val;
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: onSave,
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.successDark),
+                    icon: const Icon(Icons.save_outlined, size: 18),
+                    label: const Text('Simpan'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onCancel,
+                    child: const Text('Batal'),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.place_outlined,
+                    size: 16, color: AppColors.muted),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    item.outlet_address.isEmpty ? '-' : item.outlet_address,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodyMedium
+                        ?.copyWith(color: AppColors.muted),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Edit'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onDelete,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                      side: BorderSide(
+                          color: AppColors.error.withValues(alpha: 0.5)),
+                    ),
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                    label: const Text('Hapus'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }

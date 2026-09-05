@@ -1,22 +1,24 @@
 import 'package:flutter/material.dart';
+import '../utils/toast.dart' as app_toast;
 import 'package:gold_gym_fe_android/models/item_model.dart';
 import 'package:provider/provider.dart';
-// import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
-// import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
+import '../config/theme.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/app_bar_custom.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/pagination_bar.dart';
 import '../widgets/private_route.dart';
+import '../widgets/search_field.dart';
+import '../widgets/section_card.dart';
 import '../services/items_api.dart';
 import '../services/outlet_api.dart';
 import '../models/outlet_model.dart';
-// import '../models/stock_model.dart';
-// import '../models/api_response_model.dart';
-// import '../utils/text_formatter.dart';
 import '../utils/debouncer.dart';
+import '../utils/responsive.dart';
 import '../providers/language_provider.dart';
 import '../utils/storage.dart';
 import '../utils/constants.dart';
@@ -30,9 +32,7 @@ class AddItemsScreen extends StatefulWidget {
 }
 
 class _AddItemsScreenState extends State<AddItemsScreen> {
-  // final _stockApi = StockApi();
   final _searchDebouncer = Debouncer(milliseconds: 400);
-  // final _searchController = TextEditingController();
   final _itemNameController = TextEditingController();
   final _itemSearchListController = TextEditingController();
   final _itemTypeController = TextEditingController(text: 'STOCK');
@@ -43,9 +43,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
   final itemsArrNotifier = ValueNotifier<List<Item>>([]);
   int lengths = 0;
   int pages = 0;
-  int editingIndex = -1;
 
-  String? _selectedItemType = "STOCK";
   String _selectedCurrency = "IDR";
 
   // Scope outlet saat Add Items: satu outlet spesifik (milik penjual sendiri)
@@ -63,23 +61,12 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
   static const int _maxItemPhotoBytes = 2 * 1024 * 1024;
   Map<String, String> _photoHeaders = {};
 
-  // String _selectedInputType = 'Keyboard';
-  // List<StockModel> _stockList = [];
-  // bool _isLoading = false;
   ValueNotifier<bool> isActiveItems = ValueNotifier(
       true); // agar text field terganti ketika pilih active atau nonactive
-  // bool isActive = false;
   ValueNotifier<ItemPagination?> itemsPaginationNotifier = ValueNotifier(null);
   ValueNotifier<int> editingIndexNotifier = ValueNotifier(-1);
 
   final ValueNotifier<String> statusEditNotifier = ValueNotifier("ACTIVE");
-
-  List<String> items = [
-    'Protein Shake',
-    'Isotonic Drink',
-    'Creatine Powder',
-    'Gold Gym Shirt',
-  ];
 
   Future<void> saveItemsToBackend() async {
     List<Item> arrayOneItem = [];
@@ -165,47 +152,22 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
           _itemDescriptionController.clear();
           _resetBrandDefault();
           setState(() => _pickedItemPhoto = null);
-          // showToast("Item successfully saved");
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Item successfully saved"),
-              backgroundColor: Colors.green,
-            ),
-          );
+          app_toast.Toast.success(context, "Item successfully saved");
           // foto opsional: cuma bisa ditempel kalau backend balikin item_id
           // pasti (1 item, 1 outlet spesifik -- lihat _canPickItemPhoto)
           if (pickedPhoto != null) {
             await _uploadPickedPhoto(itemsApi, response.body, pickedPhoto);
           }
-          // getAllItems("", 1, 5);
           await getAllItems("", pages, lengths);
-          // Future.microtask(() => getAllItems("", 1, 5));
         } else {
           itemsArrNotifier.value = [];
-          // showToast("Failed to save item", isError: true);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Failed to save item"),
-              backgroundColor: Colors.red,
-            ),
-          );
+          app_toast.Toast.error(context, "Failed to save item");
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Please fill out all required fields"),
-            backgroundColor: Colors.red,
-          ),
-        );
+        app_toast.Toast.error(context, "Please fill out all required fields");
       }
     } catch (e) {
-      // showToast("Failed to save item", isError: true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Failed to save item"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      app_toast.Toast.error(context, "Failed to save item");
     }
   }
 
@@ -232,68 +194,36 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
 
     try {
       final itemsApi = ItemsApi();
-      print("body: $body");
       final response = await itemsApi.updateItems(body);
 
       if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Item updated successfully"),
-            backgroundColor: Colors.green,
-          ),
-        );
+        app_toast.Toast.success(context, "Item updated successfully");
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Failed to update item"),
-            backgroundColor: Colors.red,
-          ),
-        );
+        app_toast.Toast.error(context, "Failed to update item");
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Error updating item"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      app_toast.Toast.error(context, "Error updating item");
     }
   }
 
   Future<void> getAllItems(String name, int page, int length) async {
     try {
-      // final email = await Storage.get('userEmail') ?? "";
       final outcode = await Storage.get(AppConstants.outcode) ?? "";
       final itemsApi = ItemsApi();
       final response = await itemsApi.getAllItems(name, outcode, page, length);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // final List items = data["data"];
-
         pages = page;
         lengths = length;
 
         final pagination = ItemPagination.fromJson(data);
-        // print("itemsGet: $items");
-        // print("data: $data");
         itemsPaginationNotifier.value = pagination;
-        // print("test");
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Failed to fetch items"),
-            backgroundColor: Colors.red,
-          ),
-        );
+        app_toast.Toast.error(context, "Failed to fetch items");
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Error fetching itemss"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      app_toast.Toast.error(context, "Error fetching itemss");
     }
   }
 
@@ -362,27 +292,12 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
           totalPage: pagination.totalPage,
         );
         await getAllItems("", pages, lengths);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Item deleted successfully"),
-            backgroundColor: Colors.green,
-          ),
-        );
+        app_toast.Toast.success(context, "Item deleted successfully");
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Failed to delete item"),
-            backgroundColor: Colors.red,
-          ),
-        );
+        app_toast.Toast.error(context, "Failed to delete item");
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Error updating item"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      app_toast.Toast.error(context, "Error updating item");
     }
   }
 
@@ -395,7 +310,6 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
       final formatter = NumberFormat.currency(
         locale: 'id_ID',
         symbol: '',
-        // symbol: 'Rp ',
         decimalDigits: 0,
       );
       return formatter.format(number);
@@ -403,7 +317,6 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
       final formatter = NumberFormat.currency(
         locale: 'en_US',
         symbol: '',
-        // symbol: '\$',
         decimalDigits: 0,
       );
       return formatter.format(number);
@@ -415,7 +328,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
       msg: message,
       toastLength: Toast.LENGTH_SHORT,
       gravity: ToastGravity.BOTTOM,
-      backgroundColor: isError ? Colors.red : Colors.green,
+      backgroundColor: isError ? AppColors.error : AppColors.successDark,
       textColor: Colors.white,
       fontSize: 14,
     );
@@ -461,13 +374,21 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
   @override
   void dispose() {
     _searchDebouncer.dispose();
+    _itemNameController.dispose();
+    _itemSearchListController.dispose();
+    _itemTypeController.dispose();
+    _itemPackController.dispose();
+    _itemPriceController.dispose();
+    _itemBrandController.dispose();
+    _itemDescriptionController.dispose();
     super.dispose();
   }
 
   /// Outlet THERAPY: kolom merek otomatis terisi "THERAPY" (masih bisa diubah).
   /// Item brand THERAPY langsung terdaftar di menu sales tanpa Add Stock.
   Future<void> _loadOutletType() async {
-    final outletType = await Storage.get(AppConstants.outletTypeKey) ?? 'RETAIL';
+    final outletType =
+        await Storage.get(AppConstants.outletTypeKey) ?? 'RETAIL';
     if (!mounted) return;
     setState(() {
       _isTherapyOutlet = outletType == AppConstants.outletTherapy;
@@ -511,16 +432,16 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
           SimpleDialogOption(
             onPressed: () => Navigator.pop(dialogContext, ImageSource.camera),
             child: const Row(children: [
-              Icon(Icons.photo_camera),
-              SizedBox(width: 8),
+              Icon(Icons.photo_camera_outlined),
+              SizedBox(width: 12),
               Text('Ambil dari Kamera'),
             ]),
           ),
           SimpleDialogOption(
             onPressed: () => Navigator.pop(dialogContext, ImageSource.gallery),
             child: const Row(children: [
-              Icon(Icons.photo_library),
-              SizedBox(width: 8),
+              Icon(Icons.photo_library_outlined),
+              SizedBox(width: 12),
               Text('Pilih dari Galeri'),
             ]),
           ),
@@ -529,7 +450,8 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
     );
     if (source == null) return;
 
-    final picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
+    final picked =
+        await ImagePicker().pickImage(source: source, imageQuality: 85);
     if (picked == null) return;
     final file = File(picked.path);
     final size = await file.length();
@@ -566,6 +488,42 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
     }
   }
 
+  // ---- edit inline di daftar barang ----
+  void _startEdit(int index, ItemResponse item) {
+    editingIndexNotifier.value = index;
+
+    _itemNameController.text = item.item_name;
+    _itemTypeController.text = item.item_type;
+    _itemPackController.text = item.item_pack;
+    _itemPriceController.text = item.item_price.toString();
+    _itemBrandController.text = item.item_brand;
+    _itemDescriptionController.text = item.item_description;
+
+    statusEditNotifier.value =
+        item.item_status.isEmpty ? "ACTIVE" : item.item_status;
+  }
+
+  void _clearEditControllers() {
+    _itemNameController.clear();
+    _itemTypeController.clear();
+    _itemPackController.clear();
+    _itemPriceController.clear();
+    _itemBrandController.clear();
+    _itemDescriptionController.clear();
+  }
+
+  Future<void> _saveEdit(ItemResponse item) async {
+    await updateItemRow(item);
+    editingIndexNotifier.value = -1;
+    await getAllItems(_itemSearchListController.text, pages, lengths);
+    _clearEditControllers();
+  }
+
+  void _cancelEdit() {
+    editingIndexNotifier.value = -1;
+    _clearEditControllers();
+  }
+
   @override
   Widget build(BuildContext context) {
     return PrivateRoute(
@@ -577,27 +535,18 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
             child: Scaffold(
               appBar: AppBarCustom(
                 title: langProvider.get('Items Menu', 'Menu Barang'),
+                bottom: TabBar(
+                  tabs: [
+                    Tab(text: langProvider.get('Add Items', 'Tambah Barang')),
+                    Tab(text: langProvider.get('Items List', 'Daftar Barang')),
+                  ],
+                ),
               ),
               drawer: const AppDrawer(),
-              body: Column(
+              body: TabBarView(
                 children: [
-                  TabBar(
-                    labelColor: Theme.of(context).primaryColor,
-                    tabs: [
-                      Tab(text: langProvider.get('Add Items', 'Tambah Barang')),
-                      Tab(
-                          text:
-                              langProvider.get('Items List', 'Daftar Barang')),
-                    ],
-                  ),
-                  Expanded(
-                    child: TabBarView(
-                      children: [
-                        _buildItemDataTab(langProvider),
-                        _buildItemListTab(langProvider),
-                      ],
-                    ),
-                  ),
+                  _buildItemDataTab(langProvider),
+                  _buildItemListTab(langProvider),
                 ],
               ),
             ),
@@ -608,1109 +557,832 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
   }
 
   Widget _buildItemListTab(LanguageProvider langProvider) {
-    return Container(
-      color: const Color(0xFFEDEFF2),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
-        child: Center(
-          child: SizedBox(
-            width: 900,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                /// SEARCH
-                TextField(
-                  controller: _itemSearchListController,
-                  onChanged: (value) {
-                    _searchDebouncer.run(() {
-                      getAllItems(value, 1, lengths == 0 ? 5 : lengths);
-                    });
-                  },
-                  decoration: InputDecoration(
-                    hintText: "Search...",
-                    prefixIcon: const Icon(Icons.search),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                /// TABLE
-                ValueListenableBuilder<ItemPagination?>(
-                  valueListenable: itemsPaginationNotifier,
-                  builder: (context, pagination, child) {
-                    if (pagination == null || pagination.data.isEmpty) {
-                      return Container(
-                        height: 150,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          "No data available",
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
-                        ),
-                      );
-                    }
-
-                    final items = pagination.data;
-
-                    /// 🔧 FIX: listen editing index tanpa refresh seluruh halaman
-                    return ValueListenableBuilder<int>(
-                      valueListenable: editingIndexNotifier,
-                      builder: (context, editingIndex, _) {
-                        return Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: DataTable(
-                              columnSpacing: 20,
-                              headingRowColor: MaterialStateProperty.all(
-                                  Colors.grey.shade200),
-                              columns: const [
-                                DataColumn(label: Text("Photo")),
-                                DataColumn(label: Text("Name")),
-                                DataColumn(label: Text("Type")),
-                                DataColumn(label: Text("Unit")),
-                                DataColumn(label: Text("Price")),
-                                DataColumn(label: Text("Brand")),
-                                DataColumn(label: Text("Description")),
-                                DataColumn(label: Text("Status")),
-                                DataColumn(label: Text("Action")),
-                              ],
-                              rows: items.asMap().entries.map((entry) {
-                                final index = entry.key;
-                                final item = entry.value;
-
-                                final isEditing = editingIndex == index;
-
-                                return DataRow(
-                                  cells: [
-                                    /// PHOTO
-                                    DataCell(
-                                      SizedBox(
-                                        width: 32,
-                                        height: 32,
-                                        child: item.item_photo.isEmpty
-                                            ? Icon(Icons.image_not_supported,
-                                                size: 20, color: Colors.grey[400])
-                                            : ClipRRect(
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                                child: Image.network(
-                                                  ItemsApi().itemPhotoUrl(
-                                                      item.item_id),
-                                                  headers: _photoHeaders,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (_, __, ___) =>
-                                                      Icon(
-                                                          Icons
-                                                              .image_not_supported,
-                                                          size: 20,
-                                                          color:
-                                                              Colors.grey[400]),
-                                                ),
-                                              ),
-                                      ),
-                                    ),
-
-                                    /// NAME
-                                    DataCell(
-                                      isEditing
-                                          ? SizedBox(
-                                              width: 125,
-                                              child: TextField(
-                                                controller: _itemNameController,
-                                              ),
-                                            )
-                                          : Text(item.item_name),
-                                    ),
-
-                                    /// TYPE
-                                    DataCell(
-                                      isEditing
-                                          ? SizedBox(
-                                              width: 125,
-                                              child: TextField(
-                                                controller: _itemTypeController,
-                                              ),
-                                            )
-                                          : Text(item.item_type),
-                                    ),
-
-                                    /// UNIT
-                                    DataCell(
-                                      isEditing
-                                          ? SizedBox(
-                                              width: 125,
-                                              child: TextField(
-                                                controller: _itemPackController,
-                                              ),
-                                            )
-                                          : Text(item.item_pack),
-                                    ),
-
-                                    /// PRICE
-                                    DataCell(
-                                      isEditing
-                                          ? SizedBox(
-                                              width: 125,
-                                              child: TextField(
-                                                controller:
-                                                    _itemPriceController,
-                                              ),
-                                            )
-                                          : Text(formatCurrency(
-                                              item.item_price.toString())),
-                                    ),
-
-                                    /// BRAND
-                                    DataCell(
-                                      isEditing
-                                          ? SizedBox(
-                                              width: 125,
-                                              child: TextField(
-                                                controller:
-                                                    _itemBrandController,
-                                              ),
-                                            )
-                                          : Text(item.item_brand),
-                                    ),
-
-                                    /// Description
-                                    DataCell(
-                                      isEditing
-                                          ? SizedBox(
-                                              width: 125,
-                                              child: TextField(
-                                                controller:
-                                                    _itemDescriptionController,
-                                              ),
-                                            )
-                                          : Text(item.item_description),
-                                    ),
-
-                                    /// STATUS
-                                    DataCell(
-                                      isEditing
-                                          ? ValueListenableBuilder<String>(
-                                              valueListenable:
-                                                  statusEditNotifier,
-                                              builder: (context, value, _) {
-                                                return DropdownButton<String>(
-                                                  value: value,
-                                                  items: const [
-                                                    DropdownMenuItem(
-                                                      value: "ACTIVE",
-                                                      child: Text("ACTIVE"),
-                                                    ),
-                                                    DropdownMenuItem(
-                                                      value: "NONACTIVE",
-                                                      child: Text("NONACTIVE"),
-                                                    ),
-                                                  ],
-                                                  onChanged: (val) {
-                                                    statusEditNotifier.value =
-                                                        val!;
-                                                  },
-                                                );
-                                              },
-                                            )
-                                          : Text(item.item_status.isEmpty
-                                              ? "-"
-                                              : item.item_status),
-                                    ),
-
-                                    /// ACTION
-                                    DataCell(
-                                      Row(
-                                        children: [
-                                          ElevatedButton.icon(
-                                            icon: Icon(
-                                              isEditing
-                                                  ? Icons.save
-                                                  : Icons.edit,
-                                              size: 16,
-                                            ),
-                                            label: Text(
-                                                isEditing ? "Save" : "Edit"),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: isEditing
-                                                  ? Colors.green
-                                                  : Colors.blue,
-                                            ),
-                                            onPressed: () async {
-                                              if (!isEditing) {
-                                                /// 🔧 FIX: hanya update notifier
-                                                editingIndexNotifier.value =
-                                                    index;
-
-                                                _itemNameController.text =
-                                                    item.item_name;
-                                                _itemTypeController.text =
-                                                    item.item_type;
-                                                _itemPackController.text =
-                                                    item.item_pack;
-                                                _itemPriceController.text =
-                                                    item.item_price.toString();
-                                                _itemBrandController.text =
-                                                    item.item_brand;
-                                                _itemDescriptionController
-                                                        .text =
-                                                    item.item_description;
-
-                                                statusEditNotifier.value =
-                                                    item.item_status.isEmpty
-                                                        ? "ACTIVE"
-                                                        : item.item_status;
-                                              } else {
-                                                /// SAVE
-                                                await updateItemRow(item);
-
-                                                /// 🔧 FIX: keluar dari mode edit
-                                                editingIndexNotifier.value = -1;
-
-                                                await getAllItems(
-                                                    _itemSearchListController
-                                                        .text,
-                                                    pages,
-                                                    lengths);
-
-                                                _itemNameController.clear();
-                                                _itemTypeController.clear();
-                                                _itemPackController.clear();
-                                                _itemPriceController.clear();
-                                                _itemBrandController.clear();
-                                                _itemDescriptionController
-                                                    .clear();
-                                              }
-                                            },
-                                          ),
-                                          const SizedBox(width: 8),
-                                          if (!isEditing)
-                                            ElevatedButton.icon(
-                                              icon: const Icon(Icons.delete,
-                                                  size: 16),
-                                              label: const Text("Delete"),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: Colors.red,
-                                              ),
-                                              onPressed: () {
-                                                deleteItemList(index, item);
-                                              },
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-
-                const SizedBox(height: 10),
-
-                // FOOTER
-                ValueListenableBuilder<ItemPagination?>(
-                  valueListenable: itemsPaginationNotifier,
-                  builder: (context, pagination, child) {
-                    if (pagination == null) {
-                      return const SizedBox();
-                    }
-
-                    final start =
-                        ((pagination.page - 1) * pagination.limit) + 1;
-                    final end = start + pagination.data.length - 1;
-
-                    return Column(
-                      children: [
-                        /// SHOWING
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              "Showing $start to $end of ${pagination.totalData} entries",
-                              style: const TextStyle(color: Colors.grey),
-                            ),
-
-                            /// LIMIT DROPDOWN
-                            DropdownButton<int>(
-                              value: pagination.limit,
-                              items: const [5, 10, 20, 50]
-                                  .map(
-                                    (e) => DropdownMenuItem(
-                                      value: e,
-                                      child: Text("$e"),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (value) {
-                                getAllItems(
-                                    _itemSearchListController.text, 1, value!);
-                              },
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 10),
-
-                        /// PAGINATION
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.chevron_left),
-                              onPressed: pagination.page > 1
-                                  ? () {
-                                      getAllItems(
-                                        _itemSearchListController.text,
-                                        pagination.page - 1,
-                                        pagination.limit,
-                                      );
-                                    }
-                                  : null,
-                            ),
-                            Text(
-                              "${pagination.page} / ${pagination.totalPage}",
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.chevron_right),
-                              onPressed: pagination.page < pagination.totalPage
-                                  ? () {
-                                      getAllItems(
-                                        _itemSearchListController.text,
-                                        pagination.page + 1,
-                                        pagination.limit,
-                                      );
-                                    }
-                                  : null,
-                            ),
-                          ],
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
+    return PageBody(
+      maxWidth: 1100,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          /// SEARCH
+          SearchField(
+            controller: _itemSearchListController,
+            hintText: langProvider.get('Search items...', 'Cari barang...'),
+            onChanged: (value) {
+              _searchDebouncer.run(() {
+                getAllItems(value, 1, lengths == 0 ? 5 : lengths);
+              });
+            },
           ),
-        ),
+
+          const SizedBox(height: 16),
+
+          /// LIST
+          ValueListenableBuilder<ItemPagination?>(
+            valueListenable: itemsPaginationNotifier,
+            builder: (context, pagination, child) {
+              if (pagination == null || pagination.data.isEmpty) {
+                return EmptyState(
+                  icon: Icons.inventory_2_outlined,
+                  title:
+                      langProvider.get('No data available', 'Tidak ada data'),
+                  description: langProvider.get(
+                      'Items you add will appear here.',
+                      'Barang yang Anda tambahkan akan tampil di sini.'),
+                );
+              }
+
+              final items = pagination.data;
+
+              // listen editing index tanpa refresh seluruh halaman
+              return ValueListenableBuilder<int>(
+                valueListenable: editingIndexNotifier,
+                builder: (context, editingIndex, _) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < items.length; i++)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _ItemTile(
+                            item: items[i],
+                            isEditing: editingIndex == i,
+                            photoHeaders: _photoHeaders,
+                            priceLabel:
+                                formatCurrency(items[i].item_price.toString()),
+                            nameController: _itemNameController,
+                            typeController: _itemTypeController,
+                            packController: _itemPackController,
+                            priceController: _itemPriceController,
+                            brandController: _itemBrandController,
+                            descriptionController: _itemDescriptionController,
+                            statusNotifier: statusEditNotifier,
+                            onEdit: () => _startEdit(i, items[i]),
+                            onSave: () => _saveEdit(items[i]),
+                            onCancel: _cancelEdit,
+                            onDelete: () => deleteItemList(i, items[i]),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+
+          const SizedBox(height: 6),
+
+          // FOOTER
+          ValueListenableBuilder<ItemPagination?>(
+            valueListenable: itemsPaginationNotifier,
+            builder: (context, pagination, child) {
+              if (pagination == null) {
+                return const SizedBox();
+              }
+              return PaginationBar(
+                page: pagination.page,
+                totalPage: pagination.totalPage,
+                limit: pagination.limit,
+                totalData: pagination.totalData,
+                shownCount: pagination.data.length,
+                onPageChanged: (p) => getAllItems(
+                    _itemSearchListController.text, p, pagination.limit),
+                onLimitChanged: (l) =>
+                    getAllItems(_itemSearchListController.text, 1, l),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildItemDataTab(LanguageProvider langProvider) {
-    return Container(
-      color: const Color(0xFFEDEFF2),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
-        child: Center(
-          child: SizedBox(
-            width: 900,
+    final textTheme = Theme.of(context).textTheme;
+    return PageBody(
+      maxWidth: 900,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ===== BASIC INFORMATION =====
+          SectionCard(
+            title: langProvider.get('Basic Information', 'Informasi Dasar'),
+            icon: Icons.inventory_2_outlined,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ===== BASIC INFORMATION =====
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5F6F8),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      )
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.inventory_2_outlined, size: 22),
-                          const SizedBox(width: 12),
-                          Text(
-                            langProvider.get(
-                                'Basic Information', 'Informasi Dasar'),
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      // Item Name
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 125,
-                            child: Text(
-                              langProvider.get('Item Name', 'Nama Item') + ":",
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                          ),
-                          Expanded(
-                            child: TextField(
-                              controller: _itemNameController,
-                              decoration: InputDecoration(
-                                hintText: langProvider.get(
-                                    'Enter name', 'Isi nama (item)'),
-                                filled: true,
-                                fillColor: Colors.white,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 14),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Outlet (scope: satu outlet spesifik atau Semua Outlet)
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 125,
-                            child: Text(
-                              langProvider.get('Outlet', 'Outlet') + ":",
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                          ),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: _selectedOutcode,
-                              items: [
-                                ..._myOutlets.map((o) => DropdownMenuItem(
-                                      value: o.outlet_code,
-                                      child: Text(o.outlet_name),
-                                    )),
-                                DropdownMenuItem(
-                                  value: allOutletsSentinel,
-                                  child: Text(langProvider.get(
-                                      'All Outlets', 'Semua Outlet')),
-                                ),
-                              ],
-                              onChanged: (v) =>
-                                  setState(() => _selectedOutcode = v),
-                              decoration: InputDecoration(
-                                filled: true,
-                                fillColor: Colors.white,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 14),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-
-                      // // Item Type
-                      // Row(
-                      //   children: [
-                      //     SizedBox(
-                      //       width: 125,
-                      //       child: Text(
-                      //         langProvider.get('Item Type', 'Tipe Item') + ":",
-                      //         style: const TextStyle(fontSize: 16),
-                      //       ),
-                      //     ),
-                      //     Expanded(
-                      //       child: DropdownButtonFormField<String>(
-                      //         value: _selectedItemType,
-                      //         items: const [
-                      //           DropdownMenuItem(
-                      //             value: "STOCK",
-                      //             child: Text("STOCK"),
-                      //           ),
-                      //           DropdownMenuItem(
-                      //             value: "THERAPY",
-                      //             child: Text("THERAPY"),
-                      //           ),
-                      //         ],
-                      //         onChanged: (value) {
-                      //           setState(() {
-                      //             _selectedItemType = value;
-                      //             _itemTypeController.text = value ?? "STOCK";
-                      //           });
-                      //         },
-                      //         decoration: InputDecoration(
-                      //           filled: true,
-                      //           fillColor: Colors.white,
-                      //           border: OutlineInputBorder(
-                      //             borderRadius: BorderRadius.circular(8),
-                      //           ),
-                      //           contentPadding: const EdgeInsets.symmetric(
-                      //               horizontal: 16, vertical: 14),
-                      //         ),
-                      //         style: const TextStyle(
-                      //             fontSize: 14, color: Colors.black),
-                      //         hint: Text(
-                      //           langProvider.get('Select type', 'Pilih tipe'),
-                      //         ),
-                      //       ),
-                      //     ),
-                      //   ],
-                      // ),
-                      // const SizedBox(height: 20),
-
-                      // Item Pack
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 125,
-                            child: Text(
-                              langProvider.get('Item Unit', 'Satuan Item') +
-                                  ":",
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                          ),
-                          Expanded(
-                            child: TextField(
-                              controller: _itemPackController,
-                              decoration: InputDecoration(
-                                filled: true,
-                                fillColor: Colors.white,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 14),
-                                hintText: langProvider.get(
-                                    'Enter unit', 'Isi satuan'),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Item Price
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 125,
-                            child: Text(
-                              langProvider.get('Item Price', 'Harga Item') +
-                                  ":",
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                          ),
-                          Expanded(
-                            child: TextField(
-                              controller: _itemPriceController,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                filled: true,
-                                fillColor: Colors.white,
-
-                                /// 🔥 Gabung di sini
-                                prefixIcon: Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(horizontal: 8),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: _selectedCurrency,
-                                      items: const [
-                                        DropdownMenuItem(
-                                          value: "IDR",
-                                          child: Text("Rp"),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: "USD",
-                                          child: Text("\$"),
-                                        ),
-                                      ],
-                                      onChanged: (value) {
-                                        setState(() {
-                                          _selectedCurrency = value!;
-                                          _itemPriceController.text =
-                                              formatCurrency(
-                                                  _itemPriceController.text);
-                                        });
-                                      },
-                                    ),
-                                  ),
-                                ),
-
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 14),
-                                hintText: langProvider.get(
-                                    'Enter price', 'Isi harga'),
-                              ),
-
-                              /// 🔥 format tetap jalan
-                              onChanged: (value) {
-                                final formatted = formatCurrency(value);
-
-                                _itemPriceController.value = TextEditingValue(
-                                  text: formatted,
-                                  selection: TextSelection.collapsed(
-                                      offset: formatted.length),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Item Brand
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 125,
-                            child: Text(
-                              langProvider.get('Item Brand', 'Merek Item') +
-                                  ":",
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                          ),
-                          Expanded(
-                            child: TextField(
-                              controller: _itemBrandController,
-                              decoration: InputDecoration(
-                                filled: true,
-                                fillColor: Colors.white,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 14),
-                                hintText: langProvider.get(
-                                    'Enter brand', 'Isi merek'),
-                                helperText: _isTherapyOutlet
-                                    ? langProvider.get(
-                                        'Brand THERAPY goes straight to the sales menu; other brands need Add Stock first',
-                                        'Merek THERAPY langsung masuk menu sales; merek lain wajib Add Stock dulu')
-                                    : null,
-                                helperMaxLines: 2,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // ===== FOTO ITEM (opsional) =====
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5F6F8),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      )
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.image_outlined, size: 22),
-                          const SizedBox(width: 12),
-                          Text(
-                            langProvider.get(
-                                'Item Photo (optional)', 'Foto Item (opsional)'),
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      if (!_canPickItemPhoto)
-                        Text(
-                          langProvider.get(
-                              'Photo can only be added when saving one item to one specific outlet (not "All Outlets" / not after "Add More").',
-                              'Foto hanya bisa ditambahkan saat menyimpan satu item ke satu outlet tertentu (bukan mode "Semua Outlet" / setelah "Tambah").'),
-                          style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                        )
-                      else
-                        Row(
-                          children: [
-                            GestureDetector(
-                              onTap: _pickItemPhoto,
-                              child: Container(
-                                width: 80,
-                                height: 80,
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.grey[300]!),
-                                ),
-                                child: _pickedItemPhoto != null
-                                    ? ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Image.file(_pickedItemPhoto!,
-                                            fit: BoxFit.cover),
-                                      )
-                                    : Icon(Icons.add_a_photo_outlined,
-                                        color: Colors.grey[500]),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            if (_pickedItemPhoto != null)
-                              TextButton.icon(
-                                onPressed: () =>
-                                    setState(() => _pickedItemPhoto = null),
-                                icon: const Icon(Icons.close, size: 18),
-                                label: Text(
-                                    langProvider.get('Remove photo', 'Hapus foto')),
-                              )
-                            else
-                              Text(
-                                langProvider.get(
-                                    'Max 2 MB', 'Maks 2 MB'),
-                                style:
-                                    TextStyle(fontSize: 13, color: Colors.grey[600]),
-                              ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // ===== DESCRIPTION =====
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5F6F8),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      )
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.description_outlined, size: 22),
-                          const SizedBox(width: 12),
-                          Text(
-                            langProvider.get('Description', 'Deskripsi'),
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      TextField(
-                        maxLines: 5,
-                        controller: _itemDescriptionController,
-                        decoration: InputDecoration(
-                          hintText: langProvider.get(
-                              'Enter item description...',
-                              'Masukkan deskripsi item...'),
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          contentPadding: const EdgeInsets.all(16),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // ===== STATUS =====
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5F6F8),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      )
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.settings_outlined, size: 22),
-                      const SizedBox(width: 12),
-                      Text(
-                        langProvider.get('Status', 'Status'),
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const Spacer(),
-                      ValueListenableBuilder<bool>(
-                        valueListenable: isActiveItems,
-                        builder: (context, value, child) {
-                          return Text(
-                            "${langProvider.get(
-                              !value ? 'Non Active' : 'Active',
-                              !value ? 'Tidak Aktif' : 'Aktif',
-                            )} :",
-                            style: const TextStyle(fontSize: 16),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 20),
-                      StatusSwitch(
-                        initialValue: isActiveItems.value,
-                        onChanged: (bool value) {
-                          isActiveItems.value =
-                              value; // simpan ke variable utama
-                          print("Status sekarang: ${isActiveItems.value}");
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-
-                ValueListenableBuilder<List<Item>>(
-                  valueListenable: itemsArrNotifier,
-                  builder: (context, items, child) {
-                    if (items.isEmpty) {
-                      return const SizedBox(); // belum ada data
-                    }
-
-                    return Column(
-                      children: [
-                        const SizedBox(height: 30),
-                        const Divider(),
-                        SizedBox(
-                          height: 200,
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(minWidth: 700),
-                              child: DataTable(
-                                columnSpacing: 20,
-                                columns: const [
-                                  DataColumn(label: Text("No.")),
-                                  DataColumn(label: Text("Item Name")),
-                                  DataColumn(label: Text("Item Type")),
-                                  DataColumn(label: Text("Item Unit")),
-                                  DataColumn(label: Text("Item Price")),
-                                  DataColumn(label: Text("Item Brand")),
-                                  DataColumn(label: Text("Description")),
-                                  DataColumn(label: Text("Status")),
-                                  DataColumn(label: Text("Action")),
-                                ],
-                                rows: items.asMap().entries.map((entry) {
-                                  final item = entry.value;
-
-                                  return DataRow(
-                                    cells: [
-                                      DataCell(Text("${entry.key + 1}")),
-                                      DataCell(Text(item.item_name)),
-                                      DataCell(Text(item.item_type)),
-                                      DataCell(Text(item.item_pack)),
-                                      DataCell(
-                                          Text(item.item_price.toString())),
-                                      DataCell(Text(item.item_brand)),
-                                      DataCell(Text(item.item_description)),
-                                      DataCell(Text(
-                                        item.item_status
-                                            ? "ACTIVE"
-                                            : "NON ACTIVE",
-                                      )),
-                                      DataCell(
-                                        IconButton(
-                                          icon: const Icon(Icons.delete,
-                                              color: Colors.red),
-                                          onPressed: () {
-                                            deleteItem(entry.key);
-                                          },
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-                // ],
-                const SizedBox(height: 30),
-                const Divider(),
-                const SizedBox(height: 20),
-
-                // ===== BUTTONS =====
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 12),
-                        backgroundColor: Colors.grey[200],
-                        side: BorderSide.none,
-                      ),
-                      onPressed: () {},
-                      child: Text(
-                        langProvider.get('Cancel', 'Batal'),
-                        style: const TextStyle(fontSize: 16),
-                      ),
+                // Item Name
+                _FieldRow(
+                  label: langProvider.get('Item Name', 'Nama Item'),
+                  child: TextField(
+                    controller: _itemNameController,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: InputDecoration(
+                      hintText:
+                          langProvider.get('Enter name', 'Isi nama (item)'),
                     ),
-                    const SizedBox(width: 7),
-                    Row(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: Colors.blue,
-                              width: 1.5,
-                            ),
-                          ),
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 8),
-                            ),
-                            onPressed: addItem,
-                            child: Row(
-                              children: [
-                                const Icon(Icons.add,
-                                    size: 18, color: Colors.blue),
-                                Text(
-                                  langProvider.get('Add More', 'Tambah'),
-                                  style: const TextStyle(
-                                      fontSize: 16, color: Colors.blue),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 7),
-                        Container(
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF2E6BC5), Color(0xFF1E4FA3)],
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 12),
-                              //     horizontal: 50, vertical: 18),
-                            ),
-                            onPressed: saveItemsToBackend,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Outlet (scope: satu outlet spesifik atau Semua Outlet)
+                _FieldRow(
+                  label: langProvider.get('Outlet', 'Outlet'),
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey('outlet-${_selectedOutcode ?? ''}'),
+                    initialValue: _selectedOutcode,
+                    isExpanded: true,
+                    items: [
+                      ..._myOutlets.map((o) => DropdownMenuItem(
+                            value: o.outlet_code,
                             child: Text(
-                              langProvider.get('Save Item', 'Simpan Item'),
-                              style: const TextStyle(fontSize: 16),
+                              o.outlet_name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
+                          )),
+                      DropdownMenuItem(
+                        value: allOutletsSentinel,
+                        child: Text(
+                            langProvider.get('All Outlets', 'Semua Outlet')),
+                      ),
+                    ],
+                    onChanged: (v) => setState(() => _selectedOutcode = v),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Item Pack
+                _FieldRow(
+                  label: langProvider.get('Item Unit', 'Satuan Item'),
+                  child: TextField(
+                    controller: _itemPackController,
+                    decoration: InputDecoration(
+                      hintText: langProvider.get('Enter unit', 'Isi satuan'),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Item Price
+                _FieldRow(
+                  label: langProvider.get('Item Price', 'Harga Item'),
+                  child: TextField(
+                    controller: _itemPriceController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      prefixIcon: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedCurrency,
+                            isDense: true,
+                            items: const [
+                              DropdownMenuItem(
+                                value: "IDR",
+                                child: Text("Rp"),
+                              ),
+                              DropdownMenuItem(
+                                value: "USD",
+                                child: Text("\$"),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedCurrency = value!;
+                                _itemPriceController.text =
+                                    formatCurrency(_itemPriceController.text);
+                              });
+                            },
                           ),
                         ),
-                      ],
+                      ),
+                      hintText: langProvider.get('Enter price', 'Isi harga'),
                     ),
-                  ],
+                    onChanged: (value) {
+                      final formatted = formatCurrency(value);
+
+                      _itemPriceController.value = TextEditingValue(
+                        text: formatted,
+                        selection:
+                            TextSelection.collapsed(offset: formatted.length),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Item Brand
+                _FieldRow(
+                  label: langProvider.get('Item Brand', 'Merek Item'),
+                  child: TextField(
+                    controller: _itemBrandController,
+                    decoration: InputDecoration(
+                      hintText: langProvider.get('Enter brand', 'Isi merek'),
+                      helperText: _isTherapyOutlet
+                          ? langProvider.get(
+                              'Brand THERAPY goes straight to the sales menu; other brands need Add Stock first',
+                              'Merek THERAPY langsung masuk menu sales; merek lain wajib Add Stock dulu')
+                          : null,
+                      helperMaxLines: 3,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-        ),
+
+          const SizedBox(height: 16),
+
+          // ===== FOTO ITEM (opsional) =====
+          SectionCard(
+            title: langProvider.get(
+                'Item Photo (optional)', 'Foto Item (opsional)'),
+            icon: Icons.image_outlined,
+            child: !_canPickItemPhoto
+                ? Text(
+                    langProvider.get(
+                        'Photo can only be added when saving one item to one specific outlet (not "All Outlets" / not after "Add More").',
+                        'Foto hanya bisa ditambahkan saat menyimpan satu item ke satu outlet tertentu (bukan mode "Semua Outlet" / setelah "Tambah").'),
+                    style: textTheme.bodySmall,
+                  )
+                : Wrap(
+                    spacing: 16,
+                    runSpacing: 12,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      InkWell(
+                        onTap: _pickItemPhoto,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        child: Container(
+                          width: 88,
+                          height: 88,
+                          decoration: BoxDecoration(
+                            color: AppColors.background,
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: _pickedItemPhoto != null
+                              ? ClipRRect(
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.md),
+                                  child: Image.file(_pickedItemPhoto!,
+                                      fit: BoxFit.cover),
+                                )
+                              : const Icon(Icons.add_a_photo_outlined,
+                                  color: AppColors.muted),
+                        ),
+                      ),
+                      if (_pickedItemPhoto != null)
+                        TextButton.icon(
+                          onPressed: () =>
+                              setState(() => _pickedItemPhoto = null),
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          label: Text(
+                              langProvider.get('Remove photo', 'Hapus foto')),
+                        )
+                      else
+                        Text(
+                          langProvider.get(
+                              'Tap the box to pick a photo. Max 2 MB',
+                              'Ketuk kotak untuk pilih foto. Maks 2 MB'),
+                          style: textTheme.bodySmall,
+                        ),
+                    ],
+                  ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // ===== DESCRIPTION =====
+          SectionCard(
+            title: langProvider.get('Description', 'Deskripsi'),
+            icon: Icons.description_outlined,
+            child: TextField(
+              maxLines: 5,
+              minLines: 3,
+              controller: _itemDescriptionController,
+              decoration: InputDecoration(
+                hintText: langProvider.get(
+                    'Enter item description...', 'Masukkan deskripsi item...'),
+                alignLabelWithHint: true,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // ===== STATUS =====
+          ValueListenableBuilder<bool>(
+            valueListenable: isActiveItems,
+            builder: (context, value, child) {
+              return Card(
+                child: SwitchListTile(
+                  value: value,
+                  onChanged: (v) => isActiveItems.value = v,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  secondary: Container(
+                    width: 36,
+                    height: 36,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.blueLight,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: const Icon(Icons.toggle_on_outlined,
+                        size: 20, color: AppColors.blue),
+                  ),
+                  title: Text(langProvider.get('Status', 'Status'),
+                      style: textTheme.titleMedium),
+                  subtitle: Text(
+                    langProvider.get(
+                      !value ? 'Non Active' : 'Active',
+                      !value ? 'Tidak Aktif' : 'Aktif',
+                    ),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: value ? AppColors.successDark : AppColors.muted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+
+          ValueListenableBuilder<List<Item>>(
+            valueListenable: itemsArrNotifier,
+            builder: (context, items, child) {
+              if (items.isEmpty) {
+                return const SizedBox(); // belum ada data
+              }
+
+              return Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: SectionCard(
+                  title: langProvider.get(
+                      'Items to be saved', 'Barang yang akan disimpan'),
+                  description: '${items.length} item',
+                  icon: Icons.playlist_add_check_rounded,
+                  dense: true,
+                  child: HorizontalScrollTable(
+                    child: DataTable(
+                      columns: const [
+                        DataColumn(label: Text("No.")),
+                        DataColumn(label: Text("Item Name")),
+                        DataColumn(label: Text("Item Type")),
+                        DataColumn(label: Text("Item Unit")),
+                        DataColumn(label: Text("Item Price")),
+                        DataColumn(label: Text("Item Brand")),
+                        DataColumn(label: Text("Description")),
+                        DataColumn(label: Text("Status")),
+                        DataColumn(label: Text("Action")),
+                      ],
+                      rows: items.asMap().entries.map((entry) {
+                        final item = entry.value;
+
+                        return DataRow(
+                          cells: [
+                            DataCell(Text("${entry.key + 1}")),
+                            DataCell(Text(item.item_name)),
+                            DataCell(Text(item.item_type)),
+                            DataCell(Text(item.item_pack)),
+                            DataCell(Text(item.item_price.toString())),
+                            DataCell(Text(item.item_brand)),
+                            DataCell(ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 220),
+                              child: Text(
+                                item.item_description,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            )),
+                            DataCell(Text(
+                              item.item_status ? "ACTIVE" : "NON ACTIVE",
+                            )),
+                            DataCell(
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline_rounded,
+                                    color: AppColors.error),
+                                onPressed: () {
+                                  deleteItem(entry.key);
+                                },
+                              ),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+
+          const SizedBox(height: 20),
+
+          // ===== BUTTONS =====
+          ResponsiveActions(
+            alignment: WrapAlignment.end,
+            fullWidthOnCompact: true,
+            children: [
+              TextButton(
+                onPressed: () {},
+                child: Text(langProvider.get('Cancel', 'Batal')),
+              ),
+              OutlinedButton.icon(
+                onPressed: addItem,
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: Text(langProvider.get('Add More', 'Tambah')),
+              ),
+              ElevatedButton.icon(
+                onPressed: saveItemsToBackend,
+                icon: const Icon(Icons.save_outlined, size: 18),
+                label: Text(langProvider.get('Save Item', 'Simpan Item')),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-// ----------------------- button -----------------------
-class StatusSwitch extends StatefulWidget {
-  final bool initialValue;
-  final Function(bool) onChanged;
+/// Baris label + field: di HP label di atas field, di layar lebar label
+/// berada di kiri (lebar tetap 140) -- tidak pernah meluap.
+class _FieldRow extends StatelessWidget {
+  final String label;
+  final Widget child;
 
-  const StatusSwitch({
-    super.key,
-    required this.initialValue,
-    required this.onChanged,
-  });
-
-  @override
-  State<StatusSwitch> createState() => _StatusSwitchState();
-}
-
-class _StatusSwitchState extends State<StatusSwitch> {
-  late bool isActive;
-
-  @override
-  void initState() {
-    super.initState();
-    isActive = widget.initialValue;
-  }
+  const _FieldRow({required this.label, required this.child});
 
   @override
   Widget build(BuildContext context) {
-    return Switch(
-      value: isActive,
-      activeColor: Colors.green,
-      inactiveThumbColor: Colors.grey, // ✅ ADDED
-      inactiveTrackColor: Colors.grey.shade300, // ✅ ADDED
-      onChanged: (bool value) {
-        setState(() {
-          isActive = value;
-        });
-
-        widget.onChanged(value); // kirim nilai ke parent
-      },
+    final textTheme = Theme.of(context).textTheme;
+    final labelText = Text(
+      label,
+      style: textTheme.titleSmall,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    );
+    if (context.isCompact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          labelText,
+          const SizedBox(height: 6),
+          child,
+        ],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(width: 140, child: labelText),
+        const SizedBox(width: 12),
+        Expanded(child: child),
+      ],
     );
   }
 }
 
-// ----------------------- button -----------------------
+/// Kartu satu barang di daftar: tampilan ringkas + mode edit inline
+/// (menggantikan DataTable 9 kolom yang tidak muat di HP).
+class _ItemTile extends StatelessWidget {
+  final ItemResponse item;
+  final bool isEditing;
+  final Map<String, String> photoHeaders;
+  final String priceLabel;
+  final TextEditingController nameController;
+  final TextEditingController typeController;
+  final TextEditingController packController;
+  final TextEditingController priceController;
+  final TextEditingController brandController;
+  final TextEditingController descriptionController;
+  final ValueNotifier<String> statusNotifier;
+  final VoidCallback onEdit;
+  final VoidCallback onSave;
+  final VoidCallback onCancel;
+  final VoidCallback onDelete;
+
+  const _ItemTile({
+    required this.item,
+    required this.isEditing,
+    required this.photoHeaders,
+    required this.priceLabel,
+    required this.nameController,
+    required this.typeController,
+    required this.packController,
+    required this.priceController,
+    required this.brandController,
+    required this.descriptionController,
+    required this.statusNotifier,
+    required this.onEdit,
+    required this.onSave,
+    required this.onCancel,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final active = item.item_status == 'ACTIVE';
+    final status = item.item_status.isEmpty ? '-' : item.item_status;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: isEditing ? AppColors.blue : AppColors.border,
+          width: isEditing ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _Thumb(item: item, headers: photoHeaders),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.item_name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Rp $priceLabel',
+                      style:
+                          textTheme.titleSmall?.copyWith(color: AppColors.blue),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (!isEditing)
+                _Pill(
+                  label: status,
+                  background:
+                      active ? AppColors.successLight : AppColors.chipBg,
+                  foreground: active ? AppColors.successDark : AppColors.muted,
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (isEditing) ...[
+            _TwoColumn(children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Nama'),
+              ),
+              TextField(
+                controller: typeController,
+                decoration: const InputDecoration(labelText: 'Tipe'),
+              ),
+              TextField(
+                controller: packController,
+                decoration: const InputDecoration(labelText: 'Satuan'),
+              ),
+              TextField(
+                controller: priceController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Harga'),
+              ),
+              TextField(
+                controller: brandController,
+                decoration: const InputDecoration(labelText: 'Merek'),
+              ),
+              ValueListenableBuilder<String>(
+                valueListenable: statusNotifier,
+                builder: (context, value, _) {
+                  final current = value == 'ACTIVE' || value == 'NONACTIVE'
+                      ? value
+                      : 'ACTIVE';
+                  return DropdownButtonFormField<String>(
+                    key: ValueKey(current),
+                    initialValue: current,
+                    decoration: const InputDecoration(labelText: 'Status'),
+                    items: const [
+                      DropdownMenuItem(value: "ACTIVE", child: Text("ACTIVE")),
+                      DropdownMenuItem(
+                          value: "NONACTIVE", child: Text("NONACTIVE")),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) statusNotifier.value = val;
+                    },
+                  );
+                },
+              ),
+            ]),
+            const SizedBox(height: 10),
+            TextField(
+              controller: descriptionController,
+              maxLines: 3,
+              minLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Deskripsi',
+                alignLabelWithHint: true,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: onSave,
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.successDark),
+                    icon: const Icon(Icons.save_outlined, size: 18),
+                    label: const Text('Simpan'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onCancel,
+                    child: const Text('Batal'),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                if (item.item_type.isNotEmpty)
+                  _Pill(icon: Icons.category_outlined, label: item.item_type),
+                if (item.item_pack.isNotEmpty)
+                  _Pill(icon: Icons.straighten_rounded, label: item.item_pack),
+                if (item.item_brand.isNotEmpty)
+                  _Pill(icon: Icons.sell_outlined, label: item.item_brand),
+              ],
+            ),
+            if (item.item_description.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                item.item_description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodySmall,
+              ),
+            ],
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Edit'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onDelete,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                      side: BorderSide(
+                          color: AppColors.error.withValues(alpha: 0.5)),
+                    ),
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                    label: const Text('Hapus'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _Thumb extends StatelessWidget {
+  final ItemResponse item;
+  final Map<String, String> headers;
+
+  const _Thumb({required this.item, required this.headers});
+
+  @override
+  Widget build(BuildContext context) {
+    final placeholder = Container(
+      width: 52,
+      height: 52,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.chipBg,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: const Icon(Icons.image_not_supported_outlined,
+          size: 22, color: AppColors.muted),
+    );
+    if (item.item_photo.isEmpty) return placeholder;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: Image.network(
+        ItemsApi().itemPhotoUrl(item.item_id),
+        headers: headers,
+        width: 52,
+        height: 52,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => placeholder,
+      ),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final Color? background;
+  final Color? foreground;
+
+  const _Pill({
+    required this.label,
+    this.icon,
+    this.background,
+    this.foreground,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = foreground ?? AppColors.ink;
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 200),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: background ?? AppColors.chipBg,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 14, color: AppColors.muted),
+            const SizedBox(width: 4),
+          ],
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: fg,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 1 kolom di HP, 2 kolom di layar lebar.
+class _TwoColumn extends StatelessWidget {
+  final List<Widget> children;
+
+  const _TwoColumn({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    if (context.isCompact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            children[i],
+          ],
+        ],
+      );
+    }
+    final rows = <Widget>[];
+    for (var i = 0; i < children.length; i += 2) {
+      rows.add(Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: children[i]),
+          const SizedBox(width: 10),
+          Expanded(
+            child: i + 1 < children.length
+                ? children[i + 1]
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ));
+      if (i + 2 < children.length) rows.add(const SizedBox(height: 10));
+    }
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch, children: rows);
+  }
+}

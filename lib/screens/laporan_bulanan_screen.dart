@@ -5,9 +5,11 @@ import '../config/theme.dart';
 import '../models/sales_report_model.dart';
 import '../services/sales_api.dart';
 import '../utils/constants.dart';
+import '../utils/responsive.dart';
 import '../utils/storage.dart';
 import '../utils/text_formatter.dart';
 import '../utils/toast.dart';
+import '../widgets/empty_state.dart';
 
 /// Tab laporan PER BULAN: pilih bulan → total penjualan per blok minggu
 /// (1–7, 8–14, dst) + total keseluruhan bulan.
@@ -75,29 +77,35 @@ class _LaporanBulananViewState extends State<LaporanBulananView>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final pad = context.pagePadding;
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.fromLTRB(pad, 8, pad, 8),
           child: Row(
             children: [
               Expanded(
                 child: InkWell(
                   onTap: _pickMonth,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   child: InputDecorator(
                     decoration: const InputDecoration(
                       labelText: 'Bulan',
-                      prefixIcon: Icon(Icons.calendar_month),
-                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.calendar_month_rounded),
                       isDense: true,
                     ),
-                    child: Text(_report?.label ??
-                        DateFormat('MMMM yyyy', 'id_ID').format(_month)),
+                    child: Text(
+                      _report?.label ??
+                          DateFormat('MMMM yyyy', 'id_ID').format(_month),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
               ),
+              const SizedBox(width: 6),
               IconButton(
-                icon: const Icon(Icons.refresh),
+                icon: const Icon(Icons.refresh_rounded),
                 tooltip: 'Muat ulang',
                 onPressed: _load,
               ),
@@ -108,9 +116,14 @@ class _LaporanBulananViewState extends State<LaporanBulananView>
           child: _loading
               ? const Center(child: CircularProgressIndicator())
               : (_report == null || _report!.weeks.isEmpty)
-                  ? Center(
-                      child: Text('Tidak ada data',
-                          style: TextStyle(color: Colors.grey[600])))
+                  ? const SingleChildScrollView(
+                      child: EmptyState(
+                      icon: Icons.calendar_month_outlined,
+                      title: 'Tidak ada data',
+                      description:
+                          'Belum ada penjualan di bulan ini. Coba pilih bulan lain.',
+                      compact: true,
+                    ))
                   : _list(),
         ),
         if (!_loading && _report != null) _grandTotalBar(),
@@ -120,38 +133,50 @@ class _LaporanBulananViewState extends State<LaporanBulananView>
 
   Widget _list() {
     final weeks = _report!.weeks;
-    return Column(
-      children: [
-        _headerRow(),
-        Expanded(
-          child: ListView.separated(
-            itemCount: weeks.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, i) {
-              final w = weeks[i];
-              return _dataRow(w);
-            },
-          ),
+    final pad = context.pagePadding;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(pad, 4, pad, 8),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: AppColors.border),
         ),
-      ],
+        child: Column(
+          children: [
+            _headerRow(),
+            Expanded(
+              child: ListView.separated(
+                itemCount: weeks.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, i) {
+                  final w = weeks[i];
+                  return _dataRow(w);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _headerRow() {
-    const s = TextStyle(fontWeight: FontWeight.bold, fontSize: 13);
+    final s = Theme.of(context).textTheme.labelSmall;
     return Container(
-      color: AppTheme.primaryTeal.withValues(alpha: 0.18),
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      color: AppColors.tableHead,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
       child: Row(
-        children: const [
-          Expanded(flex: 4, child: Text('Minggu (tgl)', style: s)),
+        children: [
+          Expanded(flex: 4, child: Text('MINGGU (TGL)', style: s)),
           Expanded(
               flex: 2,
-              child: Text('Nota', style: s, textAlign: TextAlign.center)),
+              child: Text('NOTA', style: s, textAlign: TextAlign.center)),
           Expanded(
               flex: 4,
-              child:
-                  Text('Total Penjualan', style: s, textAlign: TextAlign.right)),
+              child: Text('TOTAL PENJUALAN',
+                  style: s, textAlign: TextAlign.right)),
         ],
       ),
     );
@@ -160,47 +185,62 @@ class _LaporanBulananViewState extends State<LaporanBulananView>
   Widget _dataRow(WeeklyTotal w) {
     final hasSale = w.total > 0;
     final style = TextStyle(
-        fontSize: 13, color: hasSale ? Colors.black87 : Colors.grey);
+        fontSize: 13, color: hasSale ? AppColors.ink : AppColors.muted);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
       child: Row(
         children: [
           Expanded(
             flex: 4,
-            child: Text('Minggu ${w.weekNo}  (${w.label})', style: style),
+            child: Text('Minggu ${w.weekNo}  (${w.label})',
+                style: style, maxLines: 2, overflow: TextOverflow.ellipsis),
           ),
           Expanded(
               flex: 2,
-              child:
-                  Text('${w.count}', style: style, textAlign: TextAlign.center)),
+              child: Text('${w.count}',
+                  style: style, textAlign: TextAlign.center)),
           Expanded(
               flex: 4,
               child: Text(TextFormatter.formatRupiah(w.total),
                   style: style.copyWith(fontWeight: FontWeight.w600),
-                  textAlign: TextAlign.right)),
+                  textAlign: TextAlign.right,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis)),
         ],
       ),
     );
   }
 
   Widget _grandTotalBar() {
-    return SafeArea(
-      top: false,
-      child: Container(
-        width: double.infinity,
-        color: AppTheme.primaryTeal.withValues(alpha: 0.15),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Total Keseluruhan',
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            Text(TextFormatter.formatRupiah(_report!.grandTotal),
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: AppTheme.primaryBlue)),
-          ],
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+              horizontal: context.pagePadding, vertical: 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text('Total Keseluruhan',
+                    style: textTheme.titleSmall,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                TextFormatter.formatRupiah(_report!.grandTotal),
+                style: textTheme.titleMedium?.copyWith(
+                  color: AppColors.blue,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

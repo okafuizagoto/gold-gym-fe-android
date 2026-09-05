@@ -7,11 +7,14 @@ import '../config/theme.dart';
 import '../providers/buyer_cart_provider.dart';
 import '../services/sales_api.dart';
 import '../utils/constants.dart';
+import '../utils/responsive.dart';
 import '../utils/storage.dart';
 import '../utils/text_formatter.dart';
 import '../utils/toast.dart';
+import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/buyer_outlet_picker.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
 import 'receipt_preview_screen.dart';
 
@@ -85,7 +88,7 @@ class _BuyerShopScreenState extends State<BuyerShopScreen> {
           SimpleDialogOption(
             onPressed: () => Navigator.pop(dialogContext, ImageSource.camera),
             child: const Row(children: [
-              Icon(Icons.photo_camera),
+              Icon(Icons.photo_camera_outlined),
               SizedBox(width: 8),
               Text('Ambil dari Kamera'),
             ]),
@@ -93,7 +96,7 @@ class _BuyerShopScreenState extends State<BuyerShopScreen> {
           SimpleDialogOption(
             onPressed: () => Navigator.pop(dialogContext, ImageSource.gallery),
             child: const Row(children: [
-              Icon(Icons.photo_library),
+              Icon(Icons.photo_library_outlined),
               SizedBox(width: 8),
               Text('Pilih dari Galeri'),
             ]),
@@ -164,18 +167,21 @@ class _BuyerShopScreenState extends State<BuyerShopScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Konfirmasi Pembelian'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Outlet: ${cart.outletName.toUpperCase()}'),
-            const SizedBox(height: 4),
-            Text(
-                'Total: ${TextFormatter.formatRupiah(cart.total)} (${cart.itemCount} barang)'),
-            const SizedBox(height: 12),
-            const Text('Pilih jenis pembayaran:'),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Outlet: ${cart.outletName.toUpperCase()}'),
+              const SizedBox(height: 4),
+              Text(
+                  'Total: ${TextFormatter.formatRupiah(cart.total)} (${cart.itemCount} barang)'),
+              const SizedBox(height: 12),
+              const Text('Pilih jenis pembayaran:'),
+            ],
+          ),
         ),
+        // OverflowBar: tombol turun baris sendiri di HP sempit
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, 'UNPAID'),
@@ -183,17 +189,12 @@ class _BuyerShopScreenState extends State<BuyerShopScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade600,
-              foregroundColor: Colors.white,
+              backgroundColor: AppColors.successDark,
             ),
             onPressed: () => Navigator.pop(dialogContext, 'TUNAI'),
             child: const Text('TUNAI'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade600,
-              foregroundColor: Colors.white,
-            ),
             onPressed: () => Navigator.pop(dialogContext, 'BANK'),
             child: const Text('TRANSFER BANK'),
           ),
@@ -207,8 +208,7 @@ class _BuyerShopScreenState extends State<BuyerShopScreen> {
       proof = await _pickProofImage();
       if (proof == null) {
         if (mounted) {
-          Toast.error(
-              context, 'Transfer bank butuh foto bukti pembayaran');
+          Toast.error(context, 'Transfer bank butuh foto bukti pembayaran');
         }
         return;
       }
@@ -291,133 +291,153 @@ class _BuyerShopScreenState extends State<BuyerShopScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final pad = context.pagePadding;
     return PrivateRoute(
       child: Consumer<BuyerCartProvider>(
         builder: (context, cart, child) {
+          final textTheme = Theme.of(context).textTheme;
           return Scaffold(
-            backgroundColor: AppTheme.background,
-            appBar: AppBar(title: const Text('Point of Sale')),
+            appBar: const AppBarCustom(title: 'Point of Sale'),
             drawer: const AppDrawer(),
-            body: Column(
-              children: [
-                // outlet tujuan belanja terpilih (ganti via layar Pilih Outlet)
-                const BuyerOutletBar(),
-
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.search),
-                      label: const Text('CARI BARANG (LIST BARANG)'),
-                      onPressed: () =>
-                          Navigator.pushNamed(context, '/list-barang'),
+            body: SafeArea(
+              top: false,
+              child: ContentWidth(
+                child: Column(
+                  children: [
+                    // outlet tujuan belanja terpilih (ganti via layar Pilih Outlet)
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(pad, 12, pad, 8),
+                      child: const BuyerOutletBar(),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                // keranjang bersama (diisi dari List Barang)
-                Expanded(
-                  child: cart.lines.isEmpty
-                      ? Center(
-                          child: Text(
-                            cart.hasOutlet
-                                ? 'Keranjang kosong.\nTambahkan barang dari menu List Barang.'
-                                : 'Pilih outlet tujuan belanja dulu.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey[600]),
-                          ),
-                        )
-                      : ListView(
-                          children: cart.lines
-                              .map((line) => Card(
-                                    margin: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 4),
-                                    child: ListTile(
-                                      dense: true,
-                                      title: Text(line.stock.stock_name),
-                                      subtitle: Text(
-                                          TextFormatter.formatRupiah(
-                                              line.total)),
-                                      trailing: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(
-                                                Icons.remove_circle_outline),
-                                            onPressed: () =>
-                                                cart.decrease(line),
-                                          ),
-                                          Text('${line.qty}'),
-                                          IconButton(
-                                            icon: const Icon(
-                                                Icons.add_circle_outline),
-                                            onPressed: () {
-                                              if (!cart
-                                                  .addItem(line.stock)) {
-                                                Toast.error(context,
-                                                    'Stok tidak cukup');
-                                              }
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ))
-                              .toList(),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: pad),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.search_rounded, size: 18),
+                          label: const Text('CARI BARANG (LIST BARANG)'),
+                          onPressed: () =>
+                              Navigator.pushNamed(context, '/list-barang'),
                         ),
-                ),
-
-                // total + tombol beli
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 6,
-                        offset: const Offset(0, -2),
                       ),
-                    ],
-                  ),
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // keranjang bersama (diisi dari List Barang)
+                    Expanded(
+                      child: cart.lines.isEmpty
+                          ? EmptyState(
+                              icon: Icons.shopping_cart_outlined,
+                              title: cart.hasOutlet
+                                  ? 'Keranjang kosong'
+                                  : 'Pilih outlet tujuan belanja dulu',
+                              description: cart.hasOutlet
+                                  ? 'Tambahkan barang dari menu List Barang.'
+                                  : null,
+                              compact: context.isShort,
+                            )
+                          : ListView(
+                              padding: EdgeInsets.fromLTRB(pad, 0, pad, pad),
+                              children: cart.lines
+                                  .map((line) => Card(
+                                        margin:
+                                            const EdgeInsets.only(bottom: 8),
+                                        child: ListTile(
+                                          dense: true,
+                                          title: Text(line.stock.stock_name,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis),
+                                          subtitle: Text(
+                                              TextFormatter.formatRupiah(
+                                                  line.total)),
+                                          trailing: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              IconButton(
+                                                visualDensity:
+                                                    VisualDensity.compact,
+                                                icon: const Icon(Icons
+                                                    .remove_circle_outline),
+                                                onPressed: () =>
+                                                    cart.decrease(line),
+                                              ),
+                                              Text('${line.qty}',
+                                                  style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w700)),
+                                              IconButton(
+                                                visualDensity:
+                                                    VisualDensity.compact,
+                                                icon: const Icon(
+                                                    Icons.add_circle_outline),
+                                                onPressed: () {
+                                                  if (!cart
+                                                      .addItem(line.stock)) {
+                                                    Toast.error(context,
+                                                        'Stok tidak cukup');
+                                                  }
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ))
+                                  .toList(),
+                            ),
+                    ),
+
+                    // total + tombol beli
+                    Container(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: pad, vertical: 10),
+                      decoration: const BoxDecoration(
+                        color: AppColors.surface,
+                        border:
+                            Border(top: BorderSide(color: AppColors.border)),
+                      ),
                       child: Row(
                         children: [
                           Expanded(
-                            child: Text(
-                              'Total: ${TextFormatter.formatRupiah(cart.total)}',
-                              style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text('Total', style: textTheme.bodySmall),
+                                Text(
+                                  TextFormatter.formatRupiah(cart.total),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: textTheme.titleMedium
+                                      ?.copyWith(color: AppColors.blue),
+                                ),
+                              ],
                             ),
                           ),
+                          const SizedBox(width: 12),
                           ElevatedButton.icon(
                             icon: _isSaving
                                 ? const SizedBox(
                                     width: 16,
                                     height: 16,
                                     child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white),
+                                        strokeWidth: 2, color: Colors.white),
                                   )
-                                : const Icon(Icons.shopping_cart_checkout),
+                                : const Icon(
+                                    Icons.shopping_cart_checkout_rounded,
+                                    size: 20),
                             label: const Text('BELI'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green.shade600,
-                              foregroundColor: Colors.white,
+                              backgroundColor: AppColors.successDark,
+                              minimumSize: const Size(0, 48),
                             ),
-                            onPressed:
-                                _isSaving ? null : () => _checkout(cart),
+                            onPressed: _isSaving ? null : () => _checkout(cart),
                           ),
                         ],
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           );
         },

@@ -3,8 +3,13 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../models/order_model.dart';
 import '../services/order_api.dart';
+import '../utils/responsive.dart';
 import '../utils/text_formatter.dart';
+import '../widgets/app_bar_custom.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/info_row.dart';
 import '../widgets/private_route.dart';
+import '../widgets/section_card.dart';
 
 /// Rincian satu pesanan pembeli: daftar barang + status pesanan
 /// (menunggu konfirmasi penjual / sedang diproses / selesai / ditolak).
@@ -43,18 +48,19 @@ class _BuyerOrderDetailScreenState extends State<BuyerOrderDetailScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
-  Color _statusColor(String status) {
+  // (latar, teks) per status pesanan -- warna sama dengan chip web
+  (Color, Color) _statusColors(String status) {
     switch (status) {
       case 'WAITING':
-        return Colors.orange;
+        return (AppColors.warningLight, AppColors.warningDark);
       case 'PROCESS':
-        return Colors.blue;
+        return (AppColors.infoLight, AppColors.infoDark);
       case 'FINISH':
-        return Colors.green;
+        return (AppColors.successLight, AppColors.successDark);
       case 'REJECT':
-        return Colors.red;
+        return (AppColors.errorLight, AppColors.errorDark);
       default:
-        return Colors.grey;
+        return (AppColors.chipBg, AppColors.muted);
     }
   }
 
@@ -62,99 +68,131 @@ class _BuyerOrderDetailScreenState extends State<BuyerOrderDetailScreen> {
   Widget build(BuildContext context) {
     return PrivateRoute(
       child: Scaffold(
-        backgroundColor: AppTheme.background,
-        appBar: AppBar(title: const Text('Detail Pesanan')),
+        appBar: const AppBarCustom(title: 'Detail Pesanan'),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _data == null
-                ? Center(
-                    child: Text('Pesanan tidak ditemukan',
-                        style: TextStyle(color: Colors.grey[600])))
-                : _content(_data!),
+                ? const PageBody(
+                    child: EmptyState(
+                    icon: Icons.receipt_long_outlined,
+                    title: 'Pesanan tidak ditemukan',
+                    description:
+                        'Pesanan mungkin sudah dihapus atau koneksi bermasalah.',
+                  ))
+                : PageBody(maxWidth: 720, child: _content(_data!)),
       ),
     );
   }
 
   Widget _content(BuyerOrderWithDetail d) {
     final h = d.header;
-    return ListView(
-      padding: const EdgeInsets.all(12),
+    final textTheme = Theme.of(context).textTheme;
+    final (bg, fg) = _statusColors(h.orderStatus);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // status besar
         Container(
-          width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: _statusColor(h.orderStatus).withOpacity(0.12),
-            borderRadius: BorderRadius.circular(10),
+            color: bg,
+            borderRadius: BorderRadius.circular(AppRadius.card),
           ),
           child: Column(
             children: [
               Icon(
                 h.orderStatus == 'FINISH'
-                    ? Icons.check_circle
+                    ? Icons.check_circle_rounded
                     : h.orderStatus == 'REJECT'
-                        ? Icons.cancel
-                        : Icons.hourglass_top,
-                color: _statusColor(h.orderStatus),
+                        ? Icons.cancel_rounded
+                        : Icons.hourglass_top_rounded,
+                color: fg,
                 size: 40,
               ),
               const SizedBox(height: 8),
               Text(
                 orderStatusLabel(h.orderStatus),
-                style: TextStyle(
-                    color: _statusColor(h.orderStatus),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16),
+                textAlign: TextAlign.center,
+                style: textTheme.titleMedium?.copyWith(color: fg),
               ),
               if (h.orderStatus == 'REJECT' &&
                   (h.orderRejectReason ?? '').isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Text('Alasan: ${h.orderRejectReason}',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.red)),
+                    style: textTheme.bodyMedium
+                        ?.copyWith(color: AppColors.errorDark)),
               ],
             ],
           ),
         ),
         const SizedBox(height: 12),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Outlet : ${h.orderOutletName}'),
-                Text('Pembayaran : ${h.orderPayType}'),
-                Text('Status bayar : ${h.isPaid ? "LUNAS" : "BELUM LUNAS"}'),
-              ],
-            ),
+        SectionCard(
+          title: 'Info pesanan',
+          icon: Icons.info_outline_rounded,
+          dense: true,
+          child: Column(
+            children: [
+              InfoRow(label: 'Outlet', value: h.orderOutletName),
+              InfoRow(label: 'Pembayaran', value: h.orderPayType),
+              InfoRow(
+                label: 'Status bayar',
+                value: h.isPaid ? 'LUNAS' : 'BELUM LUNAS',
+                color: h.isPaid ? AppColors.successDark : AppColors.warningDark,
+                bold: true,
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 12),
-        const Text('Barang dipesan',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        ...d.detail.map((item) => Card(
-              margin: const EdgeInsets.symmetric(vertical: 3),
-              child: ListTile(
-                dense: true,
-                title: Text(item.stockName),
-                subtitle: Text(
-                    '${item.qty} x ${TextFormatter.formatRupiah(item.price)}'),
-                trailing: Text(TextFormatter.formatRupiah(item.total),
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+        SectionCard(
+          title: 'Barang dipesan',
+          description: '${d.detail.length} jenis barang',
+          icon: Icons.shopping_basket_outlined,
+          dense: true,
+          child: Column(
+            children: [
+              for (final item in d.detail)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.stockName,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              '${item.qty} x ${TextFormatter.formatRupiah(item.price)}',
+                              style: textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        TextFormatter.formatRupiah(item.total),
+                        style: textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                ),
+              const Divider(height: 20),
+              InfoRow(
+                label: 'Total',
+                value: TextFormatter.formatRupiah(h.orderTotal),
+                highlight: true,
               ),
-            )),
-        const Divider(),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
-            Text(TextFormatter.formatRupiah(h.orderTotal),
-                style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          ],
+            ],
+          ),
         ),
       ],
     );

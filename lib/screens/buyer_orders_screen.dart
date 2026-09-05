@@ -1,10 +1,14 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../models/order_model.dart';
 import '../services/order_api.dart';
+import '../utils/responsive.dart';
 import '../utils/text_formatter.dart';
+import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
 
 /// Dashboard pembeli: daftar pesanan yang sudah dibuat, lengkap dengan
@@ -41,127 +45,173 @@ class _BuyerOrdersScreenState extends State<BuyerOrdersScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
-  Color _statusColor(String status) {
-    switch (status) {
-      case 'WAITING':
-        return Colors.orange;
-      case 'PROCESS':
-        return Colors.blue;
-      case 'FINISH':
-        return Colors.green;
-      case 'REJECT':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final pad = context.pagePadding;
+    // tengahkan daftar di tablet (padanan Container maxWidth di web)
+    final sidePad =
+        math.max(pad, (context.screenWidth - context.contentMaxWidth) / 2);
     return PrivateRoute(
       child: Scaffold(
-        backgroundColor: AppTheme.background,
-        appBar: AppBar(
-          title: const Text('Pesanan Saya'),
+        appBar: AppBarCustom(
+          title: 'Pesanan Saya',
           actions: [
-            IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+            IconButton(
+                tooltip: 'Muat ulang',
+                icon: const Icon(Icons.refresh_rounded),
+                onPressed: _load),
           ],
         ),
         drawer: const AppDrawer(),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _orders.isEmpty
-                ? Center(
-                    child: Text('Belum ada pesanan',
-                        style: TextStyle(color: Colors.grey[600])))
+                ? PageBody(
+                    child: EmptyState(
+                    icon: Icons.receipt_long_outlined,
+                    title: 'Belum ada pesanan',
+                    description:
+                        'Pesanan yang Anda buat dari menu Pesan Barang akan tampil di sini.',
+                    action: OutlinedButton.icon(
+                      icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+                      label: const Text('Pesan Barang'),
+                      onPressed: () => Navigator.pushNamed(context, '/belanja'),
+                    ),
+                  ))
                 : RefreshIndicator(
                     onRefresh: _load,
                     child: ListView.builder(
+                      padding: EdgeInsets.fromLTRB(sidePad, pad, sidePad, pad),
                       itemCount: _orders.length,
                       itemBuilder: (context, index) {
                         final o = _orders[index];
-                        return Card(
-                          margin: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 5),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(o.orderOutletName.toUpperCase(),
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.bold)),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: _statusColor(o.orderStatus)
-                                            .withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        orderStatusLabel(o.orderStatus),
-                                        style: TextStyle(
-                                            fontSize: 11,
-                                            color: _statusColor(o.orderStatus),
-                                            fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      o.orderPayType == 'TRANSFER'
-                                          ? Icons.account_balance
-                                          : Icons.payments,
-                                      size: 16,
-                                      color: Colors.grey[700],
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      '${o.orderPayType} • ${o.isPaid ? "LUNAS" : "BELUM LUNAS"}',
-                                      style: TextStyle(
-                                          fontSize: 12, color: Colors.grey[700]),
-                                    ),
-                                    const Spacer(),
-                                    Text(
-                                      TextFormatter.formatRupiah(o.orderTotal),
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                  ],
-                                ),
-                                if (o.orderStatus == 'REJECT' &&
-                                    (o.orderRejectReason ?? '').isNotEmpty) ...[
-                                  const SizedBox(height: 4),
-                                  Text('Alasan: ${o.orderRejectReason}',
-                                      style: const TextStyle(
-                                          fontSize: 12, color: Colors.red)),
-                                ],
-                                const SizedBox(height: 4),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton.icon(
-                                    icon: const Icon(Icons.list_alt, size: 18),
-                                    label: const Text('Detail'),
-                                    onPressed: () => Navigator.pushNamed(
-                                        context, '/pesanan-detail',
-                                        arguments: o.orderId),
-                                  ),
-                                ),
-                              ],
-                            ),
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _OrderCard(
+                            order: o,
+                            onDetail: () => Navigator.pushNamed(
+                                context, '/pesanan-detail',
+                                arguments: o.orderId),
                           ),
                         );
                       },
                     ),
                   ),
+      ),
+    );
+  }
+}
+
+class _OrderCard extends StatelessWidget {
+  final BuyerOrder order;
+  final VoidCallback onDetail;
+
+  const _OrderCard({required this.order, required this.onDetail});
+
+  (Color, Color) _statusColors(String status) {
+    switch (status) {
+      case 'WAITING':
+        return (AppColors.warningLight, AppColors.warningDark);
+      case 'PROCESS':
+        return (AppColors.infoLight, AppColors.infoDark);
+      case 'FINISH':
+        return (AppColors.successLight, AppColors.successDark);
+      case 'REJECT':
+        return (AppColors.errorLight, AppColors.errorDark);
+      default:
+        return (AppColors.chipBg, AppColors.muted);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final o = order;
+    final textTheme = Theme.of(context).textTheme;
+    final (bg, fg) = _statusColors(o.orderStatus);
+    return Card(
+      child: InkWell(
+        onTap: onDetail,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      o.orderOutletName.toUpperCase(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleSmall,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    constraints: const BoxConstraints(maxWidth: 150),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: bg,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: Text(
+                      orderStatusLabel(o.orderStatus),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 11, color: fg, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    o.orderPayType == 'TRANSFER'
+                        ? Icons.account_balance_outlined
+                        : Icons.payments_outlined,
+                    size: 16,
+                    color: AppColors.muted,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '${o.orderPayType} • ${o.isPaid ? "LUNAS" : "BELUM LUNAS"}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    TextFormatter.formatRupiah(o.orderTotal),
+                    style: textTheme.titleSmall,
+                  ),
+                ],
+              ),
+              if (o.orderStatus == 'REJECT' &&
+                  (o.orderRejectReason ?? '').isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text('Alasan: ${o.orderRejectReason}',
+                    style: textTheme.bodySmall
+                        ?.copyWith(color: AppColors.errorDark)),
+              ],
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.list_alt_rounded, size: 18),
+                  label: const Text('Detail'),
+                  onPressed: onDetail,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

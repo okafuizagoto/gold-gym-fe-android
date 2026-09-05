@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../utils/text_formatter.dart';
 
 class CurrencyInput extends StatefulWidget {
   final TextEditingController controller;
@@ -60,7 +59,7 @@ class _CurrencyInputState extends State<CurrencyInput> {
         labelText: widget.labelText,
         hintText: widget.hintText,
         prefixText: 'Rp ',
-        border: const OutlineInputBorder(),
+        prefixIcon: const Icon(Icons.payments_outlined, size: 20),
       ),
     );
   }
@@ -96,7 +95,8 @@ class _CurrencyInputFormatter extends TextInputFormatter {
 
     for (var i = 0; i < reversed.length; i += 3) {
       final end = i + 3;
-      chunks.add(reversed.substring(i, end > reversed.length ? reversed.length : end));
+      chunks.add(
+          reversed.substring(i, end > reversed.length ? reversed.length : end));
     }
 
     return chunks.join('.').split('').reversed.join('');

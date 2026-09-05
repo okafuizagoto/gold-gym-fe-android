@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../config/theme.dart';
+import '../utils/responsive.dart';
 import '../widgets/app_bar_custom.dart';
+import '../widgets/empty_state.dart';
 import '../services/discount_api.dart';
 import '../models/discount_model.dart';
 
@@ -41,51 +44,98 @@ class _DiscountVoucherHistoryScreenState
     }
   }
 
-  Color _statusColor(String status) {
+  ({Color bg, Color fg}) _statusColors(String status) {
     switch (status) {
       case 'USED':
-        return Colors.blue;
+        return (bg: AppColors.blueLight, fg: AppColors.blueDark);
       case 'EXPIRED':
-        return Colors.orange;
+        return (bg: AppColors.warningLight, fg: AppColors.warningDark);
       case 'DELETED':
-        return Colors.red;
+        return (bg: AppColors.errorLight, fg: AppColors.errorDark);
       default:
-        return Colors.grey;
+        return (bg: AppColors.chipBg, fg: AppColors.muted);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
       appBar: const AppBarCustom(title: 'Riwayat Voucher'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _history.isEmpty
-              ? const Center(child: Text('Belum ada riwayat voucher'))
+              ? const SingleChildScrollView(
+                  child: EmptyState(
+                    icon: Icons.history_rounded,
+                    title: 'Belum ada riwayat voucher',
+                    description:
+                        'Voucher yang terpakai, kedaluwarsa, atau dihapus akan tercatat di sini.',
+                  ),
+                )
               : ListView.builder(
-                  padding: const EdgeInsets.all(12),
+                  padding: context.pageInsets,
                   itemCount: _history.length,
                   itemBuilder: (context, index) {
                     final h = _history[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      child: ListTile(
-                        leading: Chip(
-                          label: Text(h.historyStatus,
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 11)),
-                          backgroundColor: _statusColor(h.historyStatus),
+                    final colors = _statusColors(h.historyStatus);
+                    return ContentWidth(
+                      maxWidth: 900,
+                      child: Card(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: colors.bg,
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.sm),
+                                ),
+                                child: Text(
+                                  h.historyStatus,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: colors.fg,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${h.historyVoucherCode} • ${h.historyPercent.toStringAsFixed(0)}%',
+                                      style: textTheme.titleSmall
+                                          ?.copyWith(letterSpacing: 1),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${h.historyActorName} (${h.historyActorRole})',
+                                      style: textTheme.bodySmall,
+                                    ),
+                                    Text(
+                                      DateFormat('dd-MM-yyyy HH:mm:ss')
+                                          .format(h.historyChangedAt),
+                                      style: textTheme.bodySmall,
+                                    ),
+                                    if (h.historySaleId != null)
+                                      Text(
+                                        'Nota: ${h.historySaleId}',
+                                        style: textTheme.bodySmall,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        title: Text(
-                            '${h.historyVoucherCode} • ${h.historyPercent.toStringAsFixed(0)}%',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold, letterSpacing: 1)),
-                        subtitle: Text(
-                          '${h.historyActorName} (${h.historyActorRole})\n'
-                          '${DateFormat('dd-MM-yyyy HH:mm:ss').format(h.historyChangedAt)}'
-                          '${h.historySaleId != null ? '\nNota: ${h.historySaleId}' : ''}',
-                        ),
-                        isThreeLine: true,
                       ),
                     );
                   },
