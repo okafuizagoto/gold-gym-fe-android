@@ -41,6 +41,34 @@ dependencies:
 
   flutter_typeahead: ^5.2.0
 
+  # PDF Printing (nota)
+  printing: ^5.12.0
+
+  # Pilih foto bukti pembayaran (kamera/galeri)
+  image_picker: ^1.1.2
+
+  # Simpan foto bukti pembayaran ke galeri (download dari Sales History)
+  gal: ^2.3.0
+
+  # Deep-link ke WhatsApp (wa.me) dari layar Bagikan Struk
+  url_launcher: ^6.3.1
+
+  # Share sheet Android generik (PDF nota terlampir) di layar Bagikan Struk
+  share_plus: ^10.1.4
+
+  # Direktori sementara untuk tulis PDF sebelum dibagikan (supaya nama file
+  # yang muncul di aplikasi tujuan rapi, mis. "nota-TRX123.pdf")
+  path_provider: ^2.1.4
+
+  # Cek & minta aktifkan Bluetooth sebelum Cetak Struk (adapter-state saja,
+  # BUKAN untuk scan/pairing raw print -- printer tetap dipilih lewat dialog
+  # print native Android seperti sekarang, via package printing di atas)
+  flutter_blue_plus: ^1.35.3
+
+  # Simpan PDF struk ke penyimpanan lokal ("Unduh Struk") -- aman lintas
+  # Android API level (scoped storage API 29+, fallback di bawahnya)
+  file_saver: ^0.2.14
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

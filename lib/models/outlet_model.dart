@@ -27,6 +27,7 @@ class OutletResponse {
   final int outlet_gold_id;
   final String outlet_code;
   final String outlet_name;
+  final String outlet_type;
   final String outlet_address;
   final String outlet_status;
   final DateTime created_at;
@@ -37,6 +38,7 @@ class OutletResponse {
     required this.outlet_gold_id,
     required this.outlet_code,
     required this.outlet_name,
+    this.outlet_type = 'RETAIL',
     required this.outlet_address,
     required this.outlet_status,
     required this.created_at,
@@ -50,13 +52,15 @@ class OutletResponse {
       outlet_gold_id: json["outlet_gold_id"],
       outlet_code: json["outlet_code"] ?? "",
       outlet_name: json["outlet_name"] ?? "",
+      outlet_type: json["outlet_type"] ?? "RETAIL",
       outlet_address: json["outlet_address"] ?? "",
       outlet_status: json["outlet_status"] ?? "",
-      created_at: DateTime.parse(json["created_at"]),
-      updated_at: json["updated_at"] == null ||
-              json["updated_at"] == "0001-01-01T00:00:00Z"
+      // parser aman: backend bisa mengirim "" untuk kolom tanggal NULL
+      created_at:
+          DateTime.tryParse('${json["created_at"] ?? ''}') ?? DateTime.now(),
+      updated_at: json["updated_at"] == null
           ? null
-          : DateTime.parse(json["updated_at"]),
+          : DateTime.tryParse('${json["updated_at"]}'),
     );
   }
 
@@ -67,6 +71,7 @@ class OutletResponse {
       "outlet_gold_id": outlet_gold_id,
       "outlet_code": outlet_code,
       "outlet_name": outlet_name,
+      "outlet_type": outlet_type,
       "outlet_address": outlet_address,
       "outlet_status": outlet_status,
       "created_at": created_at.toIso8601String(),

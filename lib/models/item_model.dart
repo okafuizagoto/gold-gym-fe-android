@@ -51,6 +51,7 @@ class ItemResponse {
   final String item_brand;
   final String item_description;
   final String item_status;
+  final String item_photo;
   final DateTime item_created_at;
   final DateTime? item_updated_at;
 
@@ -65,6 +66,7 @@ class ItemResponse {
     required this.item_brand,
     required this.item_description,
     required this.item_status,
+    this.item_photo = '',
     required this.item_created_at,
     this.item_updated_at,
   });
@@ -82,11 +84,14 @@ class ItemResponse {
       item_brand: json["item_brand"] ?? "",
       item_description: json["item_description"] ?? "",
       item_status: json["item_status"] ?? "",
-      item_created_at: DateTime.parse(json["item_created_at"]),
-      item_updated_at: json["item_updated_at"] == null ||
-              json["item_updated_at"] == "0001-01-01T00:00:00Z"
+      item_photo: json["item_photo"] ?? "",
+      // parser aman: backend bisa mengirim "" untuk kolom tanggal NULL
+      item_created_at:
+          DateTime.tryParse('${json["item_created_at"] ?? ''}') ??
+              DateTime.now(),
+      item_updated_at: json["item_updated_at"] == null
           ? null
-          : DateTime.parse(json["item_updated_at"]),
+          : DateTime.tryParse('${json["item_updated_at"]}'),
     );
   }
 
@@ -103,6 +108,7 @@ class ItemResponse {
       "item_brand": item_brand,
       "item_description": item_description,
       "item_status": item_status,
+      "item_photo": item_photo,
       "item_created_at": item_created_at.toIso8601String(),
       "item_updated_at": item_updated_at?.toIso8601String(),
     };

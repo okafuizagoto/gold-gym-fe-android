@@ -278,6 +278,59 @@ class _OutletScreenState extends State<ListOutletScreen> {
     outletsArrNotifier.value = updatedList;
   }
 
+  Future<void> _confirmDeleteOutlet(OutletResponse item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus Outlet'),
+        content: Text('Yakin ingin menghapus outlet "${item.outlet_name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Hapus', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final response = await outletsApi.deleteOutlet(item.outlet_code);
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Outlet berhasil dihapus"),
+            backgroundColor: Colors.green,
+          ),
+        );
+        await getAllOutlet(_outletSearchListController.text, pages, lengths);
+      } else {
+        String message = "Gagal menghapus outlet";
+        try {
+          final body = jsonDecode(response.body);
+          if (body['error'] != null) message = body['error'];
+        } catch (_) {}
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Error menghapus outlet"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -562,9 +615,9 @@ class _OutletScreenState extends State<ListOutletScreen> {
                                                       ElevatedButton.styleFrom(
                                                     backgroundColor: Colors.red,
                                                   ),
-                                                  onPressed: () {
-                                                    // deleteItemList(index, item);
-                                                  },
+                                                  onPressed: () =>
+                                                      _confirmDeleteOutlet(
+                                                          item),
                                                 ),
                                             ],
                                           ),

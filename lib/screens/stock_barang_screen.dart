@@ -14,6 +14,7 @@ import '../extensions/string_extension.dart';
 
 import '../services/items_api.dart';
 import '../utils/storage.dart';
+import '../utils/constants.dart';
 
 import 'package:gold_gym_fe_android/models/item_model.dart';
 
@@ -97,7 +98,7 @@ class _StockBarangScreenState extends State<StockBarangScreen> {
 
   Future<void> getAllItems(String name) async {
     try {
-      final outcode = await Storage.get('outcode') ?? '';
+      final outcode = await Storage.get(AppConstants.outcode) ?? '';
       final itemsApi = ItemsApi();
 
       final response = await itemsApi.getAllItems(name, outcode, 0, 0);
@@ -129,7 +130,7 @@ class _StockBarangScreenState extends State<StockBarangScreen> {
 
   Future<void> getAllStock(String name, int page, int length) async {
     try {
-      final outcode = await Storage.get('outcode') ?? '';
+      final outcode = await Storage.get(AppConstants.outcode) ?? '';
       final stockApi = StockApi();
 
       final response = await stockApi.getAllStock(name, outcode, page, length);
@@ -230,9 +231,14 @@ class _StockBarangScreenState extends State<StockBarangScreen> {
   // 🔥 END TAMBAHAN method suggestions
 
   Future<void> saveStockToBackend() async {
-    List<StockModel> arrayOneItem = [];
     Map<String, dynamic> bodyData;
-    if (_stockNameController.text == "" && stockArrNotifier.value.length == 0) {
+    // entri form hanya divalidasi jika nama diisi — setelah tombol TAMBAH,
+    // form dikosongkan dan item sudah masuk daftar, jadi form kosong + daftar
+    // terisi adalah kondisi normal (dulu tetap divalidasi ke suggestion
+    // sehingga muncul error "Pilih item dari daftar suggestion")
+    final hasFormEntry = _stockNameController.text.trim().isNotEmpty;
+
+    if (!hasFormEntry && stockArrNotifier.value.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Tolong masukkan nama stock"),
@@ -241,91 +247,71 @@ class _StockBarangScreenState extends State<StockBarangScreen> {
       );
       return;
     }
-    final inputName = _stockNameController.text.trim().toLowerCase();
-    final allItems = itemsPaginationNotifier.value?.data ?? [];
 
-    final isValid = allItems.any(
-      (item) => item.item_name.toLowerCase() == inputName,
-    );
+    final toSave = List<StockModel>.from(stockArrNotifier.value);
 
-    if (!isValid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Pilih item dari daftar suggestion"),
-          backgroundColor: Colors.red,
-        ),
+    if (hasFormEntry) {
+      final inputName = _stockNameController.text.trim().toLowerCase();
+      final allItems = itemsPaginationNotifier.value?.data ?? [];
+      final isValid = allItems.any(
+        (item) => item.item_name.toLowerCase() == inputName,
       );
-      return;
-    }
+      if (!isValid) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Pilih item dari daftar suggestion"),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      if (_stockQtyController.text == "") {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Tolong masukkan jumlah qty"),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
 
-    if (_stockQtyController.text == "" && stockArrNotifier.value.length == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Tolong masukkan jumlah qty"),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    if (stockArrNotifier.value.isEmpty) {
-      final email = await Storage.get('userEmail') ?? '';
-      final outcode = await Storage.get('outcode') ?? '';
+      final outcode = await Storage.get(AppConstants.outcode) ?? '';
       final raw = _stockQtyController.text.replaceAll(RegExp(r'[^0-9]'), '');
       final qtyFinal = int.tryParse(raw) ?? 0;
       final rawItemID =
           _stockItemIDController.text.replaceAll(RegExp(r'[^0-9]'), '');
       final itemIDFinal = int.tryParse(rawItemID) ?? 0;
 
-      final stock = StockModel(
+      // entri yang masih di form ikut disimpan bersama daftar
+      toSave.add(StockModel(
         stockItemId: itemIDFinal,
         stockOutcode: outcode,
         stockName: _stockNameController.text,
         stockPack: _stockPackController.text,
         stockQty: qtyFinal,
         stockUpdateBy: userName,
-      );
-      arrayOneItem = [
-        ...arrayOneItem,
-        stock,
-      ];
-      bodyData = {
-        "data": arrayOneItem
-            .map((item) => {
-                  "stock_item_id": item.stockItemId,
-                  "stock_outcode": item.stockOutcode,
-                  "stock_name": item.stockName,
-                  "stock_pack": item.stockPack,
-                  "stock_qty": item.stockQty,
-                  "stock_update_by": item.stockUpdateBy,
-                })
-            .toList()
-      };
-    } else {
-      bodyData = {
-        "data": stockArrNotifier.value
-            .map((item) => {
-                  "stock_item_id": item.stockItemId,
-                  "stock_outcode": item.stockOutcode,
-                  "stock_name": item.stockName,
-                  "stock_pack": item.stockPack,
-                  "stock_qty": item.stockQty,
-                  "stock_update_by": item.stockUpdateBy,
-                })
-            .toList()
-      };
+      ));
     }
 
+    bodyData = {
+      "data": toSave
+          .map((item) => {
+                "stock_item_id": item.stockItemId,
+                "stock_outcode": item.stockOutcode,
+                "stock_name": item.stockName,
+                "stock_pack": item.stockPack,
+                "stock_qty": item.stockQty,
+                "stock_update_by": item.stockUpdateBy,
+              })
+          .toList()
+    };
+
     try {
-      if (stockArrNotifier.value.isNotEmpty ||
-          (_stockNameController.text != "" &&
-              (_stockQtyController.text != "0" ||
-                  _stockQtyController.text != ""))) {
+      if (toSave.isNotEmpty) {
         final StocksApi = StockApi();
         final response = await StocksApi.insertStock(bodyData);
 
         if (response.statusCode == 200) {
-          arrayOneItem = [];
           stockArrNotifier.value = [];
           _stockNameController.clear();
           _stockPackController.clear();
@@ -374,7 +360,7 @@ class _StockBarangScreenState extends State<StockBarangScreen> {
 
   Future<void> addItem() async {
     final email = await Storage.get('userEmail') ?? '';
-    final outcode = await Storage.get('outcode') ?? '';
+    final outcode = await Storage.get(AppConstants.outcode) ?? '';
     final inputName = _stockNameController.text.trim().toLowerCase();
     final allItems = itemsPaginationNotifier.value?.data ?? [];
 
@@ -465,6 +451,7 @@ class _StockBarangScreenState extends State<StockBarangScreen> {
   @override
   Widget build(BuildContext context) {
     return PrivateRoute(
+      sellerOnly: true,
       child: Consumer<LanguageProvider>(
         builder: (context, langProvider, child) {
           return DefaultTabController(
@@ -641,6 +628,7 @@ class _StockBarangScreenState extends State<StockBarangScreen> {
                                 return _stockCard(
                                   name: item.stock_name,
                                   qty: item.stock_qty,
+                                  isTherapy: item.isTherapy,
                                 );
                               },
                             ),
@@ -1274,10 +1262,14 @@ class _StockBarangScreenState extends State<StockBarangScreen> {
 Widget _stockCard({
   required String name,
   required int qty,
+  bool isTherapy = false,
 }) {
   Color badgeColor;
 
-  if (qty == 0) {
+  if (isTherapy) {
+    // jasa terapi: stok tidak dibatasi
+    badgeColor = Colors.teal;
+  } else if (qty == 0) {
     badgeColor = Colors.red;
   } else if (qty <= 20) {
     badgeColor = Colors.orange;
@@ -1306,7 +1298,7 @@ Widget _stockCard({
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  "$qty pcs",
+                  isTherapy ? "Jasa (tanpa batas)" : "$qty pcs",
                   style: const TextStyle(color: Colors.black54),
                 ),
               ],
@@ -1319,7 +1311,7 @@ Widget _stockCard({
               borderRadius: BorderRadius.circular(30),
             ),
             child: Text(
-              "$qty pcs",
+              isTherapy ? "JASA" : "$qty pcs",
               style: const TextStyle(
                   color: Colors.white, fontWeight: FontWeight.w600),
             ),

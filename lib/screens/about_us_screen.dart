@@ -29,32 +29,28 @@ class AboutUsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-
                 _InfoCard(
                   icon: Icons.business,
                   title: langProvider.get('Company', 'Perusahaan'),
-                  content: 'Gold Gym Indonesia',
+                  content: 'Okejual Indonesia',
                 ),
                 const SizedBox(height: 16),
-
                 _InfoCard(
                   icon: Icons.location_on,
                   title: langProvider.get('Address', 'Alamat'),
                   content: 'Jakarta, Indonesia',
                 ),
                 const SizedBox(height: 16),
-
                 _InfoCard(
                   icon: Icons.phone,
                   title: langProvider.get('Phone', 'Telepon'),
                   content: '+62 xxx xxxx xxxx',
                 ),
                 const SizedBox(height: 16),
-
                 _InfoCard(
                   icon: Icons.email,
                   title: 'Email',
-                  content: 'info@goldgym.co.id',
+                  content: 'admin@okejual.co.id',
                 ),
               ],
             ),

@@ -125,8 +125,16 @@ class _OutletScreenState extends State<OutletScreen> {
       return;
     }
 
-    await Storage.set('outcode', _selectedType!);
-    Navigator.pushReplacementNamed(context, '/');
+    await Storage.set(AppConstants.outcode, _selectedType!);
+    // simpan tipe outlet supaya menu (Booking Terapi vs Belanja) menyesuaikan
+    final selected = _types.where((o) => o.outlet_code == _selectedType);
+    await Storage.set(AppConstants.outletTypeKey,
+        selected.isNotEmpty ? selected.first.outlet_type : 'RETAIL');
+    // pembeli langsung ke layar belanja; penjual/admin ke dashboard
+    final role = await Storage.get(AppConstants.userRoleKey);
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(
+        context, role == AppConstants.roleBuyer ? '/belanja' : '/');
   }
 
   Future<void> _handleNewOutlet() async {

@@ -3,18 +3,23 @@ import 'package:gold_gym_fe_android/models/item_model.dart';
 import 'package:provider/provider.dart';
 // import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:image_picker/image_picker.dart';
 // import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:io';
 import '../widgets/app_drawer.dart';
 import '../widgets/app_bar_custom.dart';
 import '../widgets/private_route.dart';
 import '../services/items_api.dart';
+import '../services/outlet_api.dart';
+import '../models/outlet_model.dart';
 // import '../models/stock_model.dart';
 // import '../models/api_response_model.dart';
 // import '../utils/text_formatter.dart';
-// import '../utils/debouncer.dart';
+import '../utils/debouncer.dart';
 import '../providers/language_provider.dart';
 import '../utils/storage.dart';
+import '../utils/constants.dart';
 import 'package:intl/intl.dart';
 
 class AddItemsScreen extends StatefulWidget {
@@ -26,7 +31,7 @@ class AddItemsScreen extends StatefulWidget {
 
 class _AddItemsScreenState extends State<AddItemsScreen> {
   // final _stockApi = StockApi();
-  // final _debouncer = Debouncer(milliseconds: 400);
+  final _searchDebouncer = Debouncer(milliseconds: 400);
   // final _searchController = TextEditingController();
   final _itemNameController = TextEditingController();
   final _itemSearchListController = TextEditingController();
@@ -42,6 +47,21 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
 
   String? _selectedItemType = "STOCK";
   String _selectedCurrency = "IDR";
+
+  // Scope outlet saat Add Items: satu outlet spesifik (milik penjual sendiri)
+  // atau "Semua Outlet" (item yang sama dibuat di semua outlet miliknya).
+  static const String allOutletsSentinel = '__ALL__';
+  final _outletsApi = OutletsApi();
+  List<OutletResponse> _myOutlets = [];
+  String? _selectedOutcode;
+
+  /// Foto item (opsional, maks 2MB) -- hanya didukung untuk 1 item ke 1 outlet
+  /// spesifik (bukan "Semua Outlet", bukan lewat buffer "Add More"), karena
+  /// hanya kasus itu yang punya satu item_id pasti untuk ditempeli foto
+  /// sesudah item dibuat. Lihat _canPickItemPhoto.
+  File? _pickedItemPhoto;
+  static const int _maxItemPhotoBytes = 2 * 1024 * 1024;
+  Map<String, String> _photoHeaders = {};
 
   // String _selectedInputType = 'Keyboard';
   // List<StockModel> _stockList = [];
@@ -67,7 +87,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
 
     if (itemsArrNotifier.value.isEmpty) {
       final email = await Storage.get('userEmail') ?? '';
-      final outcode = await Storage.get("outcode") ?? "";
+      final outcode = await _resolveOutcodeForSubmit();
       final raw = _itemPriceController.text.replaceAll(RegExp(r'[^0-9]'), '');
       final priceFinal = int.tryParse(raw) ?? 0;
       if (_itemTypeController.text == "") {
@@ -101,7 +121,8 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                   "item_status": item.item_status ? "ACTIVE" : "NON ACTIVE",
                   "item_email": item.item_email,
                 })
-            .toList()
+            .toList(),
+        "apply_all_outlets": _applyAllOutlets,
       };
     } else {
       bodyData = {
@@ -117,7 +138,8 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                   "item_status": item.item_status ? "ACTIVE" : "NON ACTIVE",
                   "item_email": item.item_email,
                 })
-            .toList()
+            .toList(),
+        "apply_all_outlets": _applyAllOutlets,
       };
     }
 
@@ -132,6 +154,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
         final response = await itemsApi.insertItems(bodyData);
 
         if (response.statusCode == 200) {
+          final pickedPhoto = _pickedItemPhoto;
           arrayOneItem = [];
           itemsArrNotifier.value = [];
           _itemNameController.clear();
@@ -140,6 +163,8 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
           _itemPriceController.clear();
           _itemBrandController.clear();
           _itemDescriptionController.clear();
+          _resetBrandDefault();
+          setState(() => _pickedItemPhoto = null);
           // showToast("Item successfully saved");
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -147,6 +172,11 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
               backgroundColor: Colors.green,
             ),
           );
+          // foto opsional: cuma bisa ditempel kalau backend balikin item_id
+          // pasti (1 item, 1 outlet spesifik -- lihat _canPickItemPhoto)
+          if (pickedPhoto != null) {
+            await _uploadPickedPhoto(itemsApi, response.body, pickedPhoto);
+          }
           // getAllItems("", 1, 5);
           await getAllItems("", pages, lengths);
           // Future.microtask(() => getAllItems("", 1, 5));
@@ -180,7 +210,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
   }
 
   Future<void> updateItemRow(ItemResponse item) async {
-    final outcode = await Storage.get("outcode") ?? "";
+    final outcode = await Storage.get(AppConstants.outcode) ?? "";
     final raw = _itemPriceController.text.replaceAll(RegExp(r'[^0-9]'), '');
     final priceFinal = double.tryParse(raw) ?? 0.0;
     final body = {
@@ -193,7 +223,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
         "item_price": _itemPriceController.text.isEmpty ? 0 : priceFinal,
         "item_brand":
             _itemBrandController.text.isEmpty ? "" : _itemBrandController.text,
-        "item_description": "",
+        "item_description": _itemDescriptionController.text,
         "item_status": statusEditNotifier.value,
         "item_outcode": outcode,
         "item_id": item.item_id,
@@ -233,7 +263,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
   Future<void> getAllItems(String name, int page, int length) async {
     try {
       // final email = await Storage.get('userEmail') ?? "";
-      final outcode = await Storage.get("outcode") ?? "";
+      final outcode = await Storage.get(AppConstants.outcode) ?? "";
       final itemsApi = ItemsApi();
       final response = await itemsApi.getAllItems(name, outcode, page, length);
       if (response.statusCode == 200) {
@@ -269,7 +299,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
 
   Future<void> addItem() async {
     final email = await Storage.get('userEmail') ?? '';
-    final outcode = await Storage.get("outcode") ?? "";
+    final outcode = await _resolveOutcodeForSubmit();
 
     final raw = _itemPriceController.text.replaceAll(RegExp(r'[^0-9]'), '');
     final priceFinal = int.tryParse(raw) ?? 0;
@@ -300,6 +330,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
     _itemPriceController.clear();
     _itemBrandController.clear();
     _itemDescriptionController.clear();
+    _resetBrandDefault();
   }
 
   void deleteItem(int index) {
@@ -311,7 +342,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
 
   void deleteItemList(int index, ItemResponse item) async {
     final pagination = itemsPaginationNotifier.value;
-    final outcode = await Storage.get("outcode") ?? "";
+    final outcode = await Storage.get(AppConstants.outcode) ?? "";
 
     try {
       final itemsApi = ItemsApi();
@@ -390,11 +421,142 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
     );
   }
 
+  bool _isTherapyOutlet = false;
+
   @override
   void initState() {
     super.initState();
 
     loadItemsOnStart();
+    _loadOutletType();
+    _loadMyOutlets();
+    ItemsApi().getAuthHeaders().then((headers) {
+      if (mounted) setState(() => _photoHeaders = headers);
+    });
+  }
+
+  /// Daftar outlet MILIK PENJUAL SENDIRI SAJA (endpoint getalloutlet sudah
+  /// terfilter per gold_id pemanggil) -- untuk dropdown scope outlet Add Items.
+  Future<void> _loadMyOutlets() async {
+    try {
+      final resp = await _outletsApi.getAllOutlet('', 'ACTIVE', 1, 100);
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        final pagination = OutletPagination.fromJson(data);
+        final activeOutcode = await Storage.get(AppConstants.outcode) ?? '';
+        if (!mounted) return;
+        setState(() {
+          _myOutlets = pagination.data;
+          _selectedOutcode = activeOutcode.isNotEmpty
+              ? activeOutcode
+              : (_myOutlets.isNotEmpty ? _myOutlets.first.outlet_code : null);
+        });
+      }
+    } catch (e) {
+      // gagal muat daftar outlet -- dropdown tetap kosong, fallback ke outlet
+      // aktif dari Storage tetap berjalan di saveItemsToBackend/addItem.
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchDebouncer.dispose();
+    super.dispose();
+  }
+
+  /// Outlet THERAPY: kolom merek otomatis terisi "THERAPY" (masih bisa diubah).
+  /// Item brand THERAPY langsung terdaftar di menu sales tanpa Add Stock.
+  Future<void> _loadOutletType() async {
+    final outletType = await Storage.get(AppConstants.outletTypeKey) ?? 'RETAIL';
+    if (!mounted) return;
+    setState(() {
+      _isTherapyOutlet = outletType == AppConstants.outletTherapy;
+      if (_isTherapyOutlet && _itemBrandController.text.isEmpty) {
+        _itemBrandController.text = 'THERAPY';
+      }
+    });
+  }
+
+  bool get _applyAllOutlets => _selectedOutcode == allOutletsSentinel;
+
+  /// Outcode yang dikirim per item -- kalau "Semua Outlet" dipilih, nilainya
+  /// cuma placeholder (backend meng-override per outlet secara otomatis).
+  Future<String> _resolveOutcodeForSubmit() async {
+    if (_applyAllOutlets) {
+      return await Storage.get(AppConstants.outcode) ?? '';
+    }
+    return _selectedOutcode ?? (await Storage.get(AppConstants.outcode) ?? '');
+  }
+
+  void _resetBrandDefault() {
+    if (_isTherapyOutlet && _itemBrandController.text.isEmpty) {
+      _itemBrandController.text = 'THERAPY';
+    }
+  }
+
+  /// Foto item cuma bisa ditempel kalau simpan menghasilkan SATU item_id
+  /// pasti: bukan mode "Semua Outlet" (fan-out ke banyak outlet/item), dan
+  /// bukan hasil buffer "Add More" (banyak item sekaligus).
+  bool get _canPickItemPhoto =>
+      !_applyAllOutlets && itemsArrNotifier.value.isEmpty;
+
+  /// Pilih foto item (kamera/galeri), validasi maks 2MB -- pola sama dengan
+  /// pemilihan foto bukti pembayaran di buyer_shop_screen.dart.
+  Future<void> _pickItemPhoto() async {
+    final source = await showDialog<ImageSource>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('Foto Item'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(dialogContext, ImageSource.camera),
+            child: const Row(children: [
+              Icon(Icons.photo_camera),
+              SizedBox(width: 8),
+              Text('Ambil dari Kamera'),
+            ]),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(dialogContext, ImageSource.gallery),
+            child: const Row(children: [
+              Icon(Icons.photo_library),
+              SizedBox(width: 8),
+              Text('Pilih dari Galeri'),
+            ]),
+          ),
+        ],
+      ),
+    );
+    if (source == null) return;
+
+    final picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
+    if (picked == null) return;
+    final file = File(picked.path);
+    final size = await file.length();
+    if (size > _maxItemPhotoBytes) {
+      showToast('Ukuran foto maksimal 2 MB', isError: true);
+      return;
+    }
+    setState(() => _pickedItemPhoto = file);
+  }
+
+  /// Upload foto yang sudah dipilih ke item yang baru dibuat. Item TETAP
+  /// tersimpan walau upload foto gagal -- ini bukan langkah blocking.
+  Future<void> _uploadPickedPhoto(
+      ItemsApi itemsApi, String insertResponseBody, File photo) async {
+    try {
+      final data = jsonDecode(insertResponseBody);
+      final itemId = data['data']?['item_id'];
+      if (itemId == null || itemId == 0) return;
+      final photoResponse = await itemsApi.uploadItemPhoto(itemId, photo);
+      if (photoResponse.statusCode == 200 || photoResponse.statusCode == 201) {
+        showToast('Foto item tersimpan');
+      } else {
+        showToast('Item tersimpan, tapi upload foto gagal', isError: true);
+      }
+    } catch (e) {
+      showToast('Item tersimpan, tapi upload foto gagal', isError: true);
+    }
   }
 
   Future<void> loadItemsOnStart() async {
@@ -407,6 +569,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
   @override
   Widget build(BuildContext context) {
     return PrivateRoute(
+      sellerOnly: true,
       child: Consumer<LanguageProvider>(
         builder: (context, langProvider, child) {
           return DefaultTabController(
@@ -458,6 +621,11 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                 /// SEARCH
                 TextField(
                   controller: _itemSearchListController,
+                  onChanged: (value) {
+                    _searchDebouncer.run(() {
+                      getAllItems(value, 1, lengths == 0 ? 5 : lengths);
+                    });
+                  },
                   decoration: InputDecoration(
                     hintText: "Search...",
                     prefixIcon: const Icon(Icons.search),
@@ -509,6 +677,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                               headingRowColor: MaterialStateProperty.all(
                                   Colors.grey.shade200),
                               columns: const [
+                                DataColumn(label: Text("Photo")),
                                 DataColumn(label: Text("Name")),
                                 DataColumn(label: Text("Type")),
                                 DataColumn(label: Text("Unit")),
@@ -526,6 +695,34 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
 
                                 return DataRow(
                                   cells: [
+                                    /// PHOTO
+                                    DataCell(
+                                      SizedBox(
+                                        width: 32,
+                                        height: 32,
+                                        child: item.item_photo.isEmpty
+                                            ? Icon(Icons.image_not_supported,
+                                                size: 20, color: Colors.grey[400])
+                                            : ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                                child: Image.network(
+                                                  ItemsApi().itemPhotoUrl(
+                                                      item.item_id),
+                                                  headers: _photoHeaders,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (_, __, ___) =>
+                                                      Icon(
+                                                          Icons
+                                                              .image_not_supported,
+                                                          size: 20,
+                                                          color:
+                                                              Colors.grey[400]),
+                                                ),
+                                              ),
+                                      ),
+                                    ),
+
                                     /// NAME
                                     DataCell(
                                       isEditing
@@ -683,7 +880,10 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                                                 editingIndexNotifier.value = -1;
 
                                                 await getAllItems(
-                                                    "", pages, lengths);
+                                                    _itemSearchListController
+                                                        .text,
+                                                    pages,
+                                                    lengths);
 
                                                 _itemNameController.clear();
                                                 _itemTypeController.clear();
@@ -888,6 +1088,47 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                       ),
                       const SizedBox(height: 20),
 
+                      // Outlet (scope: satu outlet spesifik atau Semua Outlet)
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 125,
+                            child: Text(
+                              langProvider.get('Outlet', 'Outlet') + ":",
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _selectedOutcode,
+                              items: [
+                                ..._myOutlets.map((o) => DropdownMenuItem(
+                                      value: o.outlet_code,
+                                      child: Text(o.outlet_name),
+                                    )),
+                                DropdownMenuItem(
+                                  value: allOutletsSentinel,
+                                  child: Text(langProvider.get(
+                                      'All Outlets', 'Semua Outlet')),
+                                ),
+                              ],
+                              onChanged: (v) =>
+                                  setState(() => _selectedOutcode = v),
+                              decoration: InputDecoration(
+                                filled: true,
+                                fillColor: Colors.white,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 14),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
                       // // Item Type
                       // Row(
                       //   children: [
@@ -1065,11 +1306,103 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                                     horizontal: 16, vertical: 14),
                                 hintText: langProvider.get(
                                     'Enter brand', 'Isi merek'),
+                                helperText: _isTherapyOutlet
+                                    ? langProvider.get(
+                                        'Brand THERAPY goes straight to the sales menu; other brands need Add Stock first',
+                                        'Merek THERAPY langsung masuk menu sales; merek lain wajib Add Stock dulu')
+                                    : null,
+                                helperMaxLines: 2,
                               ),
                             ),
                           ),
                         ],
                       ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // ===== FOTO ITEM (opsional) =====
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F6F8),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      )
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.image_outlined, size: 22),
+                          const SizedBox(width: 12),
+                          Text(
+                            langProvider.get(
+                                'Item Photo (optional)', 'Foto Item (opsional)'),
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      if (!_canPickItemPhoto)
+                        Text(
+                          langProvider.get(
+                              'Photo can only be added when saving one item to one specific outlet (not "All Outlets" / not after "Add More").',
+                              'Foto hanya bisa ditambahkan saat menyimpan satu item ke satu outlet tertentu (bukan mode "Semua Outlet" / setelah "Tambah").'),
+                          style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                        )
+                      else
+                        Row(
+                          children: [
+                            GestureDetector(
+                              onTap: _pickItemPhoto,
+                              child: Container(
+                                width: 80,
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.grey[300]!),
+                                ),
+                                child: _pickedItemPhoto != null
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.file(_pickedItemPhoto!,
+                                            fit: BoxFit.cover),
+                                      )
+                                    : Icon(Icons.add_a_photo_outlined,
+                                        color: Colors.grey[500]),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            if (_pickedItemPhoto != null)
+                              TextButton.icon(
+                                onPressed: () =>
+                                    setState(() => _pickedItemPhoto = null),
+                                icon: const Icon(Icons.close, size: 18),
+                                label: Text(
+                                    langProvider.get('Remove photo', 'Hapus foto')),
+                              )
+                            else
+                              Text(
+                                langProvider.get(
+                                    'Max 2 MB', 'Maks 2 MB'),
+                                style:
+                                    TextStyle(fontSize: 13, color: Colors.grey[600]),
+                              ),
+                          ],
+                        ),
                     ],
                   ),
                 ),

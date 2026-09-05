@@ -22,6 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _coreApi = CoreApi();
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -45,6 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _userController.text,
         _passwordController.text,
       );
+      print("responses = ${response.body}");
       final rawCookie = response.headers['set-cookie'];
 
       // final data = jsonDecode(response.body);
@@ -61,6 +63,14 @@ class _LoginScreenState extends State<LoginScreen> {
             AppConstants.expiresAtKey, loginResponse.expiresAt.toString());
         await Storage.set(AppConstants.userNIPKey, loginResponse.username);
         await Storage.set(AppConstants.userEmail, _userController.text);
+        await Storage.set(AppConstants.userRoleKey, loginResponse.role);
+        await Storage.set(
+            AppConstants.userGoldIdKey, loginResponse.goldId.toString());
+        await Storage.set(AppConstants.userIsBuyerKey, loginResponse.buyerYn);
+        await Storage.set(
+            AppConstants.menuDaftarPembeliKey, loginResponse.menuDaftarPembeli);
+        await Storage.set(
+            AppConstants.menuModePembeliKey, loginResponse.menuModePembeli);
         await Storage.set(
             AppConstants.languageKey, AppConstants.defaultLanguage);
         if (rawCookie != null) {
@@ -68,13 +78,27 @@ class _LoginScreenState extends State<LoginScreen> {
           await Storage.set('refresh_cookie', cookie);
         }
 
+        // Tujuan setelah login berbeda per role: pembeli TIDAK melewati menu
+        // pilih-outlet milik penjual (/outlet), melainkan langsung ke menu
+        // pembeli (pilih outlet penjual → belanja). ADMIN juga tidak lewat
+        // pilih-outlet -- semua layar admin (grup "Akses Admin") bersifat
+        // global, tidak terikat 1 outlet -- langsung ke Dashboard.
+        String dest = '/outlet';
+        if (loginResponse.role == AppConstants.roleBuyer) {
+          final buyerOutlet = await Storage.get(AppConstants.buyerOutcodeKey);
+          dest = (buyerOutlet == null || buyerOutlet.isEmpty)
+              ? '/pilih-outlet'
+              : '/belanja';
+        } else if (loginResponse.role == AppConstants.roleAdmin) {
+          dest = '/';
+        }
+
         // Update user provider
         if (mounted) {
           Provider.of<UserProvider>(context, listen: false)
               .setUserFromToken(loginResponse.bearerToken);
 
-          // Navigate to home
-          Navigator.pushReplacementNamed(context, '/outlet');
+          Navigator.pushReplacementNamed(context, dest);
         }
       } else {
         if (mounted) {
@@ -112,24 +136,58 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Logo
-                    Image.asset(
-                      'assets/images/logo.png',
+                    // Logo Okejual (mengikuti warna & desain app icon)
+                    Container(
                       width: 100,
                       height: 100,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Icon(
-                          Icons.fitness_center,
-                          size: 100,
-                          color: AppTheme.primaryBlue,
-                        );
-                      },
+                      padding: const EdgeInsets.all(22),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFFFF7A3D),
+                            Color(0xFFFF4F81),
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                const Color(0xFFFF4F81).withValues(alpha: 0.35),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(
+                            Icons.storefront,
+                            size: 56,
+                            color: Colors.white,
+                          );
+                        },
+                      ),
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 16),
+
+                    // Nama aplikasi
+                    const Text(
+                      'Okejual',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primaryBlue,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
 
                     // Title
                     const Text(
-                      'Gold Gym Login',
+                      'Login',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -152,11 +210,23 @@ class _LoginScreenState extends State<LoginScreen> {
                     // Password field
                     TextField(
                       controller: _passwordController,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Password',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                        ),
                       ),
-                      obscureText: true,
+                      obscureText: _obscurePassword,
                       textInputAction: TextInputAction.done,
                       onChanged: (_) => setState(() {}),
                       onSubmitted: (_) => _handleLogin(),
@@ -194,6 +264,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         },
                         child: const Text('BACK'),
                       ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Register buyer link
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/register');
+                      },
+                      child: const Text(
+                          'Belum punya akun? Daftarkan akunmu segera'),
                     ),
                   ],
                 ),

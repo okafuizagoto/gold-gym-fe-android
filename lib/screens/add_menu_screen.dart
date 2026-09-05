@@ -63,6 +63,7 @@ class _AddMenuScreenState extends State<AddMenuScreen> {
   @override
   Widget build(BuildContext context) {
     return PrivateRoute(
+      sellerOnly: true,
       child: Consumer<LanguageProvider>(
         builder: (context, langProvider, child) {
           return Scaffold(

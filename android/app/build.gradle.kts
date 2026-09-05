@@ -20,8 +20,9 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.gold_gym_fe_android"
+        // Application ID mengikuti domain android.okejual.com (reverse-DNS).
+        // production -> com.okejual.android ; staging + suffix -> com.okejual.android.staging
+        applicationId = "com.okejual.android"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -35,6 +36,24 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
+    // Flavor per-environment: nama app berbeda antara staging & production.
+    // Build dengan `flutter run --flavor staging` / `--flavor production`.
+    flavorDimensions += "env"
+    productFlavors {
+        create("staging") {
+            dimension = "env"
+            // staging-android.okejual.com -> com.okejual.android.staging
+            // (suffix .staging; tanda hubung tak boleh di applicationId).
+            // Juga membuat staging & production bisa terpasang bersamaan.
+            applicationIdSuffix = ".staging"
+            manifestPlaceholders["appName"] = "Okejual-staging"
+        }
+        create("production") {
+            dimension = "env"
+            manifestPlaceholders["appName"] = "Okejual"
         }
     }
 }

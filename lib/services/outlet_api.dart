@@ -38,6 +38,13 @@ class OutletsApi extends ApiClient {
     );
   }
 
+  Future<http.Response> deleteOutlet(String code) async {
+    final ApiClient client = ApiClient();
+    return client.delete(
+      "/gold-gym/v2/outlet?type=deleteoutlet&code=$code",
+    );
+  }
+
   // // GET /gold-gym/v2/userdata?type=getonestock&stockcode=XXX
   // Future<http.Response> getAllItems(
   //     String name, int page, int length) async {

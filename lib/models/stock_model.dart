@@ -103,6 +103,9 @@ class StockResponse {
   final String stock_name;
   final String stock_pack;
   final int stock_qty;
+  final int stock_price;
+  final String stock_brand;
+  final String stock_photo;
   final DateTime? stock_created_at;
   final DateTime? stock_last_updated;
   final DateTime? stock_qty_update;
@@ -115,10 +118,25 @@ class StockResponse {
     required this.stock_name,
     required this.stock_pack,
     required this.stock_qty,
+    this.stock_price = 0,
+    this.stock_brand = '',
+    this.stock_photo = '',
     required this.stock_created_at,
     required this.stock_last_updated,
     required this.stock_qty_update,
   });
+
+  /// Item brand THERAPY = jasa, stok tidak dibatasi/divalidasi.
+  bool get isTherapy => stock_brand.toUpperCase() == 'THERAPY';
+
+  /// Parser tanggal aman: null / "" / zero-date / format tak dikenal → null
+  /// (backend bisa mengirim string kosong untuk kolom tanggal yang NULL).
+  static DateTime? _tryDate(dynamic v) {
+    if (v == null) return null;
+    final s = v.toString();
+    if (s.isEmpty || s.startsWith('0001-01-01')) return null;
+    return DateTime.tryParse(s);
+  }
 
   /// JSON → Object
   factory StockResponse.fromJson(Map<String, dynamic> json) {
@@ -126,22 +144,18 @@ class StockResponse {
       stock_id: json["stock_id"],
       stock_gold_id: json["stock_gold_id"],
       stock_outcode: json["stock_outcode"] ?? "",
-      stock_item_id: json["stock_item_id"] ?? "",
+      stock_item_id: json["stock_item_id"] ?? 0,
       stock_name: json["stock_name"] ?? "",
       stock_pack: json["stock_pack"] ?? "",
-      stock_qty: json["stock_qty"] ?? "",
-      stock_created_at: json["stock_created_at"] == null ||
-              json["stock_created_at"] == "0001-01-01T00:00:00Z"
-          ? null
-          : DateTime.parse(json["stock_created_at"]),
-      stock_last_updated: json["stock_last_updated"] == null ||
-              json["stock_last_updated"] == "0001-01-01T00:00:00Z"
-          ? null
-          : DateTime.parse(json["stock_last_updated"]),
-      stock_qty_update: json["stock_qty_update"] == null ||
-              json["stock_qty_update"] == "0001-01-01T00:00:00Z"
-          ? null
-          : DateTime.parse(json["stock_qty_update"]),
+      stock_qty: json["stock_qty"] ?? 0,
+      stock_price: json["stock_price"] ?? 0,
+      stock_brand: json["stock_brand"] ?? "",
+      stock_photo: json["stock_photo"] ?? "",
+      stock_created_at: _tryDate(json["stock_created_at"]),
+      // backend memakai key "stock_last_update" (tanpa d)
+      stock_last_updated:
+          _tryDate(json["stock_last_updated"] ?? json["stock_last_update"]),
+      stock_qty_update: _tryDate(json["stock_qty_update"]),
     );
   }
 
@@ -155,6 +169,9 @@ class StockResponse {
       "stock_name": stock_name,
       "stock_pack": stock_pack,
       "stock_qty": stock_qty,
+      "stock_price": stock_price,
+      "stock_brand": stock_brand,
+      "stock_photo": stock_photo,
       "stock_created_at": stock_created_at?.toIso8601String(),
       "stock_last_updated": stock_last_updated?.toIso8601String(),
       // "stock_created_at": stock_created_at.toIso8601String(),
