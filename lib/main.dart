@@ -98,22 +98,28 @@ Future<void> main() async {
     initialRoute = '/';
   }
 
-  // Selalu mulai dari halaman login setiap kali aplikasi dijalankan.
-  // (Logika `initialRoute` berbasis token di atas sengaja diabaikan; navigasi
-  // ke home/outlet/belanja diserahkan ke LoginScreen setelah login berhasil.)
-  runApp(const MyApp(startRoute: '/login'));
+  // Kalau token masih ada, siapkan UserProvider dari token itu SEBELUM
+  // runApp -- supaya begitu langsung ke dashboard (tanpa lewat LoginScreen
+  // lagi), nama/email user di app bar tetap terisi, bukan "Guest".
+  final userProvider = UserProvider();
+  if (accessToken != null && accessToken.isNotEmpty) {
+    userProvider.setUserFromToken(accessToken);
+  }
+
+  runApp(MyApp(startRoute: initialRoute, userProvider: userProvider));
 }
 
 class MyApp extends StatelessWidget {
   final String startRoute; // ✅ ganti nama dari initialRoute
+  final UserProvider userProvider;
 
-  const MyApp({super.key, required this.startRoute});
+  const MyApp({super.key, required this.startRoute, required this.userProvider});
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider.value(value: userProvider),
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
         ChangeNotifierProvider(create: (_) => BuyerCartProvider()),

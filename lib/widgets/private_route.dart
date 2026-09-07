@@ -47,9 +47,13 @@ class _PrivateRouteState extends State<PrivateRoute> {
 
         final token = snapshot.data?['token'];
         if (token == null || token.isEmpty) {
-          // No token, redirect to login
+          // Tidak ada token -- bersihkan SELURUH stack (bukan cuma ganti
+          // route teratas) supaya tombol kembali di layar login tidak bisa
+          // membuka lagi layar yang butuh login (mis. dashboard) yang
+          // sempat tertinggal di bawahnya.
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            Navigator.pushReplacementNamed(context, '/login');
+            Navigator.pushNamedAndRemoveUntil(
+                context, '/login', (route) => false);
           });
           return const SizedBox.shrink();
         }
