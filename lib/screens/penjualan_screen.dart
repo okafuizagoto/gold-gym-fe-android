@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
@@ -19,6 +20,7 @@ import '../utils/responsive.dart';
 import '../services/meja_api.dart';
 import '../services/stock_api.dart';
 import '../services/sales_api.dart';
+import '../services/payment_api.dart';
 import '../services/booking_api.dart';
 import '../services/customer_api.dart';
 import '../services/discount_api.dart';
@@ -1383,6 +1385,10 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                   child:
                       Text(langProvider.get('Bank Transfer', 'Transfer Bank')),
                 ),
+                DropdownMenuItem(
+                  value: AppConstants.paymentQris,
+                  child: Text(langProvider.get('QRIS', 'QRIS')),
+                ),
               ],
               onChanged: (value) {
                 if (value != null) {
@@ -2676,6 +2682,117 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     );
   }
 
+  /// Charge QRIS ke backend (yang meneruskan ke Midtrans), tampilkan QR ke
+  /// pembeli, lalu polling status tiap 3 detik -- persis seperti mesin EDC:
+  /// kasir tidak perlu cek manual ke bank, layar ini yang kasih tahu begitu
+  /// pembayaran SETTLEMENT. Return order_id kalau SETTLEMENT (lanjut simpan
+  /// nota, order_id ditempel ke payload supaya backend bisa link payment ke
+  /// nota), null kalau kasir batal atau transaksi gagal/kedaluwarsa.
+  Future<String?> _payWithQris(String outcode, double amount) async {
+    final paymentApi = PaymentApi();
+    QrisCharge charge;
+    try {
+      final resp = await paymentApi.chargeQris(outcode, amount);
+      if (resp.statusCode != 200) {
+        if (mounted) Toast.error(context, 'Gagal membuat QRIS, coba lagi');
+        return null;
+      }
+      charge = QrisCharge.fromResponse(resp);
+    } catch (_) {
+      if (mounted) Toast.error(context, 'Gagal membuat QRIS, coba lagi');
+      return null;
+    }
+
+    if (!mounted) return null;
+
+    var settled = false;
+    Timer? poller;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(builder: (dialogContext, setDialogState) {
+          var statusText = 'Menunggu pembeli scan & bayar...';
+
+          poller ??= Timer.periodic(const Duration(seconds: 3), (timer) async {
+            try {
+              final statusResp = await paymentApi.getStatus(charge.orderId);
+              if (statusResp.statusCode != 200) return;
+              final status = QrisStatus.fromResponse(statusResp).status;
+
+              if (status == 'SETTLEMENT') {
+                settled = true;
+                timer.cancel();
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+              } else if (status == 'EXPIRE' ||
+                  status == 'CANCEL' ||
+                  status == 'DENY') {
+                timer.cancel();
+                setDialogState(
+                    () => statusText = 'Pembayaran gagal/kedaluwarsa');
+                await Future.delayed(const Duration(seconds: 2));
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+              }
+            } catch (_) {
+              // koneksi bermasalah sesaat -- dicoba lagi di tick berikutnya
+            }
+          });
+
+          return AlertDialog(
+            title: const Text('Scan QRIS untuk Bayar'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  child: Image.network(
+                    charge.qrUrl,
+                    width: 220,
+                    height: 220,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return const SizedBox(
+                        width: 220,
+                        height: 220,
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    },
+                    errorBuilder: (context, error, stack) => const SizedBox(
+                      width: 220,
+                      height: 220,
+                      child: Center(child: Icon(Icons.qr_code_2, size: 64)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  TextFormatter.formatRupiah(amount),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                const SizedBox(height: 8),
+                Text(statusText, textAlign: TextAlign.center),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  poller?.cancel();
+                  Navigator.pop(dialogContext);
+                },
+                child: const Text('BATAL'),
+              ),
+            ],
+          );
+        });
+      },
+    );
+
+    poller?.cancel();
+    return settled ? charge.orderId : null;
+  }
+
   /// Simpan transaksi: seluruh item cart (array) dikirim sekali ke backend,
   /// backend memasukkan ke antrian Kafka lalu consumer insert ke database.
   Future<void> _saveTransaction(BuildContext context, CartProvider cart,
@@ -2690,6 +2807,19 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     setState(() => _isSaving = true);
     try {
       final outcode = await Storage.get(AppConstants.outcode) ?? '';
+
+      // QRIS: transaksi HANYA disimpan (insertSales) setelah pembayaran
+      // benar2 dikonfirmasi Midtrans (SETTLEMENT) -- kasir tidak perlu cek
+      // manual ke bank, layar ini yang menunggu & memberi tahu otomatis.
+      String? qrisOrderId;
+      if (cart.paymentType == AppConstants.paymentQris) {
+        qrisOrderId = await _payWithQris(outcode, cart.grandTotal);
+        if (qrisOrderId == null) {
+          if (mounted) setState(() => _isSaving = false);
+          return;
+        }
+      }
+
       final payload = cart.buildInsertPayload(
         outcode: outcode,
         salesPerson: _salesPersonController.text,
@@ -2697,6 +2827,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
         customerSource:
             _receiptController.text.trim().isEmpty ? '' : _customerMode,
         customerShow: _customerShow ? 'Y' : 'N',
+        qrisOrderId: qrisOrderId,
         // waktu transaksi manual (khusus ADMIN); kosong = live
         transDate: _isAdmin && _customTransAt != null
             ? DateFormat('yyyy-MM-dd').format(_customTransAt!)
@@ -2714,6 +2845,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
         // simpan info pembayaran & total SEBELUM cart di-reset (cart.total
         // jadi 0 setelah cart.clear())
         final wasBankTransfer = cart.paymentType == AppConstants.paymentBank;
+        final savedPaymentType = cart.paymentType;
         final proofToUpload = _proofImage;
         final savedTotal = cart.grandTotal;
 
@@ -2725,8 +2857,11 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) =>
-                  PaymentSuccessScreen(saleId: saleId, amount: savedTotal),
+              builder: (_) => PaymentSuccessScreen(
+                saleId: saleId,
+                amount: savedTotal,
+                paymentMethod: savedPaymentType,
+              ),
             ),
           );
         } else if (mounted) {

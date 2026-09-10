@@ -167,6 +167,11 @@ class _AppDrawerState extends State<AppDrawer> {
               icon: Icons.swap_horizontal_circle_outlined,
               route: '/admin-akses-mode-pembeli',
             ),
+            MenuItem(
+              title: 'Laporan Pembayaran QRIS',
+              icon: Icons.receipt_long_outlined,
+              route: '/admin-payment-report',
+            ),
           ],
         ),
       // Atur Meja: khusus penjual retail (non-THERAPY) -- kelola area

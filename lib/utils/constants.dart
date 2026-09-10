@@ -51,6 +51,7 @@ class AppConstants {
   static const String paymentBank = 'BANK';
   static const String paymentDebit = 'DEBIT';
   static const String paymentTransfer = 'TRANSFER';
+  static const String paymentQris = 'QRIS';
 
   // Default Values
   static const String defaultLanguage = 'EN';

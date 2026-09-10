@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:printing/printing.dart';
 import '../config/theme.dart';
 import '../services/sales_api.dart';
+import '../utils/constants.dart';
 import '../utils/responsive.dart';
 import '../utils/text_formatter.dart';
 import '../utils/toast.dart';
@@ -12,8 +14,15 @@ import 'share_receipt_screen.dart';
 class PaymentSuccessScreen extends StatefulWidget {
   final String saleId;
   final double amount;
-  const PaymentSuccessScreen(
-      {super.key, required this.saleId, required this.amount});
+  // Dipakai untuk keputusan "umumkan lewat suara" (lihat initState) --
+  // kosong berarti diperlakukan seperti bukan QRIS (tidak diumumkan).
+  final String paymentMethod;
+  const PaymentSuccessScreen({
+    super.key,
+    required this.saleId,
+    required this.amount,
+    this.paymentMethod = '',
+  });
 
   @override
   State<PaymentSuccessScreen> createState() => _PaymentSuccessScreenState();
@@ -21,7 +30,41 @@ class PaymentSuccessScreen extends StatefulWidget {
 
 class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> {
   final _salesApi = SalesApi();
+  final _tts = FlutterTts();
   bool _printing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // QRIS-only: penjual tidak selalu punya alat EDC/kotak suara sendiri,
+    // jadi HP kasir sendiri yang mengumumkan pembayaran berhasil -- ini
+    // sebabnya kasir tidak perlu cek manual ke m-banking (lihat _payWithQris
+    // di penjualan_screen.dart yang sudah memastikan status SETTLEMENT
+    // sebelum layar ini tampil). Tunai/transfer tidak diumumkan karena
+    // kasir sudah tahu langsung (pegang uang tunai / lihat foto bukti).
+    if (widget.paymentMethod == AppConstants.paymentQris) {
+      _announcePaymentSuccess();
+    }
+  }
+
+  Future<void> _announcePaymentSuccess() async {
+    try {
+      await _tts.setLanguage('id-ID');
+      await _tts.setSpeechRate(0.45);
+      await _tts.setVolume(1.0);
+      await _tts.speak(
+          'Pembayaran QRIS berhasil, ${TextFormatter.formatRupiah(widget.amount)}');
+    } catch (_) {
+      // TTS opsional -- kalau gagal (mis. engine TTS tidak terpasang di
+      // device), transaksi tetap sah, cuma tanpa suara.
+    }
+  }
+
+  @override
+  void dispose() {
+    _tts.stop();
+    super.dispose();
+  }
 
   /// Pastikan Bluetooth aktif sebelum lanjut ke dialog print native --
   /// bukan raw ESC/POS, printer Bluetooth muncul sebagai pilihan di dialog

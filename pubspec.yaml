@@ -12,6 +12,10 @@ dependencies:
   # HTTP & API
   http: ^1.2.0
 
+  # Text-to-speech -- umumkan "Pembayaran QRIS berhasil" di HP kasir sendiri
+  # (mimik suara EDC/kotak QRIS) saat penjual tidak punya alat sendiri.
+  flutter_tts: ^4.2.0
+
   # State Management
   provider: ^6.1.0
 

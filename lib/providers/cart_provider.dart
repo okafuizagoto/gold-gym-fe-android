@@ -157,6 +157,10 @@ class CartProvider with ChangeNotifier {
     // waktu transaksi manual (khusus ADMIN); kosong = waktu sekarang (live)
     String transDate = '',
     String transTime = '',
+    // order_id transaksi QRIS yang settlement-nya memicu SIMPAN ini
+    // (null/kosong untuk pembayaran TUNAI/TRANSFER) -- dikirim supaya
+    // backend bisa link payment_transaction ke nota ini.
+    String? qrisOrderId,
   }) {
     final paidAmount =
         _paymentType == AppConstants.paymentCash ? _cashAmount : grandTotal;
@@ -190,6 +194,8 @@ class CartProvider with ChangeNotifier {
         'detail': _items.map((item) => item.toSaleDetailJson()).toList(),
         if (bookingIds.isNotEmpty) 'booking_ids': bookingIds,
         if (_mejaIds.isNotEmpty) 'meja_ids': _mejaIds,
+        if (qrisOrderId != null && qrisOrderId.isNotEmpty)
+          'qris_order_id': qrisOrderId,
         if (transDate.isNotEmpty) 'trans_date': transDate,
         if (transTime.isNotEmpty) 'trans_time': transTime,
       },

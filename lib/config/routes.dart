@@ -25,6 +25,7 @@ import '../screens/admin_buyer_outlets_screen.dart';
 import '../screens/admin_pos_customer_screen.dart';
 import '../screens/admin_proof_access_screen.dart';
 import '../screens/admin_registration_mode_screen.dart';
+import '../screens/admin_payment_report_screen.dart';
 import '../screens/seller_menu_access_screen.dart';
 import '../screens/customer_list_screen.dart';
 import '../screens/laporan_screen.dart';
@@ -61,6 +62,7 @@ class AppRoutes {
   static const String adminPosCustomer = '/admin-pos-customer';
   static const String adminProofAccess = '/admin-proof-access';
   static const String adminRegistrationMode = '/admin-registration-mode';
+  static const String adminPaymentReport = '/admin-payment-report';
   static const String adminAksesDaftarPembeli = '/admin-akses-daftar-pembeli';
   static const String adminAksesModePembeli = '/admin-akses-mode-pembeli';
   static const String daftarCustomer = '/daftar-customer';
@@ -98,6 +100,7 @@ class AppRoutes {
         adminPosCustomer: (context) => const AdminPosCustomerScreen(),
         adminProofAccess: (context) => const AdminProofAccessScreen(),
         adminRegistrationMode: (context) => const AdminRegistrationModeScreen(),
+        adminPaymentReport: (context) => const AdminPaymentReportScreen(),
         adminAksesDaftarPembeli: (context) => const SellerMenuAccessScreen(
             target: SellerMenuAccessTarget.daftarPembeli),
         adminAksesModePembeli: (context) => const SellerMenuAccessScreen(
