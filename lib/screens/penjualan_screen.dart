@@ -1346,9 +1346,15 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
       scrollable: true,
       child: StatefulBuilder(builder: (context, setModalState) {
         final isBank = cart.paymentType == AppConstants.paymentBank;
+        // QRIS manual: penjual pakai QRIS statis milik mereka sendiri
+        // (bukan digenerate app), kasir konfirmasi sendiri setelah pembeli
+        // scan & bayar -- foto bukti OPSIONAL (beda dari Transfer Bank yang
+        // wajib), sekadar dokumentasi kalau kasir mau.
+        final isQris = cart.paymentType == AppConstants.paymentQris;
         // Transfer Bank wajib melampirkan foto bukti pembayaran — KECUALI
         // admin menyembunyikan fitur ini (Akses Admin > Visibilitas Bukti
         // Pembayaran), maka tidak ada cara upload jadi tidak diwajibkan.
+        // QRIS manual tidak pernah mewajibkan foto (opsional).
         final canConfirm = cart.canSave &&
             (!isBank || !_proofFeatureEnabled || _proofImage != null);
         return Column(
@@ -1475,9 +1481,11 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                 },
               ),
 
-            // Transfer Bank: upload foto bukti pembayaran (maks 5 MB) —
-            // disembunyikan jika admin menonaktifkan fitur ini
-            if (isBank && _proofFeatureEnabled) ...[
+            // Transfer Bank (wajib) / QRIS manual (opsional): foto bukti
+            // pembayaran, ambil dari kamera atau galeri (lihat
+            // _pickProofImage) — disembunyikan jika admin menonaktifkan
+            // fitur ini.
+            if ((isBank || isQris) && _proofFeatureEnabled) ...[
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -1486,7 +1494,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                       : Icons.check_circle_rounded),
                   label: Text(
                     _proofImage == null
-                        ? 'Upload foto bukti pembayaran'
+                        ? 'Ambil/Pilih foto bukti pembayaran'
                         : 'Bukti terpilih — ganti foto',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -1511,7 +1519,10 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 4, left: 4),
-                child: Text('Wajib untuk transfer bank, maksimal 5 MB',
+                child: Text(
+                    isBank
+                        ? 'Wajib untuk transfer bank, maksimal 5 MB'
+                        : 'Opsional untuk QRIS, maksimal 5 MB',
                     style: Theme.of(context).textTheme.bodySmall),
               ),
               if (_proofImage != null)
@@ -2688,6 +2699,11 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
   /// pembayaran SETTLEMENT. Return order_id kalau SETTLEMENT (lanjut simpan
   /// nota, order_id ditempel ke payload supaya backend bisa link payment ke
   /// nota), null kalau kasir batal atau transaksi gagal/kedaluwarsa.
+  ///
+  /// SEMENTARA TIDAK DIPANGGIL (2026-09-10) -- QRIS balik ke jalur manual,
+  /// lihat deploy-notes/k8s-midtrans-secret/notes-delayed-feature/README.md
+  /// untuk cara aktifkan lagi. Fungsi ini dibiarkan utuh, bukan dihapus.
+  // ignore: unused_element
   Future<String?> _payWithQris(String outcode, double amount) async {
     final paymentApi = PaymentApi();
     QrisCharge charge;
@@ -2808,17 +2824,17 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     try {
       final outcode = await Storage.get(AppConstants.outcode) ?? '';
 
-      // QRIS: transaksi HANYA disimpan (insertSales) setelah pembayaran
-      // benar2 dikonfirmasi Midtrans (SETTLEMENT) -- kasir tidak perlu cek
-      // manual ke bank, layar ini yang menunggu & memberi tahu otomatis.
-      String? qrisOrderId;
-      if (cart.paymentType == AppConstants.paymentQris) {
-        qrisOrderId = await _payWithQris(outcode, cart.grandTotal);
-        if (qrisOrderId == null) {
-          if (mounted) setState(() => _isSaving = false);
-          return;
-        }
-      }
+      // --- QRIS Midtrans DINONAKTIFKAN SEMENTARA (2026-09-10) -- lihat
+      // deploy-notes/k8s-midtrans-secret/notes-delayed-feature/README.md.
+      // QRIS sekarang jalur manual: penjual pakai QRIS statis sendiri,
+      // kasir konfirmasi langsung (sama seperti Transfer Bank) -- tidak
+      // menunggu charge/polling apa pun. _payWithQris (charge+QR dialog+
+      // polling Midtrans) masih ada utuh di bawah, tinggal panggil lagi
+      // kalau fitur ini diaktifkan ulang:
+      //
+      //   qrisOrderId = await _payWithQris(outcode, cart.grandTotal);
+      //   if (qrisOrderId == null) { ...batal... }
+      const String? qrisOrderId = null;
 
       final payload = cart.buildInsertPayload(
         outcode: outcode,
@@ -2844,7 +2860,10 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
         final saleId = body['sale_id']?.toString() ?? '';
         // simpan info pembayaran & total SEBELUM cart di-reset (cart.total
         // jadi 0 setelah cart.clear())
+        // Transfer Bank & QRIS manual sama-sama bisa punya foto bukti
+        // (lihat _pickProofImage) -- upload berlaku untuk keduanya.
         final wasBankTransfer = cart.paymentType == AppConstants.paymentBank;
+        final wasQris = cart.paymentType == AppConstants.paymentQris;
         final savedPaymentType = cart.paymentType;
         final proofToUpload = _proofImage;
         final savedTotal = cart.grandTotal;
@@ -2886,7 +2905,9 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
         // transfer bank: upload foto bukti pembayaran (butuh sale_id) --
         // jalan di belakang layar, tidak perlu ditunggu sebelum pindah ke
         // layar sukses (punya penanganan error/toast sendiri)
-        if (wasBankTransfer && proofToUpload != null && saleId.isNotEmpty) {
+        if ((wasBankTransfer || wasQris) &&
+            proofToUpload != null &&
+            saleId.isNotEmpty) {
           _uploadProof(saleId, proofToUpload);
         }
       } else {
