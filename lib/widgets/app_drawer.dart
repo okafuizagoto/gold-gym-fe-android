@@ -53,6 +53,9 @@ class _AppDrawerState extends State<AppDrawer> {
     final isAdmin = role == AppConstants.roleAdmin;
     // penjual (retail & therapy sama-sama SELLER; dibedakan outlet_type)
     final isSeller = role == AppConstants.roleSeller;
+    // karyawan yang didaftarkan owner (lihat menu Staff) -- lewat middleware
+    // backend, data yang diakses staff otomatis data milik owner-nya
+    final isStaff = role == AppConstants.roleStaff;
     // tampilan pembeli: role BUYER asli, atau penjual/admin dalam mode pembeli
     final buyerView =
         isRealBuyer || shopMode == AppConstants.shopModeBuyer;
@@ -65,6 +68,14 @@ class _AppDrawerState extends State<AppDrawer> {
           title: 'Dashboard',
           icon: Icons.dashboard,
           route: '/',
+        ),
+      // menu wajib staff -- clock-in/out sendiri, TIDAK PERNAH ikut filter
+      // denied-menu (lihat penggabungan di bawah)
+      if (isStaff)
+        MenuItem(
+          title: 'Absen',
+          icon: Icons.fingerprint,
+          route: '/absen',
         ),
       // ADMIN tidak mengoperasikan outlet manapun -- menu operasional
       // outlet (Booking Terapi, POS, dst.) di bawah ini semua digerbang
@@ -117,7 +128,7 @@ class _AppDrawerState extends State<AppDrawer> {
         ),
       // PENJUAL (retail & therapy): satu menu laporan penjualan; per hari /
       // minggu / bulan dipilih lewat TAB di dalam layarnya.
-      if (!buyerView && isSeller)
+      if (!buyerView && (isSeller || isStaff))
         MenuItem(
           title: 'Laporan Penjualan',
           icon: Icons.assessment,
@@ -177,7 +188,7 @@ class _AppDrawerState extends State<AppDrawer> {
       // Atur Meja: khusus penjual retail (non-THERAPY) -- kelola area
       // (indoor/outdoor), meja per area, dan kosongkan meja yang sudah
       // selesai dipakai.
-      if (!buyerView && isSeller && !isTherapy)
+      if (!buyerView && (isSeller || isStaff) && !isTherapy)
         MenuItem(
           title: 'Atur Meja',
           icon: Icons.table_restaurant,
@@ -191,6 +202,29 @@ class _AppDrawerState extends State<AppDrawer> {
                 title: 'Kelola Meja',
                 icon: Icons.event_seat,
                 route: '/kelola-meja'),
+          ],
+        ),
+      // Staff: khusus owner penjual (retail & therapy) -- kelola akun staff,
+      // akses menu tiap staff, dan pantau absensi. Staff sendiri TIDAK
+      // pernah melihat grup ini.
+      if (!buyerView && isSeller && !isStaff)
+        MenuItem(
+          title: 'Staff',
+          icon: Icons.badge_outlined,
+          route: '',
+          children: [
+            MenuItem(
+                title: 'Daftar Staff',
+                icon: Icons.people_alt_outlined,
+                route: '/daftar-staff'),
+            MenuItem(
+                title: 'Akses Staff',
+                icon: Icons.checklist_outlined,
+                route: '/akses-staff'),
+            MenuItem(
+                title: 'Absen Staff',
+                icon: Icons.event_note_outlined,
+                route: '/absen-staff'),
           ],
         ),
       if (!buyerView && !isAdmin)
@@ -245,13 +279,14 @@ class _AppDrawerState extends State<AppDrawer> {
           !buyerView &&
           isRegisteredBuyer &&
           menuModePembeliEnabled &&
-          !isAdmin)
+          !isAdmin &&
+          !isStaff)
         MenuItem(
           title: 'Mode Pembeli',
           icon: Icons.swap_horiz,
           route: '/switch-buyer',
         ),
-      if (!isRealBuyer && buyerView && !isAdmin)
+      if (!isRealBuyer && buyerView && !isAdmin && !isStaff)
         MenuItem(
           title: 'Mode Penjual',
           icon: Icons.swap_horiz,
@@ -283,9 +318,35 @@ class _AppDrawerState extends State<AppDrawer> {
       );
     }).toList();
 
+    var allItems = [...staticRoutes, ...customRoutes];
+
+    // Staff: sembunyikan menu (termasuk anak grup) yang route-nya ada di
+    // denied_menu_keys milik akun ini (cache diisi saat login, lihat
+    // login_screen.dart) -- KECUALI About Us & Absen, selalu tampil apa pun
+    // izinnya.
+    if (isStaff) {
+      final denied = await Storage.getStaffDeniedMenuKeys();
+      bool allowed(String route) =>
+          route == '/about-us' || route == '/absen' || !denied.contains(route);
+      allItems = allItems
+          .where((item) => allowed(item.route))
+          .map((item) {
+            if (item.children == null) return item;
+            final children = item.children!.where((c) => allowed(c.route)).toList();
+            return MenuItem(
+              title: item.title,
+              icon: item.icon,
+              route: item.route,
+              children: children,
+            );
+          })
+          .where((item) => item.children == null || item.children!.isNotEmpty)
+          .toList();
+    }
+
     if (!mounted) return;
     setState(() {
-      menuItems = [...staticRoutes, ...customRoutes];
+      menuItems = allItems;
     });
   }
 

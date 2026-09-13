@@ -37,6 +37,11 @@ class AppConstants {
   static const String roleSeller = 'SELLER';
   static const String roleBuyer = 'BUYER';
   static const String roleAdmin = 'ADMIN';
+  static const String roleStaff = 'STAFF';
+
+  // Cache menu_key yang TIDAK boleh diakses akun STAFF (diisi setelah login,
+  // lihat login_screen.dart + service/staff_api.dart)
+  static const String staffDeniedMenusKey = 'staff_denied_menus';
 
   // Outlet types
   static const String outletTherapy = 'THERAPY';

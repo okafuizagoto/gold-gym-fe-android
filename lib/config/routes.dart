@@ -34,6 +34,10 @@ import '../screens/meja_area_screen.dart';
 import '../screens/area_form_screen.dart';
 import '../screens/meja_form_screen.dart';
 import '../screens/kelola_meja_screen.dart';
+import '../screens/staff_list_screen.dart';
+import '../screens/staff_menu_access_screen.dart';
+import '../screens/staff_attendance_screen.dart';
+import '../screens/staff_clock_screen.dart';
 
 class AppRoutes {
   static const String home = '/';
@@ -72,6 +76,10 @@ class AppRoutes {
   static const String tambahArea = '/tambah-area';
   static const String tambahMeja = '/tambah-meja';
   static const String kelolaMeja = '/kelola-meja';
+  static const String daftarStaff = '/daftar-staff';
+  static const String aksesStaff = '/akses-staff';
+  static const String absenStaff = '/absen-staff';
+  static const String absen = '/absen';
 
   static Map<String, WidgetBuilder> get routes => {
         home: (context) => const HomeScreen(),
@@ -112,5 +120,9 @@ class AppRoutes {
         tambahArea: (context) => const AreaFormScreen(),
         tambahMeja: (context) => const MejaFormScreen(),
         kelolaMeja: (context) => const KelolaMejaScreen(),
+        daftarStaff: (context) => const StaffListScreen(),
+        aksesStaff: (context) => const StaffMenuAccessScreen(),
+        absenStaff: (context) => const StaffAttendanceScreen(),
+        absen: (context) => const StaffClockScreen(),
       };
 }

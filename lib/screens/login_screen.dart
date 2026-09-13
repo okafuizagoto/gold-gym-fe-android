@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert';
 import '../services/core_api.dart';
+import '../services/staff_api.dart';
 import '../models/login_response_model.dart';
 import '../utils/storage.dart';
 import '../utils/toast.dart';
@@ -76,6 +77,27 @@ class _LoginScreenState extends State<LoginScreen> {
         if (rawCookie != null) {
           final cookie = rawCookie.split(';').first;
           await Storage.set('refresh_cookie', cookie);
+        }
+
+        // Staff: cache menu yang TIDAK boleh diakses (dibaca app_drawer.dart).
+        // Gagal fetch (network dll) -> anggap tidak ada yang ditolak, supaya
+        // staff tidak tiba-tiba kehilangan semua menu. Non-staff: bersihkan
+        // sisa cache akun STAFF sebelumnya di device yang sama.
+        if (loginResponse.role == AppConstants.roleStaff) {
+          try {
+            final resp = await StaffApi().myDeniedMenus();
+            if (resp.statusCode == 200) {
+              final body = jsonDecode(resp.body);
+              final keys = ((body['data'] ?? []) as List)
+                  .map((e) => e.toString())
+                  .toList();
+              await Storage.setStaffDeniedMenuKeys(keys);
+            }
+          } catch (_) {
+            // fail-open
+          }
+        } else {
+          await Storage.setStaffDeniedMenuKeys([]);
         }
 
         // Tujuan setelah login berbeda per role: pembeli TIDAK melewati menu
