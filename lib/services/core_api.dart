@@ -78,6 +78,17 @@ class CoreApi extends ApiClient {
     return client.put('/gold-gym/v2/userdata/registrationmode', {"mode": mode});
   }
 
+  // POST /gold-gym/v2/userdata?type=resendverification (public, tanpa
+  // token) -- kirim ulang email verifikasi (dipanggil dari
+  // CheckEmailScreen, bukan lewat link -- itu selalu dibuka di browser).
+  Future<http.Response> resendVerification(String email) async {
+    final url = Uri.parse(
+        '${ApiClient.baseUrl}/gold-gym/v2/userdata?type=resendverification');
+    return await http
+        .post(url, body: jsonEncode({"gold_email": email}))
+        .timeout(ApiClient.timeout);
+  }
+
   Future<http.Response> logout() async {
     final cookie = await Storage.get('refresh_cookie');
     final headers = {

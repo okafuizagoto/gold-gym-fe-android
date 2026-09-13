@@ -72,6 +72,8 @@ class _LoginScreenState extends State<LoginScreen> {
             AppConstants.menuDaftarPembeliKey, loginResponse.menuDaftarPembeli);
         await Storage.set(
             AppConstants.menuModePembeliKey, loginResponse.menuModePembeli);
+        await Storage.set(AppConstants.emailVerifiedKey,
+            loginResponse.emailVerified.toString());
         await Storage.set(
             AppConstants.languageKey, AppConstants.defaultLanguage);
         if (rawCookie != null) {
@@ -105,8 +107,14 @@ class _LoginScreenState extends State<LoginScreen> {
         // pembeli (pilih outlet penjual → belanja). ADMIN juga tidak lewat
         // pilih-outlet -- semua layar admin (grup "Akses Admin") bersifat
         // global, tidak terikat 1 outlet -- langsung ke Dashboard.
+        //
+        // KECUALI email belum diverifikasi -- token yang baru saja disimpan
+        // TETAP tidak bisa akses endpoint terproteksi apa pun sampai user
+        // klik link verifikasi & login ULANG (lihat ValidateToken backend).
         String dest = '/outlet';
-        if (loginResponse.role == AppConstants.roleBuyer) {
+        if (!loginResponse.emailVerified) {
+          dest = '/check-email';
+        } else if (loginResponse.role == AppConstants.roleBuyer) {
           final buyerOutlet = await Storage.get(AppConstants.buyerOutcodeKey);
           dest = (buyerOutlet == null || buyerOutlet.isEmpty)
               ? '/pilih-outlet'

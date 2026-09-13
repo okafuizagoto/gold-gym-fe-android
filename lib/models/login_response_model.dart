@@ -14,6 +14,7 @@ class LoginResponseModel {
   // terlepas dari buyerYn di atas (lihat layar admin Akses Daftar/Mode Pembeli)
   final String menuDaftarPembeli;
   final String menuModePembeli;
+  final bool emailVerified;
 
   LoginResponseModel({
     required this.tokenType,
@@ -28,6 +29,7 @@ class LoginResponseModel {
     this.buyerYn = 'N',
     this.menuDaftarPembeli = 'Y',
     this.menuModePembeli = 'Y',
+    this.emailVerified = false,
   });
 
   factory LoginResponseModel.fromJson(Map<String, dynamic> json) {
@@ -44,6 +46,7 @@ class LoginResponseModel {
       buyerYn: json['metadata']['buyer_yn'] ?? 'N',
       menuDaftarPembeli: json['metadata']['menu_daftar_pembeli'] ?? 'Y',
       menuModePembeli: json['metadata']['menu_mode_pembeli'] ?? 'Y',
+      emailVerified: json['metadata']['email_verified'] == true,
     );
   }
 

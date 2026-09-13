@@ -32,6 +32,10 @@ class AppConstants {
   static const String buyerOutletNameKey = 'buyer_outlet_name';
   // gold_id pemilik outlet tujuan (outlet_code tidak unik global, jadi wajib)
   static const String buyerOutletGoldIdKey = 'buyer_outlet_gold_id';
+  // flag "email sudah diverifikasi" dari metadata login -- token yang
+  // tersimpan TIDAK bisa akses endpoint terproteksi apa pun selama ini
+  // "false" (lihat ValidateToken middleware backend).
+  static const String emailVerifiedKey = 'email_verified';
 
   // Roles
   static const String roleSeller = 'SELLER';

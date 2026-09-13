@@ -31,6 +31,7 @@ class _PrivateRouteState extends State<PrivateRoute> {
     return {
       'token': await Storage.get(AppConstants.accessTokenKey),
       'role': await Storage.get(AppConstants.userRoleKey),
+      'emailVerified': await Storage.get(AppConstants.emailVerifiedKey),
     };
   }
 
@@ -62,6 +63,17 @@ class _PrivateRouteState extends State<PrivateRoute> {
             snapshot.data?['role'] == AppConstants.roleBuyer) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Navigator.pushReplacementNamed(context, '/belanja');
+          });
+          return const SizedBox.shrink();
+        }
+
+        // Token "belum terverifikasi" ditolak backend di SEMUA endpoint
+        // terproteksi -- redirect ke /check-email alih-alih biarkan layar
+        // ini render lalu gagal diam-diam / 403 berulang.
+        if (snapshot.data?['emailVerified'] == 'false') {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Navigator.pushNamedAndRemoveUntil(
+                context, '/check-email', (route) => false);
           });
           return const SizedBox.shrink();
         }

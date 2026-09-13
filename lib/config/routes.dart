@@ -38,6 +38,7 @@ import '../screens/staff_list_screen.dart';
 import '../screens/staff_menu_access_screen.dart';
 import '../screens/staff_attendance_screen.dart';
 import '../screens/staff_clock_screen.dart';
+import '../screens/check_email_screen.dart';
 
 class AppRoutes {
   static const String home = '/';
@@ -80,6 +81,7 @@ class AppRoutes {
   static const String aksesStaff = '/akses-staff';
   static const String absenStaff = '/absen-staff';
   static const String absen = '/absen';
+  static const String checkEmail = '/check-email';
 
   static Map<String, WidgetBuilder> get routes => {
         home: (context) => const HomeScreen(),
@@ -124,5 +126,6 @@ class AppRoutes {
         aksesStaff: (context) => const StaffMenuAccessScreen(),
         absenStaff: (context) => const StaffAttendanceScreen(),
         absen: (context) => const StaffClockScreen(),
+        checkEmail: (context) => const CheckEmailScreen(),
       };
 }
