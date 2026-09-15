@@ -61,3 +61,64 @@ class StorageSummary {
     );
   }
 }
+
+/// Admin: satu baris di GET /v1/storage/admin/users (padanan AdminUserUsage
+/// di Next.js).
+class AdminUserUsage {
+  final int goldId;
+  final double uploadGb;
+  final double downloadGb;
+  final double storageGb;
+  final double effectiveLimitGb;
+  final bool hasOverride;
+
+  AdminUserUsage({
+    required this.goldId,
+    required this.uploadGb,
+    required this.downloadGb,
+    required this.storageGb,
+    required this.effectiveLimitGb,
+    required this.hasOverride,
+  });
+
+  factory AdminUserUsage.fromJson(Map<String, dynamic> j) => AdminUserUsage(
+        goldId: (j['gold_id'] ?? 0) as int,
+        uploadGb: (j['upload_gb'] ?? 0).toDouble(),
+        downloadGb: (j['download_gb'] ?? 0).toDouble(),
+        storageGb: (j['storage_gb'] ?? 0).toDouble(),
+        effectiveLimitGb: (j['effective_limit_gb'] ?? 0).toDouble(),
+        hasOverride: j['has_override'] == true,
+      );
+}
+
+/// Admin: rollup per environment, GET /v1/storage/admin/usage-summary.
+class AdminUsageSummary {
+  final String environment;
+  final double uploadGb;
+  final double downloadGb;
+  final double storageGb;
+  final int alertGb;
+  final int limitGb;
+  final bool alerted;
+
+  AdminUsageSummary({
+    required this.environment,
+    required this.uploadGb,
+    required this.downloadGb,
+    required this.storageGb,
+    required this.alertGb,
+    required this.limitGb,
+    required this.alerted,
+  });
+
+  factory AdminUsageSummary.fromJson(Map<String, dynamic> j) =>
+      AdminUsageSummary(
+        environment: j['environment'] ?? '',
+        uploadGb: (j['upload_gb'] ?? 0).toDouble(),
+        downloadGb: (j['download_gb'] ?? 0).toDouble(),
+        storageGb: (j['storage_gb'] ?? 0).toDouble(),
+        alertGb: (j['alert_gb'] ?? 0) as int,
+        limitGb: (j['limit_gb'] ?? 0) as int,
+        alerted: j['alerted'] == true,
+      );
+}

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
@@ -21,14 +22,29 @@ class SalesApi extends ApiClient {
   }
 
   /// Ambil bytes foto bukti pembayaran (untuk ditampilkan / disimpan galeri).
+  /// 2026-09-16: 2 perbaikan sekaligus -- (1) query param yang benar
+  /// adalah "paymentprooffile" (backend tidak pernah punya case
+  /// "proofphoto", jadi fitur ini selalu gagal "unknown type" sebelum
+  /// perbaikan ini, bug lama tidak terkait B2); (2) backend sekarang
+  /// balikin JSON {url: presignedUrl} (foto di Backblaze B2), bukan bytes
+  /// langsung -- sama pola 2 langkah seperti ItemsApi.getItemPhoto.
   Future<Uint8List?> getProofPhoto(int proofId) async {
-    final headers = await getAuthHeaders();
-    final uri = Uri.parse(
-        '${ApiClient.baseUrl}/gold-gym/v2/sales?type=proofphoto&proofid=$proofId');
-    final response =
-        await http.get(uri, headers: headers).timeout(ApiClient.timeout);
+    final url = await proofPhotoUrl(proofId);
+    if (url == null) return null;
+    final response = await http.get(Uri.parse(url)).timeout(ApiClient.timeout);
     if (response.statusCode == 200) return response.bodyBytes;
     return null;
+  }
+
+  /// Presigned URL (B2, berlaku 15 menit) foto bukti pembayaran.
+  Future<String?> proofPhotoUrl(int proofId) async {
+    final response = await _client.get(
+      '/gold-gym/v2/sales',
+      queryParams: {'type': 'paymentprooffile', 'proofid': proofId.toString()},
+    );
+    if (response.statusCode != 200) return null;
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return body['url'] as String?;
   }
 
   /// Upload foto bukti pembayaran transfer bank (multipart, maks 5 MB).

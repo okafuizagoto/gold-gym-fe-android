@@ -183,6 +183,11 @@ class _AppDrawerState extends State<AppDrawer> {
               icon: Icons.receipt_long_outlined,
               route: '/admin-payment-report',
             ),
+            MenuItem(
+              title: 'Penggunaan Storage (B2)',
+              icon: Icons.data_usage,
+              route: '/admin-storage-usage',
+            ),
           ],
         ),
       // Atur Meja: khusus penjual retail (non-THERAPY) -- kelola area
@@ -300,6 +305,15 @@ class _AppDrawerState extends State<AppDrawer> {
           title: 'Storage',
           icon: Icons.sd_storage_outlined,
           route: '/storage',
+        ),
+      // QRIS Saya: penjual menyimpan foto kode QRIS statis milik mereka
+      // sendiri, ditampilkan ke pembeli lewat tombol "Tampilkan QRIS" di
+      // modal pembayaran POS.
+      if (!buyerView && isSeller && !isStaff)
+        MenuItem(
+          title: 'QRIS Saya',
+          icon: Icons.qr_code_2,
+          route: '/qris-saya',
         ),
       MenuItem(
         title: 'About Us',

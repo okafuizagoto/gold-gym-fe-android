@@ -26,6 +26,8 @@ import '../screens/admin_pos_customer_screen.dart';
 import '../screens/admin_proof_access_screen.dart';
 import '../screens/admin_registration_mode_screen.dart';
 import '../screens/admin_payment_report_screen.dart';
+import '../screens/admin_storage_usage_screen.dart';
+import '../screens/qris_saya_screen.dart';
 import '../screens/seller_menu_access_screen.dart';
 import '../screens/customer_list_screen.dart';
 import '../screens/laporan_screen.dart';
@@ -68,11 +70,13 @@ class AppRoutes {
   static const String adminProofAccess = '/admin-proof-access';
   static const String adminRegistrationMode = '/admin-registration-mode';
   static const String adminPaymentReport = '/admin-payment-report';
+  static const String adminStorageUsage = '/admin-storage-usage';
   static const String adminAksesDaftarPembeli = '/admin-akses-daftar-pembeli';
   static const String adminAksesModePembeli = '/admin-akses-mode-pembeli';
   static const String daftarCustomer = '/daftar-customer';
   static const String laporan = '/laporan';
   static const String storage = '/storage';
+  static const String qrisSaya = '/qris-saya';
   static const String mejaArea = '/meja-area';
   static const String tambahArea = '/tambah-area';
   static const String tambahMeja = '/tambah-meja';
@@ -111,6 +115,7 @@ class AppRoutes {
         adminProofAccess: (context) => const AdminProofAccessScreen(),
         adminRegistrationMode: (context) => const AdminRegistrationModeScreen(),
         adminPaymentReport: (context) => const AdminPaymentReportScreen(),
+        adminStorageUsage: (context) => const AdminStorageUsageScreen(),
         adminAksesDaftarPembeli: (context) => const SellerMenuAccessScreen(
             target: SellerMenuAccessTarget.daftarPembeli),
         adminAksesModePembeli: (context) => const SellerMenuAccessScreen(
@@ -118,6 +123,7 @@ class AppRoutes {
         daftarCustomer: (context) => const CustomerListScreen(),
         laporan: (context) => const LaporanScreen(),
         storage: (context) => const StorageScreen(),
+        qrisSaya: (context) => const QrisSayaScreen(),
         mejaArea: (context) => const MejaAreaScreen(),
         tambahArea: (context) => const AreaFormScreen(),
         tambahMeja: (context) => const MejaFormScreen(),

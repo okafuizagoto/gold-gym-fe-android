@@ -184,6 +184,24 @@ class ApiClient {
     return response;
   }
 
+  Future<http.Response> patch(String endpoint, Map<String, dynamic> body) async {
+    final headers = await _authHeaders();
+    final uri = Uri.parse("$baseUrl$endpoint");
+
+    var response = await http
+        .patch(uri, headers: headers, body: jsonEncode(body))
+        .timeout(timeout);
+
+    if (response.statusCode == 401) {
+      final newToken = await _refreshOrLogout();
+      response = await http
+          .patch(uri, headers: _headersWith(newToken), body: jsonEncode(body))
+          .timeout(timeout);
+    }
+
+    return response;
+  }
+
   Future<http.Response> delete(String endpoint,
       {Map<String, String>? queryParams}) async {
     final headers = await _authHeaders();

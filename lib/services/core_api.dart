@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'api_client.dart';
@@ -142,5 +143,46 @@ class CoreApi extends ApiClient {
         .replace(queryParameters: params);
 
     return await http.get(url, headers: headers).timeout(ApiClient.timeout);
+  }
+
+  // --- QRIS Saya (2026-09-16): foto QRIS statis milik penjual sendiri,
+  // dipakai menu "Simpan QRIS Saya" & tombol "Tampilkan QRIS" di POS. BEDA
+  // dari pembayaran QRIS Midtrans otomatis (lihat qris midtrans di
+  // services lain) -- itu tidak pernah butuh foto sama sekali.
+
+  /// Upload/ganti foto QRIS milik akun sendiri (multipart, maks 2 MB).
+  Future<http.Response> uploadQrisPhoto(File file) async {
+    final headers = await getAuthHeaders();
+    final uri =
+        Uri.parse('${ApiClient.baseUrl}/gold-gym/v2/userdata/qris-photo');
+    final request = http.MultipartRequest('POST', uri);
+    if (headers['Authorization'] != null) {
+      request.headers['Authorization'] = headers['Authorization']!;
+    }
+    request.files.add(await http.MultipartFile.fromPath('file', file.path));
+    final streamed = await request.send().timeout(ApiClient.timeout);
+    return http.Response.fromStream(streamed);
+  }
+
+  /// Hapus foto QRIS milik akun sendiri.
+  Future<http.Response> deleteQrisPhoto() async {
+    final client = ApiClient();
+    return client.delete('/gold-gym/v2/userdata/qris-photo');
+  }
+
+  /// Presigned URL (B2, berlaku 15 menit) foto QRIS. sellerGoldId kosong =
+  /// punya sendiri (butuh token); diisi = lihat QRIS penjual lain saat
+  /// checkout (endpoint publik di backend, tapi tetap lewat ApiClient
+  /// supaya token ikut terkirim kalau ada -- tidak masalah kalau tidak
+  /// ada, backend tidak mewajibkannya untuk route ini).
+  Future<String?> getQrisPhotoUrl({int? sellerGoldId}) async {
+    final client = ApiClient();
+    final endpoint = sellerGoldId != null
+        ? '/gold-gym/v2/userdata/$sellerGoldId/qris-photo'
+        : '/gold-gym/v2/userdata/qris-photo';
+    final response = await client.get(endpoint);
+    if (response.statusCode != 200) return null;
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return body['url'] as String?;
   }
 }

@@ -47,19 +47,33 @@ class ItemsApi extends ApiClient {
   }
 
   /// Ambil bytes foto item (untuk ditampilkan di Daftar Barang / POS).
+  /// 2026-09-16: backend sekarang simpan foto di Backblaze B2 (bukan disk
+  /// lokal) dan endpoint ini balikin JSON {url: presignedUrl} (berlaku 15
+  /// menit), bukan bytes langsung -- jadi diambil 2 langkah: (1) minta
+  /// presigned URL dari backend (butuh token), (2) fetch bytes dari URL itu
+  /// langsung (B2, TIDAK butuh header auth -- presigned URL sudah jadi
+  /// satu-satunya akses yang diperlukan).
   Future<Uint8List?> getItemPhoto(int itemId) async {
-    final headers = await getAuthHeaders();
-    final uri = Uri.parse(
-        '${ApiClient.baseUrl}/gold-gym/v2/items?type=itemphoto&id=$itemId');
-    final response =
-        await http.get(uri, headers: headers).timeout(ApiClient.timeout);
+    final url = await itemPhotoUrl(itemId);
+    if (url == null) return null;
+    final response = await http.get(Uri.parse(url)).timeout(ApiClient.timeout);
     if (response.statusCode == 200) return response.bodyBytes;
     return null;
   }
 
-  /// URL langsung foto item -- dipakai Image.network (perlu header auth saat load).
-  String itemPhotoUrl(int itemId) =>
-      '${ApiClient.baseUrl}/gold-gym/v2/items?type=itemphoto&id=$itemId';
+  /// Presigned URL (B2, berlaku 15 menit) foto item -- dipakai
+  /// FutureNetworkImage (bukan Image.network langsung, URL-nya perlu
+  /// ditanya dulu ke backend, tidak bisa dibentuk sinkron seperti dulu).
+  Future<String?> itemPhotoUrl(int itemId) async {
+    final client = ApiClient();
+    final response = await client.get(
+      '/gold-gym/v2/items',
+      queryParams: {'type': 'itemphoto', 'id': itemId.toString()},
+    );
+    if (response.statusCode != 200) return null;
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return body['url'] as String?;
+  }
 
   /// Upload foto item (multipart, maks 2 MB, divalidasi juga di backend).
   Future<http.Response> uploadItemPhoto(int itemId, File file) async {

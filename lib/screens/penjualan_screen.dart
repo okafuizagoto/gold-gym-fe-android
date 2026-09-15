@@ -16,6 +16,7 @@ import '../widgets/empty_state.dart';
 import '../widgets/info_row.dart';
 import '../widgets/search_field.dart';
 import '../widgets/segmented_tabs.dart';
+import '../widgets/future_network_image.dart';
 import '../utils/responsive.dart';
 import '../services/meja_api.dart';
 import '../services/stock_api.dart';
@@ -25,6 +26,7 @@ import '../services/booking_api.dart';
 import '../services/customer_api.dart';
 import '../services/discount_api.dart';
 import '../services/items_api.dart';
+import '../services/core_api.dart';
 import '../models/stock_model.dart';
 import '../models/sales_item_model.dart';
 import '../models/discount_model.dart';
@@ -77,6 +79,12 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
   // diupload setelah transaksi tersimpan (butuh sale_id)
   File? _proofImage;
 
+  // QRIS manual: tampilkan kode QRIS milik toko sendiri di modal
+  // pembayaran supaya pembeli bisa scan langsung dari HP kasir.
+  bool _showQris = false;
+  String? _qrisUrl;
+  bool _loadingQris = false;
+
   // admin bisa menyembunyikan fitur upload bukti pembayaran (global/per
   // outlet/per user) lewat menu Akses Admin > Visibilitas Bukti Pembayaran.
   // Default true supaya tidak berubah sebelum status terkonfirmasi dari server.
@@ -96,31 +104,41 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
   final _manualNoteController = TextEditingController();
 
   /// Pilih foto bukti pembayaran dari kamera/galeri, validasi maks 5 MB.
-  Future<File?> _pickProofImage() async {
-    final source = await showDialog<ImageSource>(
-      context: context,
-      builder: (dialogContext) => SimpleDialog(
-        title: const Text('Foto Bukti Pembayaran'),
-        children: [
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(dialogContext, ImageSource.camera),
-            child: const Row(children: [
-              Icon(Icons.photo_camera),
-              SizedBox(width: 8),
-              Text('Ambil dari Kamera'),
-            ]),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(dialogContext, ImageSource.gallery),
-            child: const Row(children: [
-              Icon(Icons.photo_library),
-              SizedBox(width: 8),
-              Text('Pilih dari Galeri'),
-            ]),
-          ),
-        ],
-      ),
-    );
+  /// [directCamera] = true: langsung buka kamera TANPA dialog pilihan --
+  /// dipakai alur QRIS manual ("pilih QRIS -> tampilkan -> pembeli bayar
+  /// -> foto bukti langsung dari kamera -> kembali ke POS"), beda dari
+  /// transfer bank yang tetap kasih pilihan kamera/galeri (foto bukti
+  /// transfer sering berupa screenshot, bukan hasil jepretan langsung).
+  Future<File?> _pickProofImage({bool directCamera = false}) async {
+    ImageSource? source = directCamera ? ImageSource.camera : null;
+    if (source == null) {
+      source = await showDialog<ImageSource>(
+        context: context,
+        builder: (dialogContext) => SimpleDialog(
+          title: const Text('Foto Bukti Pembayaran'),
+          children: [
+            SimpleDialogOption(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, ImageSource.camera),
+              child: const Row(children: [
+                Icon(Icons.photo_camera),
+                SizedBox(width: 8),
+                Text('Ambil dari Kamera'),
+              ]),
+            ),
+            SimpleDialogOption(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, ImageSource.gallery),
+              child: const Row(children: [
+                Icon(Icons.photo_library),
+                SizedBox(width: 8),
+                Text('Pilih dari Galeri'),
+              ]),
+            ),
+          ],
+        ),
+      );
+    }
     if (source == null) return null;
 
     final picked =
@@ -1340,6 +1358,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
       BuildContext context, LanguageProvider langProvider, CartProvider cart) {
     _cashAmountController.clear();
     _proofImage = null;
+    _showQris = false;
+    _qrisUrl = null;
 
     showModalDialog(
       context: context,
@@ -1481,10 +1501,60 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                 },
               ),
 
+            // QRIS manual: tombol tampilkan kode QRIS milik toko sendiri
+            // supaya pembeli bisa scan dari HP kasir.
+            if (isQris) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.qr_code_2),
+                  onPressed: _loadingQris
+                      ? null
+                      : () async {
+                          if (_showQris) {
+                            setModalState(() => _showQris = false);
+                            return;
+                          }
+                          setModalState(() => _showQris = true);
+                          if (_qrisUrl != null) return;
+                          setModalState(() => _loadingQris = true);
+                          final url = await CoreApi().getQrisPhotoUrl();
+                          setModalState(() {
+                            _qrisUrl = url;
+                            _loadingQris = false;
+                          });
+                        },
+                  label: Text(_loadingQris
+                      ? 'Memuat QRIS...'
+                      : (_showQris ? 'Sembunyikan QRIS' : 'Tampilkan QRIS')),
+                ),
+              ),
+              if (_showQris) ...[
+                const SizedBox(height: 8),
+                Center(
+                  child: _qrisUrl != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          child: Image.network(_qrisUrl!,
+                              width: 220, height: 220, fit: BoxFit.contain),
+                        )
+                      : const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Text(
+                            'Belum ada foto QRIS tersimpan. Simpan dulu di menu "QRIS Saya".',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ),
+                ),
+              ],
+              const SizedBox(height: 16),
+            ],
+
             // Transfer Bank (wajib) / QRIS manual (opsional): foto bukti
             // pembayaran, ambil dari kamera atau galeri (lihat
             // _pickProofImage) — disembunyikan jika admin menonaktifkan
-            // fitur ini.
+            // fitur ini. QRIS: langsung buka kamera (directCamera), bukan
+            // dialog pilihan -- lihat doc comment _pickProofImage.
             if ((isBank || isQris) && _proofFeatureEnabled) ...[
               SizedBox(
                 width: double.infinity,
@@ -1510,7 +1580,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                             .withValues(alpha: 0.5)),
                   ),
                   onPressed: () async {
-                    final file = await _pickProofImage();
+                    final file =
+                        await _pickProofImage(directCamera: isQris);
                     if (file != null) {
                       setModalState(() => _proofImage = file);
                     }
@@ -1891,11 +1962,10 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                     )
                   : ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        ItemsApi().itemPhotoUrl(stock.stock_item_id),
-                        headers: _photoHeaders,
+                      child: FutureNetworkImage(
+                        urlLoader: () => ItemsApi().itemPhotoUrl(stock.stock_item_id),
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Icon(
+                        errorBuilder: (_) => Icon(
                           stock.isTherapy
                               ? Icons.spa
                               : Icons.inventory_2_outlined,

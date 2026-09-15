@@ -11,6 +11,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
 import '../widgets/section_card.dart';
+import '../widgets/future_network_image.dart';
 
 /// Menu Storage: ringkasan pemakaian + daftar foto (item katalog & bukti
 /// pembayaran) milik user yang login, dengan aksi hapus per foto. TIDAK
@@ -114,10 +115,9 @@ class _StorageScreenState extends State<StorageScreen> {
       builder: (_) => Dialog(
         insetPadding: const EdgeInsets.all(8),
         child: InteractiveViewer(
-          child: Image.network(
-            _storageApi.photoUrl(entry),
-            headers: _photoHeaders,
-            errorBuilder: (context, error, stack) => const Padding(
+          child: FutureNetworkImage(
+            urlLoader: () => _storageApi.photoUrl(entry),
+            errorBuilder: (context) => const Padding(
               padding: EdgeInsets.all(24),
               child: Text('Foto tidak tersedia saat ini.'),
             ),
@@ -246,13 +246,12 @@ class _StorageScreenState extends State<StorageScreen> {
               borderRadius: BorderRadius.circular(AppRadius.sm),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(AppRadius.sm),
-                child: Image.network(
-                  _storageApi.photoUrl(entry),
-                  headers: _photoHeaders,
+                child: FutureNetworkImage(
+                  urlLoader: () => _storageApi.photoUrl(entry),
                   width: 56,
                   height: 56,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stack) => Container(
+                  errorBuilder: (context) => Container(
                     width: 56,
                     height: 56,
                     color: AppColors.chipBg,

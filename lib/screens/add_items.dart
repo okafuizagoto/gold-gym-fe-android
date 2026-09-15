@@ -14,6 +14,7 @@ import '../widgets/pagination_bar.dart';
 import '../widgets/private_route.dart';
 import '../widgets/search_field.dart';
 import '../widgets/section_card.dart';
+import '../widgets/future_network_image.dart';
 import '../services/items_api.dart';
 import '../services/outlet_api.dart';
 import '../models/outlet_model.dart';
@@ -1287,13 +1288,12 @@ class _Thumb extends StatelessWidget {
     if (item.item_photo.isEmpty) return placeholder;
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppRadius.sm),
-      child: Image.network(
-        ItemsApi().itemPhotoUrl(item.item_id),
-        headers: headers,
+      child: FutureNetworkImage(
+        urlLoader: () => ItemsApi().itemPhotoUrl(item.item_id),
         width: 52,
         height: 52,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => placeholder,
+        errorBuilder: (_) => placeholder,
       ),
     );
   }
