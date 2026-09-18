@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'dart:convert';
 import '../config/theme.dart';
+import '../providers/cart_provider.dart';
 import '../services/outlet_api.dart';
 import '../models/outlet_model.dart';
 import '../utils/storage.dart';
@@ -98,6 +100,11 @@ class _OutletScreenState extends State<OutletScreen> {
     // pembeli langsung ke layar belanja; penjual/admin ke dashboard
     final role = await Storage.get(AppConstants.userRoleKey);
     if (!mounted) return;
+    // KOREKSI 2026-09-18 (QA audit #1.8): CartProvider hidup sepanjang
+    // siklus app (dibuat sekali di root, lib/main.dart), bukan per-outlet
+    // -- tanpa ini, cart berisi stock_id/diskon outlet LAMA ikut terbawa
+    // ke outlet baru (transaksi/stok salah outlet saat checkout).
+    Provider.of<CartProvider>(context, listen: false).clear();
     Navigator.pushReplacementNamed(
         context, role == AppConstants.roleBuyer ? '/belanja' : '/');
   }

@@ -11,6 +11,7 @@ import '../utils/storage.dart';
 import '../utils/text_formatter.dart';
 import '../utils/toast.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/export_report_buttons.dart';
 
 /// Tab laporan PER HARI: pilih tanggal → tabel item terjual.
 /// Baris dengan customer sama ditampilkan tanpa garis pemisah di kolom customer
@@ -28,6 +29,7 @@ class _LaporanHarianViewState extends State<LaporanHarianView>
   DateTime _date = DateTime.now();
   DayReport? _report;
   bool _loading = true;
+  String _outcode = '';
 
   @override
   bool get wantKeepAlive => true;
@@ -42,6 +44,7 @@ class _LaporanHarianViewState extends State<LaporanHarianView>
     setState(() => _loading = true);
     try {
       final outcode = await Storage.get(AppConstants.outcode) ?? '';
+      _outcode = outcode;
       final dateStr = DateFormat('yyyy-MM-dd').format(_date);
       final resp = await _salesApi.getSalesReport('day', dateStr, outcode);
       if (resp.statusCode == 200) {
@@ -124,6 +127,11 @@ class _LaporanHarianViewState extends State<LaporanHarianView>
             ),
           ),
           const SizedBox(width: 6),
+          ExportReportButtons(
+            mode: 'day',
+            date: DateFormat('yyyy-MM-dd').format(_date),
+            outcode: _outcode,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Muat ulang',

@@ -35,10 +35,10 @@ class _AppDrawerState extends State<AppDrawer> {
     //                  add items, daftar pembeli, ganti outlet, about us
     // - Mode pembeli / role BUYER : booking terapi, Point of Sale (belanja),
     //                  List Barang, riwayat belanja, about us
-    final role = await Storage.get(AppConstants.userRoleKey) ??
-        AppConstants.roleSeller;
-    final outletType = await Storage.get(AppConstants.outletTypeKey) ??
-        'RETAIL';
+    final role =
+        await Storage.get(AppConstants.userRoleKey) ?? AppConstants.roleSeller;
+    final outletType =
+        await Storage.get(AppConstants.outletTypeKey) ?? 'RETAIL';
     final shopMode = await Storage.get(AppConstants.shopModeKey) ?? '';
     // flag akun sudah mendaftar sebagai pembeli (gold_buyer_yn)
     final isRegisteredBuyer =
@@ -57,8 +57,7 @@ class _AppDrawerState extends State<AppDrawer> {
     // backend, data yang diakses staff otomatis data milik owner-nya
     final isStaff = role == AppConstants.roleStaff;
     // tampilan pembeli: role BUYER asli, atau penjual/admin dalam mode pembeli
-    final buyerView =
-        isRealBuyer || shopMode == AppConstants.shopModeBuyer;
+    final buyerView = isRealBuyer || shopMode == AppConstants.shopModeBuyer;
     final isTherapy = outletType == AppConstants.outletTherapy;
 
     // Static routes
@@ -188,6 +187,16 @@ class _AppDrawerState extends State<AppDrawer> {
               icon: Icons.data_usage,
               route: '/admin-storage-usage',
             ),
+            MenuItem(
+              title: 'Daftar Request Fitur',
+              icon: Icons.feedback_outlined,
+              route: '/admin-request-fitur',
+            ),
+            MenuItem(
+              title: 'Backup Data Harian',
+              icon: Icons.backup_outlined,
+              route: '/admin-backup',
+            ),
           ],
         ),
       // Atur Meja: khusus penjual retail (non-THERAPY) -- kelola area
@@ -261,7 +270,10 @@ class _AppDrawerState extends State<AppDrawer> {
       // Bisa juga dipaksa sembunyi oleh admin (menuDaftarPembeliEnabled).
       // ADMIN tidak butuh berbelanja sebagai pembeli, jadi menu ini juga
       // tidak relevan untuknya.
-      if (!buyerView && !isRegisteredBuyer && menuDaftarPembeliEnabled && !isAdmin)
+      if (!buyerView &&
+          !isRegisteredBuyer &&
+          menuDaftarPembeliEnabled &&
+          !isAdmin)
         MenuItem(
           title: 'Daftar Pembeli',
           icon: Icons.person_add,
@@ -297,6 +309,17 @@ class _AppDrawerState extends State<AppDrawer> {
           icon: Icons.swap_horiz,
           route: '/switch-seller',
         ),
+      // Pencatatan Pengeluaran: ledger biaya operasional per outlet
+      // (sewa/listrik/gaji/dst), berdampingan dengan Laporan Penjualan.
+      // Sama seperti Stock/Items, staff yang bekerja untuk penjual ikut
+      // bisa mencatat -- hapus tetap dibatasi pemilik outlet asli
+      // (lihat requireRealSeller di backend).
+      if (!buyerView && !isAdmin)
+        MenuItem(
+          title: 'Pencatatan Pengeluaran',
+          icon: Icons.payments_outlined,
+          route: '/expense',
+        ),
       // Storage: daftar & hapus foto (item katalog + bukti pembayaran) milik
       // akun sendiri, dengan kuota 30MB -- semua role KECUALI ADMIN (admin
       // tidak punya kuota storage).
@@ -305,6 +328,16 @@ class _AppDrawerState extends State<AppDrawer> {
           title: 'Storage',
           icon: Icons.sd_storage_outlined,
           route: '/storage',
+        ),
+      // Request Fitur: kotak saran -- ide fitur baru atau laporan
+      // perbaikan pada 1 menu. Semua role non-admin (penjual retail &
+      // therapy, pembeli, staff) boleh mengajukan; admin punya menu
+      // terpisah "Daftar Request Fitur" di grup Akses Admin di bawah.
+      if (!isAdmin)
+        MenuItem(
+          title: 'Request Fitur',
+          icon: Icons.feedback_outlined,
+          route: '/request-fitur',
         ),
       // QRIS Saya: penjual menyimpan foto kode QRIS statis milik mereka
       // sendiri, ditampilkan ke pembeli lewat tombol "Tampilkan QRIS" di
@@ -346,7 +379,8 @@ class _AppDrawerState extends State<AppDrawer> {
           .where((item) => allowed(item.route))
           .map((item) {
             if (item.children == null) return item;
-            final children = item.children!.where((c) => allowed(c.route)).toList();
+            final children =
+                item.children!.where((c) => allowed(c.route)).toList();
             return MenuItem(
               title: item.title,
               icon: item.icon,

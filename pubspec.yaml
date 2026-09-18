@@ -73,6 +73,9 @@ dependencies:
   # Android API level (scoped storage API 29+, fallback di bawahnya)
   file_saver: ^0.2.14
 
+  # Grafik tren penjualan harian (Dashboard Tren Penjualan)
+  fl_chart: ^0.69.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

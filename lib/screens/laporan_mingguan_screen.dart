@@ -10,6 +10,7 @@ import '../utils/storage.dart';
 import '../utils/text_formatter.dart';
 import '../utils/toast.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/export_report_buttons.dart';
 
 /// Tab laporan PER MINGGU: pilih tanggal → sistem menentukan blok minggu
 /// (1–7, 8–14, dst) yang memuat tanggal itu, lalu menampilkan total penjualan
@@ -27,6 +28,7 @@ class _LaporanMingguanViewState extends State<LaporanMingguanView>
   DateTime _date = DateTime.now();
   WeekReport? _report;
   bool _loading = true;
+  String _outcode = '';
 
   @override
   bool get wantKeepAlive => true;
@@ -41,6 +43,7 @@ class _LaporanMingguanViewState extends State<LaporanMingguanView>
     setState(() => _loading = true);
     try {
       final outcode = await Storage.get(AppConstants.outcode) ?? '';
+      _outcode = outcode;
       final dateStr = DateFormat('yyyy-MM-dd').format(_date);
       final resp = await _salesApi.getSalesReport('week', dateStr, outcode);
       if (resp.statusCode == 200) {
@@ -103,6 +106,11 @@ class _LaporanMingguanViewState extends State<LaporanMingguanView>
                 ),
               ),
               const SizedBox(width: 6),
+              ExportReportButtons(
+                mode: 'week',
+                date: DateFormat('yyyy-MM-dd').format(_date),
+                outcode: _outcode,
+              ),
               IconButton(
                 icon: const Icon(Icons.refresh_rounded),
                 tooltip: 'Muat ulang',

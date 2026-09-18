@@ -169,6 +169,30 @@ class SalesApi extends ApiClient {
     });
   }
 
+  /// Dashboard tren penjualan: total harian (gap-filled) + KPI ringkas +
+  /// perbandingan periode sebelumnya + top 5 item. `from`/`to` kosong ->
+  /// backend default 30 hari terakhir.
+  Future<http.Response> getSalesTrend(
+      String outcode, String from, String to) {
+    final query = {"type": "dashboardtrend", "code": outcode};
+    if (from.isNotEmpty) query["from"] = from;
+    if (to.isNotEmpty) query["to"] = to;
+    return _client.get("/gold-gym/v2/sales", queryParams: query);
+  }
+
+  /// Export laporan (day/week/month) sebagai file PDF/Excel -- respons
+  /// bytes file MENTAH (bukan JSON), caller baca lewat `resp.bodyBytes`.
+  Future<http.Response> exportReport(
+      String mode, String date, String outcode, String format) {
+    return _client.get("/gold-gym/v2/sales", queryParams: {
+      "type": "exportreport",
+      "mode": mode,
+      "date": date,
+      "code": outcode,
+      "format": format,
+    });
+  }
+
   /// Admin/penjual menandai transaksi BELUM LUNAS menjadi LUNAS.
   Future<http.Response> markPaid(String saleId) {
     return _client.put(
@@ -176,15 +200,26 @@ class SalesApi extends ApiClient {
   }
 
   /// Ambil nota PDF dari backend. Return null jika belum tersedia/gagal.
+  ///
+  /// KOREKSI 2026-09-18 (QA audit #1.7): dulu tanpa try/catch -- exception
+  /// (timeout, SessionExpired) menembus `getReceiptPdfWithRetry` sampai ke
+  /// `_printReceipt`, yang salah dianggap sebagai booking/pembayaran GAGAL
+  /// padahal sudah tersimpan sukses di backend. Sekarang exception
+  /// ditangkap & diperlakukan sama seperti "belum siap" (null) supaya
+  /// retry loop tetap jalan sebagaimana mestinya.
   Future<Uint8List?> getReceiptPdf(String saleId) async {
-    final response = await _client.get("/gold-gym/v2/sales", queryParams: {
-      "type": "receipt",
-      "saleid": saleId,
-    });
-    if (response.statusCode == 200) {
-      return response.bodyBytes;
+    try {
+      final response = await _client.get("/gold-gym/v2/sales", queryParams: {
+        "type": "receipt",
+        "saleid": saleId,
+      });
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      }
+      return null;
+    } catch (_) {
+      return null;
     }
-    return null;
   }
 
   /// Insert sales async lewat Kafka: nota mungkin belum ada sesaat setelah

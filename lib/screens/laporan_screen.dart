@@ -7,9 +7,12 @@ import '../widgets/segmented_tabs.dart';
 import 'laporan_harian_screen.dart';
 import 'laporan_mingguan_screen.dart';
 import 'laporan_bulanan_screen.dart';
+import 'laporan_tren_view.dart';
 
-/// Layar "Laporan Penjualan" (khusus penjual). Berisi 3 tab: Per Hari,
-/// Per Minggu, Per Bulan — masing-masing tab memuat view laporannya sendiri.
+/// Layar "Laporan Penjualan" (khusus penjual). Berisi 4 tab: Per Hari,
+/// Per Minggu, Per Bulan, Tren — masing-masing tab memuat view laporannya
+/// sendiri. Export PDF/Excel ada di 3 tab pertama (lihat ExportReportButtons
+/// di masing-masing view); tab Tren punya grafik sendiri, tidak diexport.
 class LaporanScreen extends StatelessWidget {
   const LaporanScreen({super.key});
 
@@ -18,7 +21,7 @@ class LaporanScreen extends StatelessWidget {
     return PrivateRoute(
       sellerOnly: true,
       child: DefaultTabController(
-        length: 3,
+        length: 4,
         child: Scaffold(
           appBar: const AppBarCustom(title: 'Laporan Penjualan'),
           drawer: const AppDrawer(),
@@ -50,6 +53,10 @@ class LaporanScreen extends StatelessWidget {
                                 value: 2,
                                 label: 'Per Bulan',
                                 icon: Icons.calendar_month_rounded),
+                            SegmentedTab(
+                                value: 3,
+                                label: 'Tren',
+                                icon: Icons.show_chart_rounded),
                           ],
                         ),
                       );
@@ -62,6 +69,7 @@ class LaporanScreen extends StatelessWidget {
                       LaporanHarianView(),
                       LaporanMingguanView(),
                       LaporanBulananView(),
+                      LaporanTrenView(),
                     ],
                   ),
                 ),

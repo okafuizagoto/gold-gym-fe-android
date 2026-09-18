@@ -10,6 +10,7 @@ import '../utils/storage.dart';
 import '../utils/text_formatter.dart';
 import '../utils/toast.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/export_report_buttons.dart';
 
 /// Tab laporan PER BULAN: pilih bulan → total penjualan per blok minggu
 /// (1–7, 8–14, dst) + total keseluruhan bulan.
@@ -26,6 +27,7 @@ class _LaporanBulananViewState extends State<LaporanBulananView>
   DateTime _month = DateTime(DateTime.now().year, DateTime.now().month, 1);
   MonthReport? _report;
   bool _loading = true;
+  String _outcode = '';
 
   @override
   bool get wantKeepAlive => true;
@@ -40,6 +42,7 @@ class _LaporanBulananViewState extends State<LaporanBulananView>
     setState(() => _loading = true);
     try {
       final outcode = await Storage.get(AppConstants.outcode) ?? '';
+      _outcode = outcode;
       final monthStr = DateFormat('yyyy-MM').format(_month);
       final resp = await _salesApi.getSalesReport('month', monthStr, outcode);
       if (resp.statusCode == 200) {
@@ -104,6 +107,11 @@ class _LaporanBulananViewState extends State<LaporanBulananView>
                 ),
               ),
               const SizedBox(width: 6),
+              ExportReportButtons(
+                mode: 'month',
+                date: DateFormat('yyyy-MM').format(_month),
+                outcode: _outcode,
+              ),
               IconButton(
                 icon: const Icon(Icons.refresh_rounded),
                 tooltip: 'Muat ulang',

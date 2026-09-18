@@ -27,6 +27,8 @@ import '../screens/admin_proof_access_screen.dart';
 import '../screens/admin_registration_mode_screen.dart';
 import '../screens/admin_payment_report_screen.dart';
 import '../screens/admin_storage_usage_screen.dart';
+import '../screens/feature_request_screen.dart';
+import '../screens/admin_feature_request_screen.dart';
 import '../screens/qris_saya_screen.dart';
 import '../screens/seller_menu_access_screen.dart';
 import '../screens/customer_list_screen.dart';
@@ -41,6 +43,8 @@ import '../screens/staff_menu_access_screen.dart';
 import '../screens/staff_attendance_screen.dart';
 import '../screens/staff_clock_screen.dart';
 import '../screens/check_email_screen.dart';
+import '../screens/expense_screen.dart';
+import '../screens/admin_backup_screen.dart';
 
 class AppRoutes {
   static const String home = '/';
@@ -71,6 +75,8 @@ class AppRoutes {
   static const String adminRegistrationMode = '/admin-registration-mode';
   static const String adminPaymentReport = '/admin-payment-report';
   static const String adminStorageUsage = '/admin-storage-usage';
+  static const String requestFitur = '/request-fitur';
+  static const String adminRequestFitur = '/admin-request-fitur';
   static const String adminAksesDaftarPembeli = '/admin-akses-daftar-pembeli';
   static const String adminAksesModePembeli = '/admin-akses-mode-pembeli';
   static const String daftarCustomer = '/daftar-customer';
@@ -86,6 +92,8 @@ class AppRoutes {
   static const String absenStaff = '/absen-staff';
   static const String absen = '/absen';
   static const String checkEmail = '/check-email';
+  static const String expense = '/expense';
+  static const String adminBackup = '/admin-backup';
 
   static Map<String, WidgetBuilder> get routes => {
         home: (context) => const HomeScreen(),
@@ -116,6 +124,8 @@ class AppRoutes {
         adminRegistrationMode: (context) => const AdminRegistrationModeScreen(),
         adminPaymentReport: (context) => const AdminPaymentReportScreen(),
         adminStorageUsage: (context) => const AdminStorageUsageScreen(),
+        requestFitur: (context) => const FeatureRequestScreen(),
+        adminRequestFitur: (context) => const AdminFeatureRequestScreen(),
         adminAksesDaftarPembeli: (context) => const SellerMenuAccessScreen(
             target: SellerMenuAccessTarget.daftarPembeli),
         adminAksesModePembeli: (context) => const SellerMenuAccessScreen(
@@ -133,5 +143,7 @@ class AppRoutes {
         absenStaff: (context) => const StaffAttendanceScreen(),
         absen: (context) => const StaffClockScreen(),
         checkEmail: (context) => const CheckEmailScreen(),
+        expense: (context) => const ExpenseScreen(),
+        adminBackup: (context) => const AdminBackupScreen(),
       };
 }

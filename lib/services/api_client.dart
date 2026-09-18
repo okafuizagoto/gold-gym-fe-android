@@ -14,6 +14,41 @@ class SessionExpiredException implements Exception {
   String toString() => message;
 }
 
+/// Dilempar oleh service ADMIN-only (backup/feature-request/dll) saat
+/// backend balas 403 -- dibedakan dari error lain (500/timeout) supaya
+/// layar bisa tampilkan "Khusus admin" HANYA untuk kasus akses ditolak,
+/// bukan untuk error server biasa (QA audit 2026-09-18, bug #1.1/#1.4).
+class ForbiddenException implements Exception {
+  final String message;
+  ForbiddenException([this.message = 'Khusus admin']);
+  @override
+  String toString() => message;
+}
+
+/// Baca pesan error dari body JSON backend (`{"error": "..."}`), fallback
+/// ke [fallback] kalau body bukan JSON atau tidak punya field itu -- pola
+/// yang sudah dipakai di laporan_tren_view.dart, disatukan di sini supaya
+/// tidak diulang-ulang di tiap service.
+String extractErrorMessage(http.Response response, String fallback) {
+  try {
+    final body = jsonDecode(response.body);
+    if (body is Map && body['error'] is String) return body['error'];
+  } catch (_) {}
+  return fallback;
+}
+
+/// Lempar [ForbiddenException] untuk 403, atau [Exception] dengan pesan
+/// backend untuk status non-200 lainnya. Dipakai service yang perlu
+/// membedakan "khusus admin" dari error biasa (backup, feature-request).
+void throwOnErrorStatus(http.Response response, String fallbackMessage) {
+  if (response.statusCode == 403) {
+    throw ForbiddenException();
+  }
+  if (response.statusCode != 200) {
+    throw Exception(extractErrorMessage(response, fallbackMessage));
+  }
+}
+
 class ApiClient {
   static String get baseUrl => Env.baseApiUrl;
   static const Duration timeout = Duration(seconds: 10);
@@ -130,19 +165,28 @@ class ApiClient {
     });
   }
 
-  Future<http.Response> post(String endpoint, Map<String, dynamic> body) async {
+  // KOREKSI 2026-09-18 (QA audit, mirror dari bug Next.js #2.3): dulu SEMUA
+  // POST -- termasuk trigger backup manual yang memicu mysqldump+gzip+
+  // upload B2 SINKRON di server -- terikat ke `timeout` global (10s).
+  // Timeout klien yang terlalu pendek untuk operasi server berat bisa
+  // membunuh proses backup di tengah jalan murni karena timeout klien,
+  // bukan masalah nyata di server. `timeoutOverride` opsional, default
+  // null = perilaku lama (semua caller lain tidak berubah).
+  Future<http.Response> post(String endpoint, Map<String, dynamic> body,
+      {Duration? timeoutOverride}) async {
+    final effectiveTimeout = timeoutOverride ?? timeout;
     final headers = await _authHeaders();
     final url = Uri.parse("$baseUrl$endpoint");
 
     var response = await http
         .post(url, headers: headers, body: jsonEncode(body))
-        .timeout(timeout);
+        .timeout(effectiveTimeout);
 
     if (response.statusCode == 401) {
       final newToken = await _refreshOrLogout();
       response = await http
           .post(url, headers: _headersWith(newToken), body: jsonEncode(body))
-          .timeout(timeout);
+          .timeout(effectiveTimeout);
     }
 
     return response;

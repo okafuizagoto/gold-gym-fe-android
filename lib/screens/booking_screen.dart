@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
@@ -156,14 +157,24 @@ class _BookingScreenState extends State<BookingScreen> {
     return AppColors.success; // tersedia
   }
 
+  // KOREKSI 2026-09-18 (QA audit #1.7): dulu tanpa try/catch -- kegagalan
+  // cetak nota (ambil PDF/Printing.layoutPdf) TIDAK BOLEH dianggap sebagai
+  // booking/pembayaran gagal oleh pemanggil (booking sudah tersimpan
+  // sukses di backend saat fungsi ini dipanggil).
   Future<void> _printReceipt(String saleId) async {
-    Toast.info(context, 'Menyiapkan nota...');
-    final pdfBytes = await _salesApi.getReceiptPdfWithRetry(saleId);
-    if (pdfBytes != null) {
-      await Printing.layoutPdf(onLayout: (format) async => pdfBytes);
-    } else {
+    if (mounted) Toast.info(context, 'Menyiapkan nota...');
+    try {
+      final pdfBytes = await _salesApi.getReceiptPdfWithRetry(saleId);
+      if (pdfBytes != null) {
+        await Printing.layoutPdf(onLayout: (format) async => pdfBytes);
+      } else {
+        if (mounted) {
+          Toast.error(context, 'Nota belum siap, coba dari History Sales');
+        }
+      }
+    } catch (_) {
       if (mounted) {
-        Toast.error(context, 'Nota belum siap, coba dari History Sales');
+        Toast.error(context, 'Gagal mencetak nota, coba dari History Sales');
       }
     }
   }
@@ -228,8 +239,20 @@ class _BookingScreenState extends State<BookingScreen> {
               }
             }
             setDialogState(() => saving = true);
+            // KOREKSI 2026-09-18 (QA audit #1.7): dulu _loadSlots/
+            // _printReceipt/_offerContinueShopping dipanggil DI DALAM try
+            // block yang sama dengan insertBooking -- kalau salah satu di
+            // antaranya (terutama ambil PDF nota) gagal, catch block di
+            // bawah salah menganggap SELURUH booking gagal padahal sudah
+            // tersimpan sukses di backend (risiko double booking kalau
+            // kasir booking ulang). Sekarang dipisah: try/catch HANYA
+            // membungkus API booking, sisanya (refresh/cetak/lanjut
+            // belanja) di luar try itu. `setDialogState` juga tidak lagi
+            // dipanggil setelah `Navigator.pop` (risiko "setState after
+            // dispose" yang dicatat di audit).
+            http.Response response;
             try {
-              final response = await _bookingApi.insertBooking(
+              response = await _bookingApi.insertBooking(
                 outcode: _outcode,
                 date: _dateStr,
                 start: slot.start,
@@ -240,26 +263,34 @@ class _BookingScreenState extends State<BookingScreen> {
                 therapyType: therapyType,
                 customPrice: customPrice,
               );
-              final body = jsonDecode(response.body);
-              if (response.statusCode == 201) {
-                if (mounted) {
-                  Navigator.pop(dialogContext);
-                  Toast.success(this.context, 'Booking berhasil');
-                  await _loadSlots();
-                  final saleId = body['sale_id'];
-                  if (saleId != null && saleId.toString().isNotEmpty) {
-                    await _printReceipt(saleId);
-                  }
-                  await _offerContinueShopping();
-                }
-              } else {
-                setDialogState(() => saving = false);
-                Toast.error(context, body['error'] ?? 'Booking gagal');
-              }
             } catch (e) {
               setDialogState(() => saving = false);
               Toast.error(context, 'Booking gagal');
+              return;
             }
+
+            Map<String, dynamic> body = {};
+            try {
+              body = jsonDecode(response.body) as Map<String, dynamic>;
+            } catch (_) {}
+
+            if (response.statusCode != 201) {
+              setDialogState(() => saving = false);
+              Toast.error(context, body['error'] ?? 'Booking gagal');
+              return;
+            }
+
+            // Booking sudah tersimpan sukses di backend dari sini.
+            if (mounted) {
+              Navigator.pop(dialogContext);
+              Toast.success(this.context, 'Booking berhasil');
+            }
+            await _loadSlots();
+            final saleId = body['sale_id'];
+            if (saleId != null && saleId.toString().isNotEmpty) {
+              await _printReceipt(saleId.toString());
+            }
+            await _offerContinueShopping();
           }
 
           final textTheme = Theme.of(context).textTheme;
@@ -723,32 +754,45 @@ class _BookingScreenState extends State<BookingScreen> {
               }
             }
             setDialogState(() => saving = true);
+            // KOREKSI 2026-09-18 (QA audit #1.7) -- lihat komentar sama di
+            // `save()` (booking baru): pisahkan try/catch API pembayaran
+            // dari refresh/cetak-nota/lanjut-belanja, supaya kegagalan
+            // cetak nota tidak dilaporkan sebagai "Gagal membayar" padahal
+            // sudah lunas di backend.
+            http.Response response;
             try {
-              final response = await _bookingApi.payBooking(
+              response = await _bookingApi.payBooking(
                 booking.bookingId,
                 selectedItem?.item_id ?? 0,
                 customPrice: customPrice,
               );
-              final body = jsonDecode(response.body);
-              if (response.statusCode == 200) {
-                if (mounted) {
-                  Navigator.pop(dialogContext);
-                  Toast.success(this.context, 'Booking lunas');
-                  await _loadSlots();
-                  final saleId = body['sale_id'];
-                  if (saleId != null && saleId.toString().isNotEmpty) {
-                    await _printReceipt(saleId);
-                  }
-                  await _offerContinueShopping();
-                }
-              } else {
-                setDialogState(() => saving = false);
-                Toast.error(context, body['error'] ?? 'Gagal membayar');
-              }
             } catch (e) {
               setDialogState(() => saving = false);
               Toast.error(context, 'Gagal membayar');
+              return;
             }
+
+            Map<String, dynamic> body = {};
+            try {
+              body = jsonDecode(response.body) as Map<String, dynamic>;
+            } catch (_) {}
+
+            if (response.statusCode != 200) {
+              setDialogState(() => saving = false);
+              Toast.error(context, body['error'] ?? 'Gagal membayar');
+              return;
+            }
+
+            if (mounted) {
+              Navigator.pop(dialogContext);
+              Toast.success(this.context, 'Booking lunas');
+            }
+            await _loadSlots();
+            final saleId = body['sale_id'];
+            if (saleId != null && saleId.toString().isNotEmpty) {
+              await _printReceipt(saleId.toString());
+            }
+            await _offerContinueShopping();
           }
 
           final textTheme = Theme.of(context).textTheme;

@@ -148,6 +148,63 @@ class WeeklyTotal {
       );
 }
 
+/// Satu item terlaris pada dashboard tren (top 5 by revenue).
+class TopItem {
+  final String itemName;
+  final int qty;
+  final double revenue;
+
+  TopItem({required this.itemName, required this.qty, required this.revenue});
+
+  factory TopItem.fromJson(Map<String, dynamic> j) => TopItem(
+        itemName: j['item_name'] ?? '',
+        qty: _toInt(j['qty']),
+        revenue: _toDouble(j['revenue']),
+      );
+}
+
+/// Dashboard tren penjualan: total harian gap-filled + KPI ringkas +
+/// perbandingan ke periode sebelumnya (sama panjang) + item terlaris.
+class SalesTrend {
+  final String rangeStart;
+  final String rangeEnd;
+  final List<DailyTotal> days;
+  final double totalRevenue;
+  final int totalTransactions;
+  final double averageOrderValue;
+  final double prevPeriodRevenue;
+  final double revenueChangePercent;
+  final List<TopItem> topItems;
+
+  SalesTrend({
+    required this.rangeStart,
+    required this.rangeEnd,
+    required this.days,
+    required this.totalRevenue,
+    required this.totalTransactions,
+    required this.averageOrderValue,
+    required this.prevPeriodRevenue,
+    required this.revenueChangePercent,
+    required this.topItems,
+  });
+
+  factory SalesTrend.fromJson(Map<String, dynamic> j) => SalesTrend(
+        rangeStart: j['range_start'] ?? '',
+        rangeEnd: j['range_end'] ?? '',
+        days: ((j['days'] ?? []) as List)
+            .map((e) => DailyTotal.fromJson(e))
+            .toList(),
+        totalRevenue: _toDouble(j['total_revenue']),
+        totalTransactions: _toInt(j['total_transactions']),
+        averageOrderValue: _toDouble(j['average_order_value']),
+        prevPeriodRevenue: _toDouble(j['prev_period_revenue']),
+        revenueChangePercent: _toDouble(j['revenue_change_percent']),
+        topItems: ((j['top_items'] ?? []) as List)
+            .map((e) => TopItem.fromJson(e))
+            .toList(),
+      );
+}
+
 /// Laporan per-bulan: daftar total per minggu + total keseluruhan.
 class MonthReport {
   final String month;
