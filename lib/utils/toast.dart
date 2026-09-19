@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
+import 'friendly_error.dart';
 
 /// Notifikasi singkat bergaya web (react-hot-toast): pil melayang di atas,
 /// hijau untuk sukses, merah untuk error, radius 12, lebar dibatasi supaya
@@ -64,7 +65,8 @@ class Toast {
   static void error(BuildContext context, String message) {
     _show(
       context,
-      content: _row(Icons.error_rounded, message),
+      // Production: sembunyikan detail teknis backend (lihat friendly_error.dart).
+      content: _row(Icons.error_rounded, friendlyErrorMessage(message)),
       background: const Color(0xFFDC2626),
       duration: const Duration(seconds: 3),
     );
