@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../models/staff_model.dart';
 import '../services/staff_api.dart';
+import '../utils/password_strength.dart';
 import '../utils/responsive.dart';
 import '../utils/toast.dart';
 import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/password_strength_bar.dart';
 import '../widgets/private_route.dart';
 
 /// Menu penjual: Daftar Staff. Registrasi akun staff (dibawahi owner, akses
@@ -96,7 +98,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
                     obscureText: obscure,
                     decoration: InputDecoration(
                       labelText: 'Password *',
-                      helperText: 'Minimal 6 karakter',
+                      helperText: 'Minimal 6 karakter, huruf besar, huruf kecil, dan angka',
                       prefixIcon: const Icon(Icons.lock_outline_rounded),
                       suffixIcon: IconButton(
                         icon: Icon(obscure
@@ -106,7 +108,9 @@ class _StaffListScreenState extends State<StaffListScreen> {
                             setDialogState(() => obscure = !obscure),
                       ),
                     ),
+                    onChanged: (_) => setDialogState(() {}),
                   ),
+                  PasswordStrengthBar(password: passC.text),
                 ],
               ),
             ),
@@ -124,13 +128,12 @@ class _StaffListScreenState extends State<StaffListScreen> {
     );
     if (ok != true) return;
 
-    if (namaC.text.trim().isEmpty ||
-        !emailC.text.contains('@') ||
-        passC.text.length < 6) {
-      if (mounted) {
-        Toast.error(context,
-            'Lengkapi nama & email, password minimal 6 karakter.');
-      }
+    if (namaC.text.trim().isEmpty || !emailC.text.contains('@')) {
+      if (mounted) Toast.error(context, 'Lengkapi nama & email.');
+      return;
+    }
+    if (!evaluatePassword(passC.text).valid) {
+      if (mounted) Toast.error(context, passwordPolicyMessage);
       return;
     }
 

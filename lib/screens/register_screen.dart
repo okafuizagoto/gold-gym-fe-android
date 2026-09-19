@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/core_api.dart';
 import '../utils/constants.dart';
+import '../utils/password_strength.dart';
 import '../utils/toast.dart';
 import '../widgets/auth_card.dart';
+import '../widgets/password_strength_bar.dart';
 import '../widgets/segmented_tabs.dart';
 
 /// Registrasi akun (role PEMBELI atau PENJUAL) — langsung aktif tanpa OTP.
@@ -70,14 +72,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool get _canSubmit {
     return _namaController.text.isNotEmpty &&
         _emailController.text.contains('@') &&
-        _passwordController.text.length >= 6 &&
+        evaluatePassword(_passwordController.text).valid &&
         _passwordController.text == _confirmController.text;
   }
 
   Future<void> _handleRegister() async {
     if (!_canSubmit) {
-      Toast.error(context,
-          'Lengkapi data. Password minimal 6 karakter dan harus sama dengan konfirmasi.');
+      Toast.error(
+          context,
+          !evaluatePassword(_passwordController.text).valid
+              ? passwordPolicyMessage
+              : 'Lengkapi data. Password harus sama dengan konfirmasi.');
       return;
     }
 
@@ -198,7 +203,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             textInputAction: TextInputAction.next,
             decoration: InputDecoration(
               labelText: 'Password',
-              helperText: 'Minimal 6 karakter',
+              helperText: 'Minimal 6 karakter, huruf besar, huruf kecil, dan angka',
               prefixIcon: const Icon(Icons.lock_outline_rounded),
               suffixIcon: IconButton(
                 icon: Icon(
@@ -215,6 +220,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             onChanged: (_) => setState(() {}),
           ),
+          PasswordStrengthBar(password: _passwordController.text),
           const SizedBox(height: 14),
           TextField(
             controller: _confirmController,
