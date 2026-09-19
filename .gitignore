@@ -1,3 +1,7 @@
+# Symlink ke catatan arsitektur pribadi (repo terpisah claude-notes),
+# sengaja tidak ikut riwayat git repo ini -- lihat isi filenya.
+CLAUDE.md
+
 # Miscellaneous
 *.class
 *.log
@@ -58,3 +62,6 @@ coverage/
 
 # Exceptions
 !.env.example
+
+# Tangkapan layar hasil test/screenshots_test.dart (artefak lokal, bukan source)
+test/goldens/
