@@ -11,7 +11,24 @@ const msgLoginFailed = 'Email/username atau password salah.';
 const msgNotFound = 'Data tidak ditemukan.';
 const msgNetwork =
     'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
-const msgServer = 'Terjadi kesalahan pada server. Silakan coba lagi nanti.';
+
+/// Error di sisi server (production): pesan profesional + KODE GALAT supaya admin bisa menelusuri di
+/// log/Grafana. Kode diturunkan dari tag lapisan backend, mis.
+/// "[Service][RegisterBuyer][sendVerificationEmail]" -> "ERR-REGISTERBUYER-SENDVERIFICATIONEMAIL"
+/// (lapisan pertama Service/Data/... dibuang). Tanpa tag: "ERR-SERVER". Detail teknis lain TIDAK ikut tampil.
+/// Sama dengan serverErrorCode/serverErrorMessage di utils/friendlyError.ts.
+String serverErrorCode(String raw) {
+  final tags = RegExp(r'\[([A-Za-z_]+)\]')
+      .allMatches(raw)
+      .map((t) => t.group(1)!)
+      .toList();
+  final parts = tags.length >= 2 ? tags.skip(1).take(3).toList() : <String>[];
+  return 'ERR-${parts.isEmpty ? 'SERVER' : parts.join('-').toUpperCase()}';
+}
+
+String serverErrorMessage(String raw) =>
+    'Mohon maaf, terjadi kendala pada sistem kami. Silakan coba kembali beberapa saat lagi. '
+    'Apabila kendala berlanjut, mohon hubungi admin dan sertakan kode galat: ${serverErrorCode(raw)}.';
 
 final _code =
     RegExp(r'^[A-Z0-9_]+$'); // kode seperti TOKEN_EXPIRED -- dibiarkan
@@ -67,12 +84,12 @@ String friendlyErrorMessage(String raw, {bool? production}) {
   }
   if (!(production ?? Env.isProduction)) return raw;
   final m = raw.trim().replaceFirst(_prefix, '');
-  if (m.isEmpty) return msgServer;
+  if (m.isEmpty) return serverErrorMessage('');
   if (_code.hasMatch(m)) return m;
 
   final isLogin = _loginTag.hasMatch(m) || _credPhrase.hasMatch(m);
   if (_networkKw.hasMatch(m)) {
-    return _serverNetKw.hasMatch(m) ? msgServer : msgNetwork;
+    return _serverNetKw.hasMatch(m) ? serverErrorMessage(m) : msgNetwork;
   }
   if (isLogin) {
     // Login gagal: email tidak ada ATAU password salah -> SATU pesan yang sama
@@ -81,10 +98,12 @@ String friendlyErrorMessage(String raw, {bool? production}) {
     return _internalKw.hasMatch(m) &&
             !_notFoundTech.hasMatch(m) &&
             !_credPhrase.hasMatch(m)
-        ? msgServer
+        ? serverErrorMessage(m)
         : msgLoginFailed;
   }
   if (_notFoundTech.hasMatch(m)) return msgNotFound;
-  if (_layerTag.hasMatch(m) || _internalKw.hasMatch(m)) return msgServer;
+  if (_layerTag.hasMatch(m) || _internalKw.hasMatch(m)) {
+    return serverErrorMessage(m);
+  }
   return m;
 }

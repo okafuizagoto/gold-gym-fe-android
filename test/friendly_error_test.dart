@@ -12,9 +12,9 @@ void main() {
   test('masalah server saat login bukan "salah password"', () {
     expect(
         f('[Service][LoginUser]: dial tcp 10.0.0.1:6379: connection refused'),
-        msgServer);
-    expect(
-        f('[Service][LoginUser]: redis: connection pool timeout'), msgServer);
+        contains('ERR-LOGINUSER'));
+    expect(f('[Service][LoginUser]: redis: connection pool timeout'),
+        contains('ERR-LOGINUSER'));
   });
   test('pesan bisnis & kode dibiarkan', () {
     expect(f('email sudah terdaftar'), 'email sudah terdaftar');
@@ -24,15 +24,28 @@ void main() {
         'Stok tidak cukup untuk item ini');
   });
   test('detail teknis disamarkan', () {
-    expect(f('[Service][GetItems]: Error 1054: Unknown column x'), msgServer);
+    final m = f('[Service][GetItems]: Error 1054: Unknown column x');
+    expect(m, contains('hubungi admin'));
+    expect(m, contains('ERR-GETITEMS'));
+    expect(m, isNot(contains('Unknown column')));
+    expect(m, isNot(contains('[Service]')));
     expect(f('[Data][GetX]: record not found'), msgNotFound);
-    expect(
-        f("Key: 'X.Name' Error:Field validation for 'Name' failed"), msgServer);
+    expect(f("Key: 'X.Name' Error:Field validation for 'Name' failed"),
+        contains('ERR-SERVER'));
     expect(f('Backup gagal: [Service][Backup]: Error 1045 access denied'),
-        msgServer);
+        contains('ERR-BACKUP'));
     expect(f('Network Error'), msgNetwork);
     expect(f('ClientException: Failed host lookup: x'), msgNetwork);
-    expect(f(''), msgServer);
+    expect(f(''), contains('ERR-SERVER'));
+  });
+  test('kode galat dari tag lapisan backend', () {
+    expect(
+        serverErrorCode('[Service][RegisterBuyer][sendVerificationEmail]: 535'),
+        'ERR-REGISTERBUYER-SENDVERIFICATIONEMAIL');
+    expect(serverErrorCode('Error 1054: Unknown column'), 'ERR-SERVER');
+    // staging/local: pesan mentah tetap tampil apa adanya
+    expect(friendlyErrorMessage('[Service][X]: boom', production: false),
+        '[Service][X]: boom');
   });
   test('kode langganan/batas/sesi -> pesan jelas di semua environment', () {
     for (final prod in [true, false]) {
