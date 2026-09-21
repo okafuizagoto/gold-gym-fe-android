@@ -26,6 +26,20 @@ class CheckEmailScreen extends StatefulWidget {
 
 class _CheckEmailScreenState extends State<CheckEmailScreen> {
   final _coreApi = CoreApi();
+
+  /// Logout: cabut sesi di server (refresh token) lalu hapus sesi lokal.
+  Future<void> _logout() async {
+    try {
+      await _coreApi.logout();
+    } catch (_) {
+      // abaikan: sesi lokal tetap dihapus
+    }
+    Storage.clear();
+    if (mounted) {
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (r) => false);
+    }
+  }
+
   String _email = '';
   bool _sending = false;
   int _cooldown = 0;
@@ -77,7 +91,8 @@ class _CheckEmailScreenState extends State<CheckEmailScreen> {
       }
     } catch (_) {
       if (mounted) {
-        Toast.error(context, 'Gagal mengirim ulang. Periksa koneksi internet Anda.');
+        Toast.error(
+            context, 'Gagal mengirim ulang. Periksa koneksi internet Anda.');
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -150,9 +165,8 @@ class _CheckEmailScreenState extends State<CheckEmailScreen> {
           SizedBox(
             height: 48,
             child: TextButton(
-              onPressed: () =>
-                  Navigator.pushNamedAndRemoveUntil(context, '/login', (r) => false),
-              child: const Text('Kembali ke Login'),
+              onPressed: _logout,
+              child: const Text('Logout'),
             ),
           ),
         ],
