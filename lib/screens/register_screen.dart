@@ -98,7 +98,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (response.statusCode == 201) {
         if (mounted) {
-          Toast.success(context, 'Registrasi berhasil, silakan login');
+          Toast.success(
+            context,
+            'Registrasi berhasil. Kami telah mengirimkan tautan verifikasi ke email Anda. Silakan periksa kotak masuk (atau folder spam) untuk memverifikasi email sebelum masuk.',
+            duration: const Duration(seconds: 8),
+          );
           Navigator.pop(context);
         }
       } else {
@@ -203,7 +207,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             textInputAction: TextInputAction.next,
             decoration: InputDecoration(
               labelText: 'Password',
-              helperText: 'Minimal 6 karakter, huruf besar, huruf kecil, dan angka',
+              helperText:
+                  'Minimal 6 karakter, huruf besar, huruf kecil, dan angka',
               prefixIcon: const Icon(Icons.lock_outline_rounded),
               suffixIcon: IconButton(
                 icon: Icon(

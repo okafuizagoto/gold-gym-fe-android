@@ -53,12 +53,13 @@ class Toast {
     );
   }
 
-  static void success(BuildContext context, String message) {
+  static void success(BuildContext context, String message,
+      {Duration duration = const Duration(seconds: 2)}) {
     _show(
       context,
       content: _row(Icons.check_circle_rounded, message),
       background: const Color(0xFF16A34A),
-      duration: const Duration(seconds: 2),
+      duration: duration,
     );
   }
 
@@ -80,8 +81,8 @@ class Toast {
           const SizedBox(
             width: 20,
             height: 20,
-            child: CircularProgressIndicator(
-                color: Colors.white, strokeWidth: 2),
+            child:
+                CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
           ),
           const SizedBox(width: 12),
           Expanded(
