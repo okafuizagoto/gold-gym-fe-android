@@ -139,6 +139,14 @@ class ApiClient {
         await Storage.set('access_token', token);
         return token;
       }
+      // Sesi ini digantikan login di perangkat lain ("1 akun 1 device", login
+      // terakhir menang): tandai supaya layar login menampilkan alasannya.
+      if (response.statusCode == 401) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data['error'] == 'SESSION_REPLACED') {
+          await Storage.set('session_replaced', '1');
+        }
+      }
     } catch (_) {
       // gagal jaringan / parsing -> anggap refresh gagal
     }
@@ -228,7 +236,8 @@ class ApiClient {
     return response;
   }
 
-  Future<http.Response> patch(String endpoint, Map<String, dynamic> body) async {
+  Future<http.Response> patch(
+      String endpoint, Map<String, dynamic> body) async {
     final headers = await _authHeaders();
     final uri = Uri.parse("$baseUrl$endpoint");
 

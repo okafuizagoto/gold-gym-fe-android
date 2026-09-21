@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/outlet_api.dart';
 import '../models/outlet_model.dart';
+import '../utils/roles.dart';
 import '../utils/toast.dart';
 import '../widgets/auth_card.dart';
 import '../widgets/empty_state.dart';
@@ -18,6 +19,8 @@ class ListOutletScreen extends StatefulWidget {
 }
 
 class _OutletScreenState extends State<ListOutletScreen> {
+  // STAFF: daftar outlet baca-saja (backend menolak ubah/hapus).
+  bool _isStaff = false;
   final outletsApi = OutletsApi();
   final _outletAddressController = TextEditingController();
   final _outletSearchListController = TextEditingController();
@@ -36,6 +39,9 @@ class _OutletScreenState extends State<ListOutletScreen> {
   @override
   void initState() {
     super.initState();
+    isStaffRole().then((v) {
+      if (mounted && v) setState(() => _isStaff = true);
+    });
 
     loadItemsOnStart();
   }
@@ -143,8 +149,8 @@ class _OutletScreenState extends State<ListOutletScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Hapus',
-                style: TextStyle(color: AppColors.error)),
+            child:
+                const Text('Hapus', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -190,7 +196,6 @@ class _OutletScreenState extends State<ListOutletScreen> {
             onSubmitted: (v) => getAllOutlet(v, 1, lengths),
           ),
           const SizedBox(height: 16),
-
           ValueListenableBuilder<OutletPagination?>(
             valueListenable: outletsPaginationNotifier,
             builder: (context, pagination, child) {
@@ -229,6 +234,7 @@ class _OutletScreenState extends State<ListOutletScreen> {
                                 1,
                             item: items[i],
                             isEditing: editingIndex == i,
+                            readOnly: _isStaff,
                             addressController: _outletAddressController,
                             statusNotifier: statusEditNotifier,
                             onEdit: () => _startEdit(i, items[i]),
@@ -257,7 +263,6 @@ class _OutletScreenState extends State<ListOutletScreen> {
               );
             },
           ),
-
           const SizedBox(height: 20),
           const Divider(),
           const SizedBox(height: 12),
@@ -287,6 +292,7 @@ class _OutletTile extends StatelessWidget {
   final VoidCallback onSave;
   final VoidCallback onCancel;
   final VoidCallback onDelete;
+  final bool readOnly;
 
   const _OutletTile({
     required this.number,
@@ -298,6 +304,7 @@ class _OutletTile extends StatelessWidget {
     required this.onSave,
     required this.onCancel,
     required this.onDelete,
+    this.readOnly = false,
   });
 
   @override
@@ -347,7 +354,9 @@ class _OutletTile extends StatelessWidget {
                       style: textTheme.titleSmall,
                     ),
                     Text(
-                      item.outlet_code,
+                      item.locked
+                          ? '${item.outlet_code} · 🔒 Terkunci: melebihi batas paket'
+                          : item.outlet_code,
                       style: textTheme.bodySmall,
                     ),
                   ],
@@ -438,37 +447,40 @@ class _OutletTile extends StatelessWidget {
                     item.outlet_address.isEmpty ? '-' : item.outlet_address,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodyMedium
-                        ?.copyWith(color: AppColors.muted),
+                    style:
+                        textTheme.bodyMedium?.copyWith(color: AppColors.muted),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onEdit,
-                    icon: const Icon(Icons.edit_outlined, size: 18),
-                    label: const Text('Edit'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onDelete,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.error,
-                      side: BorderSide(
-                          color: AppColors.error.withValues(alpha: 0.5)),
+            if (!readOnly) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      // outlet terkunci tidak bisa diubah; hapus tetap boleh untuk mengosongkan slot
+                      onPressed: item.locked ? null : onEdit,
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('Edit'),
                     ),
-                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                    label: const Text('Hapus'),
                   ),
-                ),
-              ],
-            ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onDelete,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                        side: BorderSide(
+                            color: AppColors.error.withValues(alpha: 0.5)),
+                      ),
+                      icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                      label: const Text('Hapus'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ],
       ),

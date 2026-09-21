@@ -7,6 +7,7 @@ import '../services/outlet_api.dart';
 import '../models/outlet_model.dart';
 import '../utils/storage.dart';
 import '../utils/constants.dart';
+import '../utils/roles.dart';
 import '../services/core_api.dart';
 import '../utils/toast.dart';
 import '../widgets/auth_card.dart';
@@ -19,6 +20,7 @@ class OutletScreen extends StatefulWidget {
 }
 
 class _OutletScreenState extends State<OutletScreen> {
+  bool _isStaff = false;
   final _formKey = GlobalKey<FormState>();
   final _coreApi = CoreApi();
 
@@ -33,6 +35,9 @@ class _OutletScreenState extends State<OutletScreen> {
   @override
   void initState() {
     super.initState();
+    isStaffRole().then((v) {
+      if (mounted && v) setState(() => _isStaff = true);
+    });
 
     loadItemsOnStart();
   }
@@ -141,10 +146,14 @@ class _OutletScreenState extends State<OutletScreen> {
                         : null),
               ),
               items: _types.map((type) {
+                // Outlet terkunci (melebihi batas paket): tetap terlihat tapi tidak bisa dipilih.
                 return DropdownMenuItem<String>(
                   value: type.outlet_code,
+                  enabled: !type.locked,
                   child: Text(
-                    type.outlet_name.toUpperCase(),
+                    type.locked
+                        ? '🔒 ${type.outlet_name.toUpperCase()} (terkunci)'
+                        : type.outlet_name.toUpperCase(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -177,18 +186,21 @@ class _OutletScreenState extends State<OutletScreen> {
                 label: const Text('LIST OUTLET'),
               ),
             ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed: _handleNewOutlet,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.warningDark,
+            // STAFF tidak boleh membuat outlet (backend 403) -- tombol disembunyikan.
+            if (!_isStaff) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: _handleNewOutlet,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.warningDark,
+                  ),
+                  icon: const Icon(Icons.add_business_rounded, size: 20),
+                  label: const Text('NEW OUTLET'),
                 ),
-                icon: const Icon(Icons.add_business_rounded, size: 20),
-                label: const Text('NEW OUTLET'),
               ),
-            ),
+            ],
             const SizedBox(height: 10),
             SizedBox(
               height: 48,
@@ -196,8 +208,8 @@ class _OutletScreenState extends State<OutletScreen> {
                 onPressed: _handleLogout,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.error,
-                  side: BorderSide(
-                      color: AppColors.error.withValues(alpha: 0.5)),
+                  side:
+                      BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
                 ),
                 icon: const Icon(Icons.logout_rounded, size: 20),
                 label: const Text('LOGOUT'),

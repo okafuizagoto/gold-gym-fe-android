@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/outlet_api.dart';
 import '../models/outlet_model.dart';
+import '../utils/roles.dart';
 import '../utils/toast.dart';
 import '../widgets/auth_card.dart';
 
@@ -22,6 +23,18 @@ class _OutletScreenState extends State<NewOutletScreen> {
   bool _isLoading = false;
 
   ValueNotifier<bool> isActiveOutlet = ValueNotifier(true);
+
+  @override
+  void initState() {
+    super.initState();
+    // STAFF tidak boleh membuat outlet (backend 403) -- jangan tampilkan formnya.
+    isStaffRole().then((v) {
+      if (mounted && v) {
+        Toast.error(context, 'Hanya pemilik yang boleh membuat outlet.');
+        Navigator.of(context).maybePop();
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -177,8 +190,7 @@ class _OutletScreenState extends State<NewOutletScreen> {
                   child: SwitchListTile(
                     value: value,
                     onChanged: (v) => isActiveOutlet.value = v,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 12),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                     secondary: const Icon(Icons.toggle_on_outlined),
                     title: Text('Status Outlet', style: textTheme.titleSmall),
                     subtitle: Text(

@@ -33,6 +33,10 @@ class OutletResponse {
   final DateTime created_at;
   final DateTime? updated_at;
 
+  /// true = melebihi batas paket (outlet yang dibuat terakhir): tampil tapi tidak
+  /// bisa dipakai/diubah.
+  final bool locked;
+
   OutletResponse({
     required this.outlet_id,
     required this.outlet_gold_id,
@@ -43,6 +47,7 @@ class OutletResponse {
     required this.outlet_status,
     required this.created_at,
     this.updated_at,
+    this.locked = false,
   });
 
   /// JSON → Object
@@ -61,6 +66,7 @@ class OutletResponse {
       updated_at: json["updated_at"] == null
           ? null
           : DateTime.tryParse('${json["updated_at"]}'),
+      locked: json["locked"] == true,
     );
   }
 

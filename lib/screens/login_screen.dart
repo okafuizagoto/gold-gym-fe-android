@@ -28,6 +28,22 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    // Dilempar keluar karena akun login di perangkat lain (ApiClient menandai
+    // session_replaced) -> beri tahu alasannya.
+    Storage.get('session_replaced').then((v) async {
+      if (v == '1') {
+        await Storage.delete('session_replaced');
+        if (mounted) {
+          Toast.error(context,
+              'Akun Anda sedang dipakai di perangkat lain. Silakan masuk lagi.');
+        }
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _userController.dispose();
     _passwordController.dispose();
@@ -132,8 +148,8 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       } else {
         if (mounted) {
-          Toast.error(context,
-              'Login gagal. Periksa kembali email dan password Anda.');
+          Toast.error(
+              context, 'Login gagal. Periksa kembali email dan password Anda.');
         }
       }
     } catch (e) {
@@ -241,8 +257,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   onTap: () => Navigator.pushNamed(context, '/register'),
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 2, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
                     child: Text(
                       'Daftarkan akunmu segera',
                       style: textTheme.bodyMedium?.copyWith(

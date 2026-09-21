@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../config/theme.dart';
 import '../services/sales_api.dart';
+import '../utils/subscription_state.dart';
 import '../utils/toast.dart';
 
 /// Tombol export PDF/Excel untuk laporan (GET .../sales?type=exportreport),
@@ -55,8 +56,8 @@ class _ExportReportButtonsState extends State<ExportReportButtons> {
       }
       final ext = format == 'xlsx' ? 'xlsx' : 'pdf';
       final dir = await getTemporaryDirectory();
-      final file = File(
-          '${dir.path}/laporan-${widget.mode}-${widget.date}.$ext');
+      final file =
+          File('${dir.path}/laporan-${widget.mode}-${widget.date}.$ext');
       await file.writeAsBytes(resp.bodyBytes);
       await Share.shareXFiles([XFile(file.path)], text: 'Laporan Penjualan');
     } catch (_) {
@@ -76,6 +77,16 @@ class _ExportReportButtonsState extends State<ExportReportButtons> {
           height: 20,
           child: CircularProgressIndicator(strokeWidth: 2),
         ),
+      );
+    }
+    // Export laporan = fitur paket Growth ke atas (backend menolak dengan PLAN_UPGRADE_REQUIRED).
+    if (!SubscriptionState.hasFeature('export_reports')) {
+      return IconButton(
+        icon: const Icon(Icons.lock_outline_rounded),
+        tooltip: 'Export laporan tersedia di paket Growth ke atas',
+        color: AppColors.disabled,
+        onPressed: () => Navigator.pushNamed(context, '/langganan',
+            arguments: 'export_reports'),
       );
     }
     return Row(

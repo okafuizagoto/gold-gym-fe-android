@@ -13,7 +13,8 @@ const msgNetwork =
     'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
 const msgServer = 'Terjadi kesalahan pada server. Silakan coba lagi nanti.';
 
-final _code = RegExp(r'^[A-Z0-9_]+$'); // kode seperti TOKEN_EXPIRED -- dibiarkan
+final _code =
+    RegExp(r'^[A-Z0-9_]+$'); // kode seperti TOKEN_EXPIRED -- dibiarkan
 final _layerTag = RegExp(
     r'\[[A-Za-z_]+\]\[[A-Za-z_]+\]|\[(service|data|repository|repo|delivery|handler)\]',
     caseSensitive: false);
@@ -34,7 +35,36 @@ final _notFoundTech =
     RegExp(r'(record not found|no rows in result set)', caseSensitive: false);
 final _prefix = RegExp(r'^(Error|Exception):\s*', caseSensitive: false);
 
+/// Kode error langganan/batas/sesi dari backend -> pesan yang jelas untuk user. Berlaku di
+/// SEMUA environment (ini pesan produk, bukan detail teknis), dan dikenali walau kodenya
+/// terbungkus di dalam pesan lain (mis. "[Service]...: OUTLET_LOCKED").
+/// Sama dengan PLAN_MESSAGES di utils/friendlyError.ts.
+const _planMessages = <String, String>{
+  'SUBSCRIPTION_EXPIRED':
+      'Langganan Anda sudah berakhir, aplikasi dalam mode baca saja. Pilih paket di menu Langganan untuk melanjutkan.',
+  'PLAN_UPGRADE_REQUIRED':
+      'Fitur ini belum termasuk di paket Anda. Lihat paket di menu Langganan.',
+  'PLAN_LIMIT_OUTLETS':
+      'Batas jumlah outlet paket Anda sudah tercapai. Naikkan paket di menu Langganan untuk menambah outlet.',
+  'PLAN_LIMIT_USERS':
+      'Batas jumlah pengguna paket Anda sudah tercapai. Naikkan paket di menu Langganan untuk menambah karyawan.',
+  'OUTLET_LOCKED':
+      'Outlet ini terkunci karena melebihi batas paket Anda. Naikkan paket di menu Langganan.',
+  'PLAY_NOT_CONFIGURED':
+      'Pembayaran langganan belum tersedia. Coba lagi nanti.',
+  'PLAY_ACCOUNT_MISMATCH': 'Pembelian ini terikat ke akun lain.',
+  'PLAY_TOKEN_IN_USE': 'Pembelian ini sudah dipakai oleh akun lain.',
+  'PLAY_PAYMENT_PENDING':
+      'Pembayaran masih diproses. Langganan aktif otomatis setelah selesai.',
+  'PLAY_UNKNOWN_PRODUCT': 'Produk langganan tidak dikenali.',
+  'SESSION_REPLACED':
+      'Akun Anda sedang dipakai di perangkat lain. Silakan masuk lagi.',
+};
+
 String friendlyErrorMessage(String raw, {bool? production}) {
+  for (final e in _planMessages.entries) {
+    if (raw.contains(e.key)) return e.value;
+  }
   if (!(production ?? Env.isProduction)) return raw;
   final m = raw.trim().replaceFirst(_prefix, '');
   if (m.isEmpty) return msgServer;

@@ -4,6 +4,7 @@ import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/private_route.dart';
 import '../widgets/segmented_tabs.dart';
+import '../utils/subscription_state.dart';
 import 'laporan_harian_screen.dart';
 import 'laporan_mingguan_screen.dart';
 import 'laporan_bulanan_screen.dart';
@@ -63,19 +64,52 @@ class LaporanScreen extends StatelessWidget {
                     },
                   ),
                 ),
-                const Expanded(
+                Expanded(
                   child: TabBarView(
                     children: [
-                      LaporanHarianView(),
-                      LaporanMingguanView(),
-                      LaporanBulananView(),
-                      LaporanTrenView(),
+                      const LaporanHarianView(),
+                      const LaporanMingguanView(),
+                      const LaporanBulananView(),
+                      SubscriptionState.hasFeature('trend_dashboard')
+                          ? const LaporanTrenView()
+                          : const _LockedTrend(),
                     ],
                   ),
                 ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tab Tren untuk paket tanpa fitur Dashboard Tren Penjualan (Pro).
+class _LockedTrend extends StatelessWidget {
+  const _LockedTrend();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.lock_outline_rounded, size: 40),
+            const SizedBox(height: 12),
+            const Text(
+              'Dashboard tren penjualan tersedia di paket Pro.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: () => Navigator.pushNamed(context, '/langganan',
+                  arguments: 'trend_dashboard'),
+              child: const Text('Lihat paket'),
+            ),
+          ],
         ),
       ),
     );

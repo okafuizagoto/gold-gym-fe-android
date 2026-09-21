@@ -8,6 +8,7 @@ import '../screens/penjualan_screen.dart';
 import '../screens/sales_history_screen.dart';
 import '../screens/stock_barang_screen.dart';
 import '../screens/about_us_screen.dart';
+import '../screens/subscription_screen.dart';
 import '../screens/add_menu_screen.dart';
 import '../screens/add_items.dart';
 import '../screens/discount_screen.dart';
@@ -56,6 +57,7 @@ class AppRoutes {
   static const String salesHistory = '/history-sales';
   static const String stockBarang = '/stock-barang';
   static const String aboutUs = '/about-us';
+  static const String langganan = '/langganan';
   static const String addMenu = '/add-menu';
   static const String addItems = '/add-items';
   static const String diskon = '/diskon';
@@ -105,6 +107,7 @@ class AppRoutes {
         salesHistory: (context) => const SalesHistoryScreen(),
         stockBarang: (context) => const StockBarangScreen(),
         aboutUs: (context) => const AboutUsScreen(),
+        langganan: (context) => const SubscriptionScreen(),
         addMenu: (context) => const AddMenuScreen(),
         addItems: (context) => const AddItemsScreen(),
         diskon: (context) => const DiscountScreen(),

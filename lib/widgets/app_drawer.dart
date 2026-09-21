@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../utils/storage.dart';
 import '../utils/constants.dart';
+import '../utils/subscription_state.dart';
 import '../services/core_api.dart';
 import '../utils/toast.dart';
 import 'brand_logo.dart';
@@ -85,6 +86,7 @@ class _AppDrawerState extends State<AppDrawer> {
           title: 'Booking Terapi',
           icon: Icons.event_available,
           route: '/booking',
+          feature: 'booking',
         ),
       if (!buyerView && !isAdmin)
         MenuItem(
@@ -230,15 +232,18 @@ class _AppDrawerState extends State<AppDrawer> {
             MenuItem(
                 title: 'Daftar Staff',
                 icon: Icons.people_alt_outlined,
-                route: '/daftar-staff'),
+                route: '/daftar-staff',
+                feature: 'staff_management'),
             MenuItem(
                 title: 'Akses Staff',
                 icon: Icons.checklist_outlined,
-                route: '/akses-staff'),
+                route: '/akses-staff',
+                feature: 'staff_management'),
             MenuItem(
                 title: 'Absen Staff',
                 icon: Icons.event_note_outlined,
-                route: '/absen-staff'),
+                route: '/absen-staff',
+                feature: 'staff_management'),
           ],
         ),
       if (!buyerView && !isAdmin)
@@ -255,7 +260,11 @@ class _AppDrawerState extends State<AppDrawer> {
           children: [
             MenuItem(
                 title: 'Add Items', icon: Icons.add_box, route: '/add-items'),
-            MenuItem(title: 'Diskon', icon: Icons.percent, route: '/diskon'),
+            MenuItem(
+                title: 'Diskon',
+                icon: Icons.percent,
+                route: '/diskon',
+                feature: 'discount_voucher'),
           ],
         ),
       // penjual: kelola daftar customer (tabel customer) — tambah 1 / massal
@@ -319,6 +328,14 @@ class _AppDrawerState extends State<AppDrawer> {
           title: 'Pencatatan Pengeluaran',
           icon: Icons.payments_outlined,
           route: '/expense',
+          feature: 'expenses',
+        ),
+      // Langganan: paket, batas outlet/pengguna, dan fitur akun (penjual & staff).
+      if (!buyerView && !isAdmin && !isRealBuyer)
+        MenuItem(
+          title: 'Langganan',
+          icon: Icons.workspace_premium_outlined,
+          route: '/langganan',
         ),
       // Storage: daftar & hapus foto (item katalog + bukti pembayaran) milik
       // akun sendiri, dengan kuota 30MB -- semua role KECUALI ADMIN (admin
@@ -365,7 +382,34 @@ class _AppDrawerState extends State<AppDrawer> {
       );
     }).toList();
 
-    var allItems = [...staticRoutes, ...customRoutes];
+    // Fitur paket: yang belum ada di paket tampil dengan gembok dan mengarah ke layar
+    // Langganan. Hanya penjual/staff (pembeli & admin tidak dibatasi paket).
+    await SubscriptionState.load();
+    MenuItem gateByPlan(MenuItem it) {
+      if (it.children != null) {
+        return MenuItem(
+          title: it.title,
+          icon: it.icon,
+          route: it.route,
+          children: it.children!.map(gateByPlan).toList(),
+        );
+      }
+      if (!isAdmin &&
+          !buyerView &&
+          it.feature != null &&
+          !SubscriptionState.hasFeature(it.feature!)) {
+        return MenuItem(
+          title: it.title,
+          icon: it.icon,
+          route: '/langganan',
+          feature: it.feature,
+          locked: true,
+        );
+      }
+      return it;
+    }
+
+    var allItems = [...staticRoutes.map(gateByPlan), ...customRoutes];
 
     // Staff: sembunyikan menu (termasuk anak grup) yang route-nya ada di
     // denied_menu_keys milik akun ini (cache diisi saat login, lihat
@@ -386,6 +430,8 @@ class _AppDrawerState extends State<AppDrawer> {
               icon: item.icon,
               route: item.route,
               children: children,
+              feature: item.feature,
+              locked: item.locked,
             );
           })
           .where((item) => item.children == null || item.children!.isNotEmpty)
@@ -433,6 +479,9 @@ class _AppDrawerState extends State<AppDrawer> {
       await Storage.set(AppConstants.shopModeKey, '');
       if (!mounted) return;
       Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+    } else if (item.locked) {
+      // fitur belum ada di paket: arahkan ke Langganan dengan penanda fiturnya
+      Navigator.pushNamed(context, '/langganan', arguments: item.feature);
     } else {
       Navigator.pushNamed(context, item.route);
     }
@@ -515,7 +564,8 @@ class _AppDrawerState extends State<AppDrawer> {
                   return _DrawerTile(
                     icon: item.icon,
                     title: item.title,
-                    active: _isActive(currentRoute, item.route),
+                    active: !item.locked && _isActive(currentRoute, item.route),
+                    locked: item.locked,
                     onTap: () => _onMenuTap(item),
                   );
                 },
@@ -548,6 +598,9 @@ class _DrawerTile extends StatelessWidget {
   final double indent;
   final VoidCallback onTap;
 
+  /// fitur belum ada di paket: tampil dengan gembok
+  final bool locked;
+
   const _DrawerTile({
     required this.icon,
     required this.title,
@@ -555,6 +608,7 @@ class _DrawerTile extends StatelessWidget {
     this.active = false,
     this.color,
     this.indent = 0,
+    this.locked = false,
   });
 
   @override
@@ -581,6 +635,10 @@ class _DrawerTile extends StatelessWidget {
             color: fg,
           ),
         ),
+        trailing: locked
+            ? const Icon(Icons.lock_rounded,
+                size: 16, color: AppColors.disabled)
+            : null,
         onTap: onTap,
       ),
     );
@@ -653,8 +711,9 @@ class _DrawerGroupState extends State<_DrawerGroup> {
                 _DrawerTile(
                   icon: child.icon,
                   title: child.title,
-                  active: widget.isActive(child.route),
+                  active: !child.locked && widget.isActive(child.route),
                   indent: 16,
+                  locked: child.locked,
                   onTap: () => widget.onTap(child),
                 ),
             ],
@@ -672,10 +731,18 @@ class MenuItem {
   final String route;
   final List<MenuItem>? children;
 
+  /// kunci fitur paket langganan yang dibutuhkan (lihat utils/subscription_state.dart)
+  final String? feature;
+
+  /// true kalau fitur belum ada di paket -> tampil dengan gembok & mengarah ke /langganan
+  final bool locked;
+
   MenuItem({
     required this.title,
     required this.icon,
     required this.route,
     this.children,
+    this.feature,
+    this.locked = false,
   });
 }
