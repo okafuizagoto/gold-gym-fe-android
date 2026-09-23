@@ -39,6 +39,19 @@ class TextFormatter {
     return text[0].toUpperCase() + text.substring(1).toLowerCase();
   }
 
+  // Format jam dari sale_transtime backend (disimpan mentah "HHMMSS", mis.
+  // "143025") -> "14:30:25". Fallback ke nilai asli kalau formatnya lain.
+  static String formatTimeHms(String raw) {
+    final t = raw.trim();
+    if (t.length == 6 && RegExp(r'^\d{6}$').hasMatch(t)) {
+      return '${t.substring(0, 2)}:${t.substring(2, 4)}:${t.substring(4, 6)}';
+    }
+    if (t.length == 4 && RegExp(r'^\d{4}$').hasMatch(t)) {
+      return '${t.substring(0, 2)}:${t.substring(2, 4)}:00';
+    }
+    return t;
+  }
+
   // Get month short name
   static String getMonthShortName(int month) {
     const months = [

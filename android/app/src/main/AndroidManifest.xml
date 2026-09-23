@@ -1,9 +1,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- simpan foto bukti pembayaran ke galeri (Android 9 ke bawah) -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <!-- cek/nyalakan Bluetooth sebelum Cetak Struk (Android 12+) -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <application
-        android:label="gold_gym_fe_android"
+        android:usesCleartextTraffic="true"
+        android:label="${appName}"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"> <!-- 
+        android:usesCleartextTraffic="true"
+        hanya untuk local
+         -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

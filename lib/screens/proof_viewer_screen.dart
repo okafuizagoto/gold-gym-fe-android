@@ -1,0 +1,197 @@
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:gal/gal.dart';
+import '../config/theme.dart';
+import '../services/sales_api.dart';
+import '../utils/responsive.dart';
+import '../utils/toast.dart';
+
+/// Menampilkan foto bukti pembayaran transfer sebuah nota (dari Sales
+/// History). Foto bisa di-download ke galeri HP lewat tombol simpan.
+class ProofViewerScreen extends StatefulWidget {
+  final String saleTrancnum; // nomor nota (judul)
+  final List<Map<String, dynamic>> proofs; // metadata dari type=proofs
+
+  const ProofViewerScreen({
+    super.key,
+    required this.saleTrancnum,
+    required this.proofs,
+  });
+
+  @override
+  State<ProofViewerScreen> createState() => _ProofViewerScreenState();
+}
+
+class _ProofViewerScreenState extends State<ProofViewerScreen> {
+  final _salesApi = SalesApi();
+  // cache bytes per proof_id supaya tidak fetch ulang saat scroll/simpan
+  final Map<int, Uint8List> _photoCache = {};
+  // toast "foto tidak tersedia" cuma sekali per proof (FutureBuilder bisa
+  // memanggil _loadPhoto berkali-kali saat rebuild/scroll)
+  final Set<int> _toastedMissing = {};
+  int? _savingProofId;
+
+  Future<Uint8List?> _loadPhoto(int proofId) async {
+    if (_photoCache.containsKey(proofId)) return _photoCache[proofId];
+    final bytes = await _salesApi.getProofPhoto(proofId);
+    if (bytes != null) {
+      _photoCache[proofId] = bytes;
+    } else if (_toastedMissing.add(proofId)) {
+      if (mounted) Toast.error(context, 'Foto tidak tersedia saat ini.');
+    }
+    return bytes;
+  }
+
+  /// Download foto ke galeri HP.
+  Future<void> _saveToGallery(int proofId, String filename) async {
+    setState(() => _savingProofId = proofId);
+    try {
+      final bytes = await _loadPhoto(proofId);
+      if (bytes == null) {
+        if (mounted) Toast.error(context, 'Foto tidak bisa diambil');
+        return;
+      }
+      await Gal.putImageBytes(bytes, name: 'bukti-$filename');
+      if (mounted) {
+        Toast.success(context, 'Foto tersimpan di galeri');
+      }
+    } on GalException catch (e) {
+      if (mounted) {
+        Toast.error(
+            context,
+            e.type == GalExceptionType.accessDenied
+                ? 'Izin galeri ditolak — aktifkan izin penyimpanan'
+                : 'Gagal menyimpan foto');
+      }
+    } catch (_) {
+      if (mounted) Toast.error(context, 'Gagal menyimpan foto');
+    } finally {
+      if (mounted) setState(() => _savingProofId = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final photoHeight = context.isShort ? 180.0 : 240.0;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Bukti Transfer ${widget.saleTrancnum}',
+            maxLines: 1, overflow: TextOverflow.ellipsis),
+      ),
+      body: SafeArea(
+        top: false,
+        child: ContentWidth(
+          maxWidth: 720,
+          child: ListView.builder(
+            padding: context.pageInsets,
+            itemCount: widget.proofs.length,
+            itemBuilder: (context, index) {
+              final proof = widget.proofs[index];
+              final proofId = proof['proof_id'] ?? 0;
+              final bytesSize = (proof['proof_bytes'] ?? 0) as num;
+              final uploadedBy = '${proof['proof_uploaded_by'] ?? ''}';
+              final uploadedAt =
+                  '${proof['proof_uploaded_at'] ?? ''}'.split('T').join(' ');
+              final filename = '${proof['proof_filename'] ?? proofId}';
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    FutureBuilder<Uint8List?>(
+                      future: _loadPhoto(proofId),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return SizedBox(
+                            height: photoHeight,
+                            child: const Center(
+                                child: CircularProgressIndicator()),
+                          );
+                        }
+                        if (snapshot.data == null) {
+                          return Container(
+                            height: 120,
+                            color: AppColors.chipBg,
+                            alignment: Alignment.center,
+                            child: Text('Foto tidak bisa dimuat',
+                                style: textTheme.bodyMedium
+                                    ?.copyWith(color: AppColors.muted)),
+                          );
+                        }
+                        // tap foto untuk lihat penuh (zoom)
+                        return GestureDetector(
+                          onTap: () => showDialog(
+                            context: context,
+                            builder: (_) => Dialog(
+                              insetPadding: const EdgeInsets.all(8),
+                              child: InteractiveViewer(
+                                child: Image.memory(snapshot.data!),
+                              ),
+                            ),
+                          ),
+                          child: Image.memory(
+                            snapshot.data!,
+                            height: photoHeight,
+                            fit: BoxFit.cover,
+                          ),
+                        );
+                      },
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Ukuran: ${(bytesSize / 1024).toStringAsFixed(0)} KB'
+                            '${uploadedBy.isNotEmpty ? " • Oleh: $uploadedBy" : ""}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.bodySmall,
+                          ),
+                          if (uploadedAt.isNotEmpty)
+                            Text(
+                              'Diupload: $uploadedAt',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.bodySmall,
+                            ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              icon: _savingProofId == proofId
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2, color: Colors.white),
+                                    )
+                                  : const Icon(Icons.download_rounded,
+                                      size: 18),
+                              label: const Text('DOWNLOAD KE GALERI',
+                                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.tealDark,
+                              ),
+                              onPressed: _savingProofId != null
+                                  ? null
+                                  : () => _saveToGallery(proofId, filename),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
