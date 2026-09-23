@@ -356,6 +356,15 @@ class _AppDrawerState extends State<AppDrawer> {
           icon: Icons.feedback_outlined,
           route: '/request-fitur',
         ),
+      // Request Aplikasi Baru: ide APLIKASI terpisah (bukan fitur di dalam
+      // Okejual), mis. "aplikasi kas harian". Semua role non-admin; admin
+      // lihat hasilnya di "Daftar Request Fitur" (filter tipe Aplikasi Baru).
+      if (!isAdmin)
+        MenuItem(
+          title: 'Request Aplikasi Baru',
+          icon: Icons.apps_outlined,
+          route: '/request-aplikasi-baru',
+        ),
       // QRIS Saya: penjual menyimpan foto kode QRIS statis milik mereka
       // sendiri, ditampilkan ke pembeli lewat tombol "Tampilkan QRIS" di
       // modal pembayaran POS.

@@ -183,6 +183,10 @@ class _AdminFeatureRequestScreenState extends State<AdminFeatureRequestScreen> {
                                         value: FeatureRequestType.perbaikan,
                                         child: Text(FeatureRequestType.label(
                                             FeatureRequestType.perbaikan))),
+                                    DropdownMenuItem(
+                                        value: FeatureRequestType.aplikasiBaru,
+                                        child: Text(FeatureRequestType.label(
+                                            FeatureRequestType.aplikasiBaru))),
                                   ],
                                   onChanged: (v) {
                                     setState(() => _type = v);
