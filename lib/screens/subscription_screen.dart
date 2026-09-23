@@ -176,9 +176,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       builder: (dc) => AlertDialog(
         title: Text('Berlangganan paket ${p.name}'),
         content: Text(
-          'Pembayaran langganan langsung dari aplikasi segera hadir. Untuk saat ini, '
-          'hubungi admin Okejual agar paket ${p.name} (${formatRupiah(price)}/${_yearly ? 'tahun' : 'bulan'}) '
-          'diaktifkan di akun Anda.\n\nEmail: admin@okejual.co.id',
+          'Pembayaran langganan langsung dari aplikasi ini segera hadir. Untuk saat ini, silakan '
+          'berlangganan paket ${p.name} (${formatRupiah(price)}/${_yearly ? 'tahun' : 'bulan'}) '
+          'lewat aplikasi Okejual di Play Store.',
         ),
         actions: [
           TextButton(
