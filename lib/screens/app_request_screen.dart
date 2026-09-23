@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../config/theme.dart';
 import '../models/feature_request_model.dart';
+import '../providers/language_provider.dart';
 import '../services/feature_request_api.dart';
 import '../utils/constants.dart';
 import '../utils/storage.dart';
@@ -20,7 +22,9 @@ import '../widgets/section_card.dart';
 /// tercampur dengan ide fitur Okejual sendiri. PRIVATE by design -- setiap
 /// akun cuma lihat riwayat MILIKNYA SENDIRI di sini; daftar semua request
 /// cuma tampil di menu admin (admin_feature_request_screen.dart, filter
-/// tipe "Aplikasi Baru"). Padanan pages/request-aplikasi-baru (Next.js).
+/// tipe "Aplikasi Baru"). Bilingual (LanguageProvider) -- padanan
+/// pages/request-aplikasi-baru (Next.js), ubah keduanya bersamaan (termasuk
+/// teksnya).
 class AppRequestScreen extends StatefulWidget {
   const AppRequestScreen({super.key});
 
@@ -63,7 +67,11 @@ class _AppRequestScreenState extends State<AppRequestScreen> {
             .toList());
       }
     } catch (e) {
-      if (mounted) Toast.error(context, 'Gagal memuat riwayat request: $e');
+      if (mounted) {
+        final lang = context.read<LanguageProvider>();
+        Toast.error(context,
+            '${lang.get("Failed to load request history", "Gagal memuat riwayat request")}: $e');
+      }
     } finally {
       if (mounted) setState(() => _loadingHistory = false);
     }
@@ -71,6 +79,7 @@ class _AppRequestScreenState extends State<AppRequestScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    final lang = context.read<LanguageProvider>();
 
     final role = await Storage.get(AppConstants.userRoleKey);
     final outcode = role == AppConstants.roleSeller
@@ -87,7 +96,10 @@ class _AppRequestScreenState extends State<AppRequestScreen> {
       );
       if (!mounted) return;
       if (response.statusCode == 200) {
-        Toast.success(context, 'Request aplikasi berhasil diajukan');
+        Toast.success(
+            context,
+            lang.get('App request sent, thank you!',
+                'Request aplikasi berhasil diajukan'));
         _formKey.currentState!.reset();
         _titleController.clear();
         _descriptionController.clear();
@@ -95,10 +107,16 @@ class _AppRequestScreenState extends State<AppRequestScreen> {
       } else {
         final body = jsonDecode(response.body);
         Toast.error(
-            context, body['error']?.toString() ?? 'Gagal mengajukan request');
+            context,
+            body['error']?.toString() ??
+                lang.get(
+                    'Failed to send app request', 'Gagal mengajukan request'));
       }
     } catch (_) {
-      if (mounted) Toast.error(context, 'Gagal mengajukan request');
+      if (mounted) {
+        Toast.error(context,
+            lang.get('Failed to send app request', 'Gagal mengajukan request'));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -121,11 +139,13 @@ class _AppRequestScreenState extends State<AppRequestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = Provider.of<LanguageProvider>(context);
     // Tidak pakai sellerOnly -- BUYER dan STAFF juga wajib bisa mengajukan
     // request aplikasi (menu ini muncul untuk semua role non-admin).
     return PrivateRoute(
       child: Scaffold(
-        appBar: const AppBarCustom(title: 'Request Aplikasi Baru'),
+        appBar: AppBarCustom(
+            title: lang.get('Request New App', 'Request Aplikasi Baru')),
         drawer: const AppDrawer(),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -133,7 +153,7 @@ class _AppRequestScreenState extends State<AppRequestScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SectionCard(
-                title: 'Ajukan Ide Aplikasi',
+                title: lang.get('Submit an App Idea', 'Ajukan Ide Aplikasi'),
                 icon: Icons.apps_outlined,
                 child: Form(
                   key: _formKey,
@@ -142,28 +162,33 @@ class _AppRequestScreenState extends State<AppRequestScreen> {
                     children: [
                       TextFormField(
                         controller: _titleController,
-                        decoration: const InputDecoration(
-                          labelText: 'Nama/judul aplikasi',
-                          hintText: 'Ringkasan singkat idenya',
+                        decoration: InputDecoration(
+                          labelText:
+                              lang.get('App name/title', 'Nama/judul aplikasi'),
+                          hintText: lang.get('A short summary of your idea',
+                              'Ringkasan singkat idenya'),
                         ),
                         maxLength: 150,
                         validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Judul wajib diisi'
+                            ? lang.get('Title is required', 'Judul wajib diisi')
                             : null,
                       ),
                       TextFormField(
                         controller: _descriptionController,
-                        decoration: const InputDecoration(
-                          labelText: 'Ceritakan aplikasinya untuk apa',
-                          hintText:
-                              'Contoh: aplikasi pencatatan uang masuk/keluar harian di luar toko',
+                        decoration: InputDecoration(
+                          labelText: lang.get('Tell us what the app is for',
+                              'Ceritakan aplikasinya untuk apa'),
+                          hintText: lang.get(
+                              'Example: an app for tracking daily cash in/out outside the store',
+                              'Contoh: aplikasi pencatatan uang masuk/keluar harian di luar toko'),
                           alignLabelWithHint: true,
                         ),
                         maxLength: 2000,
                         minLines: 3,
                         maxLines: 6,
                         validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Deskripsi wajib diisi'
+                            ? lang.get('Description is required',
+                                'Deskripsi wajib diisi')
                             : null,
                       ),
                       const SizedBox(height: 8),
@@ -171,8 +196,9 @@ class _AppRequestScreenState extends State<AppRequestScreen> {
                         height: 48,
                         child: ElevatedButton(
                           onPressed: _saving ? null : _submit,
-                          child:
-                              Text(_saving ? 'Mengirim...' : 'Kirim Request'),
+                          child: Text(_saving
+                              ? lang.get('Sending...', 'Mengirim...')
+                              : lang.get('Send Request', 'Kirim Request')),
                         ),
                       ),
                     ],
@@ -181,7 +207,7 @@ class _AppRequestScreenState extends State<AppRequestScreen> {
               ),
               const SizedBox(height: 16),
               SectionCard(
-                title: 'Riwayat Request Saya',
+                title: lang.get('My Requests', 'Riwayat Request Saya'),
                 icon: Icons.history,
                 child: _loadingHistory
                     ? const Padding(
@@ -189,9 +215,10 @@ class _AppRequestScreenState extends State<AppRequestScreen> {
                         child: Center(child: CircularProgressIndicator()),
                       )
                     : _history.isEmpty
-                        ? const EmptyState(
+                        ? EmptyState(
                             icon: Icons.apps_outlined,
-                            title: 'Belum ada request yang diajukan',
+                            title: lang.get('No requests submitted yet',
+                                'Belum ada request yang diajukan'),
                             compact: true,
                           )
                         : Column(
