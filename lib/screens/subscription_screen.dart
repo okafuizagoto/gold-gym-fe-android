@@ -104,8 +104,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   String _statusSentence(SubscriptionInfo s) {
-    if (s.readOnly) {
-      return 'Berakhir pada ${formatDate(s.periodEnd)}. Aplikasi dalam mode baca saja.';
+    if (s.plan == 'free' && s.status == 'EXPIRED') {
+      return 'Masa aktif berakhir pada ${formatDate(s.periodEnd)}. Anda sekarang menggunakan paket Free -- POS tetap bisa dipakai jualan.';
     }
     switch (s.status) {
       case 'LIFETIME':
@@ -113,7 +113,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       case 'TRIAL':
         return 'Percobaan gratis sampai ${formatDate(s.periodEnd)}, dengan fitur paket tertinggi.';
       default:
-        return 'Berlaku sampai ${formatDate(s.periodEnd)}.';
+        return s.plan == 'free'
+            ? 'Paket gratis, tidak ada batas waktu.'
+            : 'Berlaku sampai ${formatDate(s.periodEnd)}.';
     }
   }
 
@@ -278,14 +280,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                       Chip(
                                         visualDensity: VisualDensity.compact,
                                         label: Text(
-                                          const {
-                                                'TRIAL': 'Masa percobaan',
-                                                'ACTIVE': 'Aktif',
-                                                'LIFETIME':
-                                                    'Aktif tanpa batas waktu',
-                                                'EXPIRED': 'Berakhir',
-                                              }[s.status] ??
-                                              s.status,
+                                          s.plan == 'free' &&
+                                                  s.status == 'EXPIRED'
+                                              ? 'Turun ke Free'
+                                              : const {
+                                                    'TRIAL': 'Masa percobaan',
+                                                    'ACTIVE': 'Aktif',
+                                                    'LIFETIME':
+                                                        'Aktif tanpa batas waktu',
+                                                    'EXPIRED': 'Berakhir',
+                                                  }[s.status] ??
+                                                  s.status,
                                         ),
                                       ),
                                     ],
@@ -374,10 +379,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
   }
 
+  /// Daftar fitur LENGKAP (union semua paket) untuk matriks perbandingan -- Pro selalu memuat
+  /// semua fitur paket lain (lihat urutan planCatalog backend), jadi urutannya dipakai apa adanya.
+  List<String> get _allFeatures {
+    if (_plans.isEmpty) return const [];
+    return _plans
+        .firstWhere((p) => p.id == 'pro', orElse: () => _plans.last)
+        .features;
+  }
+
   Widget _planCard(PlanDef p, TextTheme textTheme) {
     final s = _sub;
-    final current =
-        s != null && s.plan == p.id && s.status != 'TRIAL' && !s.readOnly;
+    final current = s != null && s.plan == p.id && s.status != 'TRIAL';
     final recommended = p.id == 'growth';
     final price = _yearly ? p.priceYearly : p.priceMonthly;
     return Card(
@@ -471,18 +484,28 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 title: const Text('Lihat semua fitur',
                     style: TextStyle(fontSize: 14)),
                 children: [
-                  for (final f in p.features)
+                  for (final f in _allFeatures)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 3),
                       child: Row(
                         children: [
-                          const Icon(Icons.check_rounded,
-                              size: 18, color: AppColors.success),
+                          Icon(
+                            p.features.contains(f)
+                                ? Icons.check_rounded
+                                : Icons.close_rounded,
+                            size: 18,
+                            color: p.features.contains(f)
+                                ? AppColors.success
+                                : AppColors.muted,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               featureLabel(f),
                               style: TextStyle(
+                                  color: p.features.contains(f)
+                                      ? null
+                                      : AppColors.muted,
                                   fontWeight: f == _focusFeature
                                       ? FontWeight.w700
                                       : FontWeight.w400),

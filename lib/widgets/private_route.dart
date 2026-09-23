@@ -64,14 +64,14 @@ class _PrivateRouteState extends State<PrivateRoute> {
 
     final String? text;
     final Color bg;
-    if (s.readOnly) {
+    if (s.plan == 'free' && s.status == 'EXPIRED') {
       text =
-          'Langganan Anda sudah berakhir. Aplikasi dalam mode baca saja: data tetap bisa dilihat, tetapi tidak bisa ditambah atau diubah.';
-      bg = const Color(0xFFFEE2E2);
+          'Masa aktif langganan Anda sudah berakhir, akun turun ke paket Free. POS tetap bisa dipakai jualan, tapi laporan, data pelanggan, QRIS, dan fitur lain tidak tersedia.';
+      bg = const Color(0xFFE8F1FD);
     } else if (s.status == 'TRIAL') {
       final left = s.daysLeft ?? 0;
       text =
-          'Masa percobaan gratis: sisa $left hari. Setelah itu aplikasi menjadi baca saja sampai Anda memilih paket.';
+          'Masa percobaan gratis: sisa $left hari. Setelah itu akun otomatis turun ke paket Free (tetap bisa jualan) sampai Anda memilih paket berbayar.';
       bg = left <= 3 ? const Color(0xFFFEF3C7) : const Color(0xFFE8F1FD);
     } else {
       text = null;
