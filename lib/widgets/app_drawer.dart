@@ -176,6 +176,11 @@ class _AppDrawerState extends State<AppDrawer> {
               route: '/admin-registration-mode',
             ),
             MenuItem(
+              title: 'Tampilan Langganan',
+              icon: Icons.workspace_premium_outlined,
+              route: '/admin-langganan-tampilan',
+            ),
+            MenuItem(
               title: 'Akses Daftar Pembeli',
               icon: Icons.person_add_alt,
               route: '/admin-akses-daftar-pembeli',

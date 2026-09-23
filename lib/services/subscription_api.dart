@@ -15,4 +15,10 @@ class SubscriptionApi extends ApiClient {
   Future<http.Response> getMine() {
     return _client.get('/gold-gym/v2/userdata/subscription');
   }
+
+  /// PATCH /admin/pricing-ui (ADMIN): hide/unhide baris Marketplace/Booking di matriks Langganan.
+  /// Murni tampilan -- tidak mempengaruhi akses fitur sungguhan.
+  Future<http.Response> adminSetPricingUI(Map<String, dynamic> body) {
+    return _client.patch('/gold-gym/v2/userdata/admin/pricing-ui', body);
+  }
 }

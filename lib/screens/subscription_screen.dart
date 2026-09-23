@@ -25,6 +25,9 @@ class SubscriptionScreen extends StatefulWidget {
 class _SubscriptionScreenState extends State<SubscriptionScreen> {
   SubscriptionInfo? _sub;
   List<PlanDef> _plans = const [];
+  // Flag tampilan dari admin: baris Marketplace/Booking default TERSEMBUNYI (murni tampilan).
+  bool _showMarketplace = false;
+  bool _showBooking = false;
   bool _yearly = false;
   bool _isStaff = false;
   bool _loading = true;
@@ -62,6 +65,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       if (res.statusCode == 200) {
         final body = jsonDecode(res.body);
         final list = body is Map ? body['data'] : null;
+        final ui = body is Map ? body['ui'] : null;
+        _showMarketplace = ui is Map && ui['show_marketplace'] == true;
+        _showBooking = ui is Map && ui['show_booking'] == true;
         if (list is List) {
           _plans = list
               .whereType<Map<String, dynamic>>()
@@ -385,7 +391,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     if (_plans.isEmpty) return const [];
     return _plans
         .firstWhere((p) => p.id == 'pro', orElse: () => _plans.last)
-        .features;
+        .features
+        .where((f) =>
+            (f != 'marketplace' || _showMarketplace) &&
+            (f != 'booking' || _showBooking))
+        .toList();
   }
 
   Widget _planCard(PlanDef p, TextTheme textTheme) {

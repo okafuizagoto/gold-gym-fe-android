@@ -26,6 +26,7 @@ import '../screens/admin_buyer_outlets_screen.dart';
 import '../screens/admin_pos_customer_screen.dart';
 import '../screens/admin_proof_access_screen.dart';
 import '../screens/admin_registration_mode_screen.dart';
+import '../screens/admin_pricing_ui_screen.dart';
 import '../screens/admin_payment_report_screen.dart';
 import '../screens/admin_storage_usage_screen.dart';
 import '../screens/feature_request_screen.dart';
@@ -76,6 +77,7 @@ class AppRoutes {
   static const String adminPosCustomer = '/admin-pos-customer';
   static const String adminProofAccess = '/admin-proof-access';
   static const String adminRegistrationMode = '/admin-registration-mode';
+  static const String adminLanggananTampilan = '/admin-langganan-tampilan';
   static const String adminPaymentReport = '/admin-payment-report';
   static const String adminStorageUsage = '/admin-storage-usage';
   static const String requestFitur = '/request-fitur';
@@ -127,6 +129,7 @@ class AppRoutes {
         adminPosCustomer: (context) => const AdminPosCustomerScreen(),
         adminProofAccess: (context) => const AdminProofAccessScreen(),
         adminRegistrationMode: (context) => const AdminRegistrationModeScreen(),
+        adminLanggananTampilan: (context) => const AdminPricingUiScreen(),
         adminPaymentReport: (context) => const AdminPaymentReportScreen(),
         adminStorageUsage: (context) => const AdminStorageUsageScreen(),
         requestFitur: (context) => const FeatureRequestScreen(),
