@@ -4,6 +4,7 @@ import '../utils/storage.dart';
 import '../utils/constants.dart';
 import '../utils/subscription_state.dart';
 import '../services/core_api.dart';
+import '../services/feature_request_api.dart';
 import '../utils/toast.dart';
 import 'brand_logo.dart';
 
@@ -50,6 +51,11 @@ class _AppDrawerState extends State<AppDrawer> {
         (await Storage.get(AppConstants.menuDaftarPembeliKey) ?? 'Y') == 'Y';
     final menuModePembeliEnabled =
         (await Storage.get(AppConstants.menuModePembeliKey) ?? 'Y') == 'Y';
+    // flag ADMIN global: sembunyikan menu Request Aplikasi Baru dari semua user (app_settings,
+    // dicek langsung ke server tiap layar ini dibuka -- bukan dicache saat login seperti 2 flag
+    // di atas, karena ini bukan bagian respons login).
+    final menuRequestAplikasiBaruEnabled =
+        await FeatureRequestApi().getEnabled();
     final isRealBuyer = role == AppConstants.roleBuyer;
     final isAdmin = role == AppConstants.roleAdmin;
     // penjual (retail & therapy sama-sama SELLER; dibedakan outlet_type)
@@ -355,6 +361,15 @@ class _AppDrawerState extends State<AppDrawer> {
           title: 'Request Fitur',
           icon: Icons.feedback_outlined,
           route: '/request-fitur',
+        ),
+      // Request Aplikasi Baru: ide APLIKASI terpisah (bukan fitur di dalam
+      // Okejual), mis. "aplikasi kas harian". Semua role non-admin; admin
+      // lihat hasilnya di "Daftar Request Fitur" (filter tipe Aplikasi Baru).
+      if (!isAdmin && menuRequestAplikasiBaruEnabled)
+        MenuItem(
+          title: 'Request Aplikasi Baru',
+          icon: Icons.apps_outlined,
+          route: '/request-aplikasi-baru',
         ),
       // QRIS Saya: penjual menyimpan foto kode QRIS statis milik mereka
       // sendiri, ditampilkan ke pembeli lewat tombol "Tampilkan QRIS" di

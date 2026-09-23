@@ -1,13 +1,18 @@
 /// Konstanta tipe request -- FITUR_BARU tidak terikat 1 menu (menu boleh
 /// kosong), PERBAIKAN wajib menyertakan nama menu yang dilaporkan.
+/// APLIKASI_BARU: ide APLIKASI terpisah (bukan fitur di dalam Okejual), menu
+/// boleh kosong seperti FITUR_BARU. Ditambahkan 2026-09-23.
 class FeatureRequestType {
   static const String fiturBaru = 'FITUR_BARU';
   static const String perbaikan = 'PERBAIKAN';
+  static const String aplikasiBaru = 'APLIKASI_BARU';
 
   static String label(String value) {
     switch (value) {
       case perbaikan:
         return 'Perbaikan';
+      case aplikasiBaru:
+        return 'Aplikasi Baru';
       default:
         return 'Fitur Baru';
     }

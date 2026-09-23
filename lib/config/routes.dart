@@ -29,6 +29,7 @@ import '../screens/admin_registration_mode_screen.dart';
 import '../screens/admin_payment_report_screen.dart';
 import '../screens/admin_storage_usage_screen.dart';
 import '../screens/feature_request_screen.dart';
+import '../screens/app_request_screen.dart';
 import '../screens/admin_feature_request_screen.dart';
 import '../screens/qris_saya_screen.dart';
 import '../screens/seller_menu_access_screen.dart';
@@ -78,6 +79,7 @@ class AppRoutes {
   static const String adminPaymentReport = '/admin-payment-report';
   static const String adminStorageUsage = '/admin-storage-usage';
   static const String requestFitur = '/request-fitur';
+  static const String requestAplikasiBaru = '/request-aplikasi-baru';
   static const String adminRequestFitur = '/admin-request-fitur';
   static const String adminAksesDaftarPembeli = '/admin-akses-daftar-pembeli';
   static const String adminAksesModePembeli = '/admin-akses-mode-pembeli';
@@ -128,6 +130,7 @@ class AppRoutes {
         adminPaymentReport: (context) => const AdminPaymentReportScreen(),
         adminStorageUsage: (context) => const AdminStorageUsageScreen(),
         requestFitur: (context) => const FeatureRequestScreen(),
+        requestAplikasiBaru: (context) => const AppRequestScreen(),
         adminRequestFitur: (context) => const AdminFeatureRequestScreen(),
         adminAksesDaftarPembeli: (context) => const SellerMenuAccessScreen(
             target: SellerMenuAccessTarget.daftarPembeli),
