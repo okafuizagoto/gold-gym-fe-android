@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:provider/provider.dart';
+import '../providers/language_provider.dart';
 
 /// Satu slide banner bernuansa jual-beli/pasar (gradient + ikon commerce).
 class CommerceSlide {
@@ -29,29 +31,36 @@ class CommerceCarousel extends StatelessWidget {
     this.autoPlayDuration = const Duration(seconds: 3),
   });
 
-  static const List<CommerceSlide> _slides = [
-    CommerceSlide(
-      icon: Icons.storefront,
-      title: 'Jualan Lebih Mudah',
-      subtitle: 'Kelola toko & penjualan dalam satu aplikasi',
-      gradient: [Color(0xFF267BE4), Color(0xFF6DBAB9)],
-    ),
-    CommerceSlide(
-      icon: Icons.shopping_cart,
-      title: 'Belanja Cepat',
-      subtitle: 'Transaksi pembeli praktis dan real-time',
-      gradient: [Color(0xFFF2994A), Color(0xFFF2C94C)],
-    ),
-    CommerceSlide(
-      icon: Icons.storefront_outlined,
-      title: 'Ramaikan Pasar',
-      subtitle: 'Semua outlet penjual dalam genggaman',
-      gradient: [Color(0xFF11998E), Color(0xFF38EF7D)],
-    ),
-  ];
+  // Bilingual (LanguageProvider) -- ubah bersamaan dengan components/SwipedPictures.tsx (Next.js),
+  // termasuk teksnya.
+  List<CommerceSlide> _slides(LanguageProvider lang) => [
+        CommerceSlide(
+          icon: Icons.storefront,
+          title: lang.get('Sell With Ease', 'Jualan Lebih Mudah'),
+          subtitle: lang.get('Manage your store & sales in one app',
+              'Kelola toko & penjualan dalam satu aplikasi'),
+          gradient: const [Color(0xFF267BE4), Color(0xFF6DBAB9)],
+        ),
+        CommerceSlide(
+          icon: Icons.shopping_cart,
+          title: lang.get('Shop Fast', 'Belanja Cepat'),
+          subtitle: lang.get('Quick, real-time buyer transactions',
+              'Transaksi pembeli praktis dan real-time'),
+          gradient: const [Color(0xFFF2994A), Color(0xFFF2C94C)],
+        ),
+        CommerceSlide(
+          icon: Icons.storefront_outlined,
+          title: lang.get('Grow the Marketplace', 'Ramaikan Pasar'),
+          subtitle: lang.get("Every seller's outlet, right in your hand",
+              'Semua outlet penjual dalam genggaman'),
+          gradient: const [Color(0xFF11998E), Color(0xFF38EF7D)],
+        ),
+      ];
 
   @override
   Widget build(BuildContext context) {
+    final lang = Provider.of<LanguageProvider>(context);
+    final slides = _slides(lang);
     return CarouselSlider(
       options: CarouselOptions(
         height: height,
@@ -60,7 +69,7 @@ class CommerceCarousel extends StatelessWidget {
         enlargeCenterPage: true,
         viewportFraction: 0.9,
       ),
-      items: _slides.map((slide) {
+      items: slides.map((slide) {
         return Builder(
           builder: (BuildContext context) {
             return Container(
