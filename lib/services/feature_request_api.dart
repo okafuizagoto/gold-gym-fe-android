@@ -71,4 +71,26 @@ class FeatureRequestApi extends ApiClient {
       {'status': status},
     );
   }
+
+  /// GET /gold-gym/v2/featurerequest/enabled -- apakah menu "Request Aplikasi Baru" ditampilkan
+  /// ke user. Gagal/tidak login -> default true (fail-open, sama pola dengan hasFeature di
+  /// utils/subscription_state.dart).
+  Future<bool> getEnabled() async {
+    try {
+      final response = await _client.get('/gold-gym/v2/featurerequest/enabled');
+      if (response.statusCode != 200) return true;
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return (body['data']?['enabled']) != false;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// PATCH /gold-gym/v2/featurerequest/admin/enabled -- ADMIN hide/unhide menu untuk semua user.
+  Future<http.Response> adminSetEnabled(bool enabled) {
+    return _client.patch(
+      '/gold-gym/v2/featurerequest/admin/enabled',
+      {'enabled': enabled},
+    );
+  }
 }

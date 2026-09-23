@@ -34,10 +34,39 @@ class _AdminFeatureRequestScreenState extends State<AdminFeatureRequestScreen> {
   String? _status;
   String? _type;
 
+  bool _appRequestEnabled = true;
+  bool _togglingEnabled = false;
+
   @override
   void initState() {
     super.initState();
     _load();
+    _api.getEnabled().then((v) {
+      if (mounted) setState(() => _appRequestEnabled = v);
+    });
+  }
+
+  Future<void> _toggleAppRequestEnabled(bool next) async {
+    setState(() => _togglingEnabled = true);
+    try {
+      final resp = await _api.adminSetEnabled(next);
+      if (resp.statusCode == 200) {
+        if (mounted) {
+          setState(() => _appRequestEnabled = next);
+          Toast.success(
+              context,
+              next
+                  ? 'Menu Request Aplikasi Baru ditampilkan ke user'
+                  : 'Menu Request Aplikasi Baru disembunyikan dari user');
+        }
+      } else {
+        if (mounted) Toast.error(context, 'Gagal mengubah pengaturan');
+      }
+    } catch (e) {
+      if (mounted) Toast.error(context, 'Gagal mengubah pengaturan: $e');
+    } finally {
+      if (mounted) setState(() => _togglingEnabled = false);
+    }
   }
 
   // KOREKSI 2026-09-18 (QA audit #1.4): dulu tanpa try/catch dan `rows==
@@ -115,6 +144,21 @@ class _AdminFeatureRequestScreenState extends State<AdminFeatureRequestScreen> {
                     child: ListView(
                       padding: const EdgeInsets.all(16),
                       children: [
+                        SectionCard(
+                          title: 'Menu Request Aplikasi Baru',
+                          icon: Icons.feedback_outlined,
+                          child: SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: _appRequestEnabled,
+                            onChanged: _togglingEnabled
+                                ? null
+                                : _toggleAppRequestEnabled,
+                            title: Text(_appRequestEnabled
+                                ? 'Ditampilkan ke user (ketuk untuk sembunyikan)'
+                                : 'Disembunyikan dari user (ketuk untuk tampilkan)'),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
                         SectionCard(
                           title: 'Filter',
                           icon: Icons.filter_alt_outlined,
