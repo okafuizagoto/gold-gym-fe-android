@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/language_provider.dart';
 import '../utils/storage.dart';
 import '../utils/constants.dart';
 import '../utils/subscription_state.dart';
@@ -61,17 +63,22 @@ class _PrivateRouteState extends State<PrivateRoute> {
     final s = fresh ?? SubscriptionState.current;
     if (!mounted || s == null) return;
     if (ModalRoute.of(context)?.settings.name == '/langganan') return;
+    final lang = context.read<LanguageProvider>();
 
     final String? text;
     final Color bg;
     if (s.plan == 'free' && s.status == 'EXPIRED') {
-      text =
-          'Masa aktif langganan Anda sudah berakhir, akun turun ke paket Free. POS tetap bisa dipakai jualan, tapi laporan, data pelanggan, QRIS, dan fitur lain tidak tersedia.';
+      text = lang.get(
+        'Your subscription has ended and your account moved to the Free plan. POS still works for selling, but reports, customer data, QRIS, and other features are unavailable.',
+        'Masa aktif langganan Anda sudah berakhir, akun turun ke paket Free. POS tetap bisa dipakai jualan, tapi laporan, data pelanggan, QRIS, dan fitur lain tidak tersedia.',
+      );
       bg = const Color(0xFFE8F1FD);
     } else if (s.status == 'TRIAL') {
       final left = s.daysLeft ?? 0;
-      text =
-          'Masa percobaan gratis: sisa $left hari. Setelah itu akun otomatis turun ke paket Free (tetap bisa jualan) sampai Anda memilih paket berbayar.';
+      text = lang.get(
+        'Free trial: $left day(s) left. After that your account automatically moves to the Free plan (still usable for selling) until you choose a paid plan.',
+        'Masa percobaan gratis: sisa $left hari. Setelah itu akun otomatis turun ke paket Free (tetap bisa jualan) sampai Anda memilih paket berbayar.',
+      );
       bg = left <= 3 ? const Color(0xFFFEF3C7) : const Color(0xFFE8F1FD);
     } else {
       text = null;
@@ -91,11 +98,11 @@ class _PrivateRouteState extends State<PrivateRoute> {
                 messenger.clearMaterialBanners();
                 Navigator.pushNamed(context, '/langganan');
               },
-              child: const Text('Lihat paket'),
+              child: Text(lang.get('View plans', 'Lihat paket')),
             ),
             TextButton(
               onPressed: () => messenger.clearMaterialBanners(),
-              child: const Text('Tutup'),
+              child: Text(lang.get('Close', 'Tutup')),
             ),
           ],
         ),

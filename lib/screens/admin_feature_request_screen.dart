@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../config/theme.dart';
 import '../models/feature_request_model.dart';
+import '../providers/language_provider.dart';
 import '../services/api_client.dart';
 import '../services/feature_request_api.dart';
 import '../utils/toast.dart';
@@ -47,6 +49,7 @@ class _AdminFeatureRequestScreenState extends State<AdminFeatureRequestScreen> {
   }
 
   Future<void> _toggleAppRequestEnabled(bool next) async {
+    final lang = context.read<LanguageProvider>();
     setState(() => _togglingEnabled = true);
     try {
       final resp = await _api.adminSetEnabled(next);
@@ -56,14 +59,24 @@ class _AdminFeatureRequestScreenState extends State<AdminFeatureRequestScreen> {
           Toast.success(
               context,
               next
-                  ? 'Menu Request Aplikasi Baru ditampilkan ke user'
-                  : 'Menu Request Aplikasi Baru disembunyikan dari user');
+                  ? lang.get("'Request New App' menu is now shown to users",
+                      'Menu Request Aplikasi Baru ditampilkan ke user')
+                  : lang.get("'Request New App' menu is now hidden from users",
+                      'Menu Request Aplikasi Baru disembunyikan dari user'));
         }
       } else {
-        if (mounted) Toast.error(context, 'Gagal mengubah pengaturan');
+        if (mounted) {
+          Toast.error(
+              context,
+              lang.get(
+                  'Failed to update setting', 'Gagal mengubah pengaturan'));
+        }
       }
     } catch (e) {
-      if (mounted) Toast.error(context, 'Gagal mengubah pengaturan: $e');
+      if (mounted) {
+        Toast.error(context,
+            '${lang.get("Failed to update setting", "Gagal mengubah pengaturan")}: $e');
+      }
     } finally {
       if (mounted) setState(() => _togglingEnabled = false);
     }
@@ -130,6 +143,7 @@ class _AdminFeatureRequestScreenState extends State<AdminFeatureRequestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = Provider.of<LanguageProvider>(context);
     return PrivateRoute(
       child: Scaffold(
         appBar: const AppBarCustom(title: 'Daftar Request Fitur'),
@@ -145,7 +159,8 @@ class _AdminFeatureRequestScreenState extends State<AdminFeatureRequestScreen> {
                       padding: const EdgeInsets.all(16),
                       children: [
                         SectionCard(
-                          title: 'Menu Request Aplikasi Baru',
+                          title: lang.get("'Request New App' Menu",
+                              'Menu Request Aplikasi Baru'),
                           icon: Icons.feedback_outlined,
                           child: SwitchListTile(
                             contentPadding: EdgeInsets.zero,
@@ -154,8 +169,10 @@ class _AdminFeatureRequestScreenState extends State<AdminFeatureRequestScreen> {
                                 ? null
                                 : _toggleAppRequestEnabled,
                             title: Text(_appRequestEnabled
-                                ? 'Ditampilkan ke user (ketuk untuk sembunyikan)'
-                                : 'Disembunyikan dari user (ketuk untuk tampilkan)'),
+                                ? lang.get('Shown to users (tap to hide)',
+                                    'Ditampilkan ke user (ketuk untuk sembunyikan)')
+                                : lang.get('Hidden from users (tap to show)',
+                                    'Disembunyikan dari user (ketuk untuk tampilkan)')),
                           ),
                         ),
                         const SizedBox(height: 16),
