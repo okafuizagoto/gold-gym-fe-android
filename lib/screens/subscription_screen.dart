@@ -393,6 +393,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final current = s != null && s.plan == p.id && s.status != 'TRIAL';
     final recommended = p.id == 'growth';
     final price = _yearly ? p.priceYearly : p.priceMonthly;
+    // Fitur paket ini dulu (✓), baru sisanya (✗) di bawah -- bukan urutan tetap katalog, supaya
+    // fitur yang tersebar (mis. paket Free) tetap terlihat mengelompok rapi.
+    final sortedFeatures = [
+      ..._allFeatures.where((f) => p.features.contains(f)),
+      ..._allFeatures.where((f) => !p.features.contains(f)),
+    ];
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
@@ -484,7 +490,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 title: const Text('Lihat semua fitur',
                     style: TextStyle(fontSize: 14)),
                 children: [
-                  for (final f in _allFeatures)
+                  for (final f in sortedFeatures)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 3),
                       child: Row(
