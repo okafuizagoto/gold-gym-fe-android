@@ -60,7 +60,7 @@ class _AppDrawerState extends State<AppDrawer> {
         await FeatureRequestApi().getEnabled();
     // Fitur foto bukti bayar + QRIS (Akses Admin > Visibilitas Bukti Pembayaran): menu QRIS Outlet
     // ikut hilang kalau dimatikan untuk user ini. Gagal cek = biarkan tampil.
-    bool proofFeatureEnabled = true;
+    bool proofFeatureEnabled = false;
     try {
       final r = await SalesApi().getProofVisibility('');
       if (r.statusCode == 200) {

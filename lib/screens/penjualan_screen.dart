@@ -88,7 +88,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
   // admin bisa menyembunyikan fitur upload bukti pembayaran (global/per
   // outlet/per user) lewat menu Akses Admin > Visibilitas Bukti Pembayaran.
   // Default true supaya tidak berubah sebelum status terkonfirmasi dari server.
-  bool _proofFeatureEnabled = true;
+  bool _proofFeatureEnabled = false;
 
   // 0 = Katalog, 1 = Manual, 2 = Pesanan (tab tampilan POS)
   int _activeTab = 0;
@@ -270,7 +270,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     }
     // visibilitas fitur bukti pembayaran (admin bisa matikan global/per
     // outlet/per user) — gagal load dianggap aktif (default aman)
-    bool proofEnabled = true;
+    bool proofEnabled = false;
     try {
       final outcode = await Storage.get(AppConstants.outcode) ?? '';
       final r = await SalesApi().getProofVisibility(outcode);
