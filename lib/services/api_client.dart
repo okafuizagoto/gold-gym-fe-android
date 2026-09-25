@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:math';
 import '../utils/storage.dart';
 import '../utils/navigation.dart';
 import '../config/env.dart';
@@ -50,6 +51,7 @@ void throwOnErrorStatus(http.Response response, String fallbackMessage) {
 }
 
 class ApiClient {
+  static final Random _rng = Random.secure();
   static String get baseUrl => Env.baseApiUrl;
   static const Duration timeout = Duration(seconds: 10);
 
@@ -100,6 +102,14 @@ class ApiClient {
       'Content-Type': 'application/json',
     };
   }
+
+  /// Tambahkan ID unik per percobaan (X-App-Request-Id) untuk request TULIS -- anti klik-ganda/replay
+  /// di backend (middleware CheckUniqueRequest). Retry setelah refresh token dapat ID baru.
+  Map<String, String> _withRequestId(Map<String, String> h) => {
+        ...h,
+        'X-App-Request-Id':
+            '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}-${_rng.nextInt(1 << 32).toRadixString(36)}-${_rng.nextInt(1 << 32).toRadixString(36)}',
+      };
 
   /// Header untuk retry setelah 401 memakai token baru hasil refresh.
   Map<String, String> _headersWith(String token) => {
@@ -187,13 +197,15 @@ class ApiClient {
     final url = Uri.parse("$baseUrl$endpoint");
 
     var response = await http
-        .post(url, headers: headers, body: jsonEncode(body))
+        .post(url, headers: _withRequestId(headers), body: jsonEncode(body))
         .timeout(effectiveTimeout);
 
     if (response.statusCode == 401) {
       final newToken = await _refreshOrLogout();
       response = await http
-          .post(url, headers: _headersWith(newToken), body: jsonEncode(body))
+          .post(url,
+              headers: _withRequestId(_headersWith(newToken)),
+              body: jsonEncode(body))
           .timeout(effectiveTimeout);
     }
 
@@ -223,13 +235,15 @@ class ApiClient {
     final uri = Uri.parse("$baseUrl$endpoint");
 
     var response = await http
-        .put(uri, headers: headers, body: jsonEncode(body))
+        .put(uri, headers: _withRequestId(headers), body: jsonEncode(body))
         .timeout(timeout);
 
     if (response.statusCode == 401) {
       final newToken = await _refreshOrLogout();
       response = await http
-          .put(uri, headers: _headersWith(newToken), body: jsonEncode(body))
+          .put(uri,
+              headers: _withRequestId(_headersWith(newToken)),
+              body: jsonEncode(body))
           .timeout(timeout);
     }
 
@@ -242,13 +256,15 @@ class ApiClient {
     final uri = Uri.parse("$baseUrl$endpoint");
 
     var response = await http
-        .patch(uri, headers: headers, body: jsonEncode(body))
+        .patch(uri, headers: _withRequestId(headers), body: jsonEncode(body))
         .timeout(timeout);
 
     if (response.statusCode == 401) {
       final newToken = await _refreshOrLogout();
       response = await http
-          .patch(uri, headers: _headersWith(newToken), body: jsonEncode(body))
+          .patch(uri,
+              headers: _withRequestId(_headersWith(newToken)),
+              body: jsonEncode(body))
           .timeout(timeout);
     }
 
@@ -262,12 +278,14 @@ class ApiClient {
       queryParameters: queryParams,
     );
 
-    var response = await http.delete(uri, headers: headers).timeout(timeout);
+    var response = await http
+        .delete(uri, headers: _withRequestId(headers))
+        .timeout(timeout);
 
     if (response.statusCode == 401) {
       final newToken = await _refreshOrLogout();
       response = await http
-          .delete(uri, headers: _headersWith(newToken))
+          .delete(uri, headers: _withRequestId(_headersWith(newToken)))
           .timeout(timeout);
     }
 
