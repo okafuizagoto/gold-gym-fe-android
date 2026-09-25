@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -32,11 +34,32 @@ android {
         versionName = flutter.versionName
     }
 
+    // Penandatanganan rilis Play Store: android/key.properties (GITIGNORED, jangan di-commit) berisi
+    //   storeFile=/path/upload-keystore.jks  storePassword=...  keyAlias=upload  keyPassword=...
+    // Tanpa file itu build rilis memakai kunci debug (HANYA untuk uji lokal, Play akan menolak) dan diberi peringatan.
+    val keystoreProps = Properties()
+    val keystoreFile = rootProject.file("key.properties")
+    if (keystoreFile.exists()) keystoreFile.inputStream().use { keystoreProps.load(it) }
+
+    signingConfigs {
+        if (keystoreFile.exists()) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (keystoreFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                logger.warn("PERINGATAN: android/key.properties tidak ada -- build rilis ditandatangani kunci DEBUG (tidak bisa diunggah ke Play).")
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

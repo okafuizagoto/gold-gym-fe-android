@@ -212,6 +212,11 @@ class _AppDrawerState extends State<AppDrawer> {
               route: '/admin-storage-usage',
             ),
             MenuItem(
+              title: 'Statistik Pengguna',
+              icon: Icons.insights_outlined,
+              route: '/admin-statistik-pengguna',
+            ),
+            MenuItem(
               title: 'Daftar Request Fitur',
               icon: Icons.feedback_outlined,
               route: '/admin-request-fitur',

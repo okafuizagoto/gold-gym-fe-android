@@ -8,7 +8,9 @@ import '../utils/storage.dart';
 import '../utils/toast.dart';
 import '../utils/constants.dart';
 import '../providers/user_provider.dart';
+import '../config/env.dart';
 import '../config/theme.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../widgets/auth_card.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -52,6 +54,14 @@ class _LoginScreenState extends State<LoginScreen> {
     _passwordFocus.dispose();
     _totpController.dispose();
     super.dispose();
+  }
+
+  /// Halaman hukum ada di web (domain web = domain API tanpa awalan "api"/"staging-api").
+  Uri _webUri(String path) {
+    final base = Env.baseApiUrl
+        .replaceFirst('staging-api.', 'staging.')
+        .replaceFirst('//api.', '//');
+    return Uri.parse('$base$path');
   }
 
   bool get _canSubmit {
@@ -312,6 +322,21 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             ),
             const SizedBox(height: 6),
+            Wrap(
+              alignment: WrapAlignment.center,
+              children: [
+                for (final (label, path) in const [
+                  ('Kebijakan Privasi', '/kebijakan-privasi'),
+                  ('Syarat & Ketentuan', '/syarat-ketentuan'),
+                  ('Hapus Akun', '/hapus-akun'),
+                ])
+                  TextButton(
+                    onPressed: () => launchUrl(_webUri(path),
+                        mode: LaunchMode.externalApplication),
+                    child: Text(label, style: textTheme.bodySmall),
+                  ),
+              ],
+            ),
             Text(
               '${AppConstants.appName} v${AppConstants.version}',
               textAlign: TextAlign.center,

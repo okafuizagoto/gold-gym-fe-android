@@ -5,13 +5,11 @@
     <!-- cek/nyalakan Bluetooth sebelum Cetak Struk (Android 12+) -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <application
-        android:usesCleartextTraffic="true"
+        android:usesCleartextTraffic="false"
         android:label="${appName}"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"> <!-- 
-        android:usesCleartextTraffic="true"
-        hanya untuk local
-         -->
+        android:icon="@mipmap/ic_launcher"> <!-- usesCleartextTraffic=false: semua trafik wajib HTTPS (syarat rilis Play).
+             HTTP untuk pengembangan lokal hanya diizinkan di src/debug dan src/profile. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
