@@ -37,6 +37,9 @@ class OutletResponse {
   /// bisa dipakai/diubah.
   final bool locked;
 
+  /// true = sudah dihapus (hapus lunak): tetap tampil, nonaktif, tidak bisa diubah.
+  final bool deleted;
+
   OutletResponse({
     required this.outlet_id,
     required this.outlet_gold_id,
@@ -48,6 +51,7 @@ class OutletResponse {
     required this.created_at,
     this.updated_at,
     this.locked = false,
+    this.deleted = false,
   });
 
   /// JSON → Object
@@ -67,6 +71,7 @@ class OutletResponse {
           ? null
           : DateTime.tryParse('${json["updated_at"]}'),
       locked: json["locked"] == true,
+      deleted: json["outlet_deleted_at"] != null,
     );
   }
 

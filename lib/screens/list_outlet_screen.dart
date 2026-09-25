@@ -310,9 +310,13 @@ class _OutletTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final status = item.outlet_status.isEmpty
-        ? '-'
-        : (item.outlet_status == 'INACTIVE' ? 'NONACTIVE' : item.outlet_status);
+    final status = item.deleted
+        ? 'DIHAPUS'
+        : item.outlet_status.isEmpty
+            ? '-'
+            : (item.outlet_status == 'INACTIVE'
+                ? 'NONACTIVE'
+                : item.outlet_status);
     final active = item.outlet_status == 'ACTIVE';
 
     return Container(
@@ -453,7 +457,7 @@ class _OutletTile extends StatelessWidget {
                 ),
               ],
             ),
-            if (!readOnly) ...[
+            if (!readOnly && !item.deleted) ...[
               const SizedBox(height: 10),
               Row(
                 children: [
