@@ -7,7 +7,8 @@ import '../utils/storage.dart';
 
 class CoreApi extends ApiClient {
   // POST /gold-gym/v2/userdata/login
-  Future<http.Response> login(String user, String password) async {
+  Future<http.Response> login(String user, String password,
+      {String? totpCode}) async {
     final headers = await getBasicAuthHeaders(user, password);
     final url =
         Uri.parse('${ApiClient.baseUrl}/gold-gym/v2/userdata?type=loginuser');
@@ -15,6 +16,7 @@ class CoreApi extends ApiClient {
     Map<String, dynamic> body = {
       "gold_email": user,
       "gold_password": password,
+      if (totpCode != null && totpCode.isNotEmpty) "totp_code": totpCode,
     };
     return await http
         // .post(url, headers: headers)

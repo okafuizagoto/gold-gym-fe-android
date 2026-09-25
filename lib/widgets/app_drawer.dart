@@ -395,6 +395,11 @@ class _AppDrawerState extends State<AppDrawer> {
           route: '/qris-outlet',
         ),
       MenuItem(
+        title: 'Keamanan Akun',
+        icon: Icons.lock_person_outlined,
+        route: '/keamanan-akun',
+      ),
+      MenuItem(
         title: 'About Us',
         icon: Icons.info,
         route: '/about-us',

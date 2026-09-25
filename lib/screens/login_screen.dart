@@ -23,6 +23,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _userController = TextEditingController();
   final _passwordController = TextEditingController();
   final _passwordFocus = FocusNode();
+  final _totpController = TextEditingController();
+  bool _needTotp = false;
   final _coreApi = CoreApi();
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -48,12 +50,14 @@ class _LoginScreenState extends State<LoginScreen> {
     _userController.dispose();
     _passwordController.dispose();
     _passwordFocus.dispose();
+    _totpController.dispose();
     super.dispose();
   }
 
   bool get _canSubmit {
     return _userController.text.trim().isNotEmpty &&
-        _passwordController.text.isNotEmpty;
+        _passwordController.text.isNotEmpty &&
+        (!_needTotp || _totpController.text.trim().isNotEmpty);
   }
 
   Future<void> _handleLogin() async {
@@ -65,6 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final response = await _coreApi.login(
         _userController.text.trim(),
         _passwordController.text,
+        totpCode: _needTotp ? _totpController.text.trim() : null,
       );
       final rawCookie = response.headers['set-cookie'];
 
@@ -147,7 +152,27 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.pushReplacementNamed(context, dest);
         }
       } else {
-        if (mounted) {
+        String? code;
+        String? msg;
+        try {
+          final b = jsonDecode(response.body);
+          code = b['error'] is String ? b['error'] : null;
+          msg = b['message'] is String ? b['message'] : null;
+        } catch (_) {}
+        if (!mounted) return;
+        if (response.statusCode == 401 && code == 'TOTP_REQUIRED') {
+          setState(() => _needTotp = true);
+          Toast.info(context,
+              'Masukkan kode verifikasi dari aplikasi authenticator Anda.');
+        } else if (response.statusCode == 401 && code == 'TOTP_INVALID') {
+          _totpController.clear();
+          Toast.error(context, msg ?? 'Kode verifikasi salah.');
+        } else if (response.statusCode == 429) {
+          Toast.error(
+              context,
+              msg ??
+                  'Terlalu banyak percobaan masuk. Coba lagi beberapa saat lagi.');
+        } else {
           Toast.error(
               context, 'Login gagal. Periksa kembali email dan password Anda.');
         }
@@ -217,6 +242,22 @@ class _LoginScreenState extends State<LoginScreen> {
               onChanged: (_) => setState(() {}),
               onSubmitted: (_) => _handleLogin(),
             ),
+            if (_needTotp) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _totpController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Kode verifikasi 2 langkah',
+                  helperText:
+                      'Kode 6 digit dari authenticator, atau kode pemulihan',
+                  prefixIcon: Icon(Icons.verified_user_outlined),
+                ),
+                autofillHints: const [AutofillHints.oneTimeCode],
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) => _handleLogin(),
+              ),
+            ],
             const SizedBox(height: 20),
             SizedBox(
               height: 48,
