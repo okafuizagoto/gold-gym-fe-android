@@ -1411,10 +1411,11 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                   child:
                       Text(langProvider.get('Bank Transfer', 'Transfer Bank')),
                 ),
-                DropdownMenuItem(
-                  value: AppConstants.paymentQris,
-                  child: Text(langProvider.get('QRIS', 'QRIS')),
-                ),
+                // QRIS disembunyikan dari user 2026-09-25 (belum ada payment gateway yang cocok)
+                // DropdownMenuItem(
+                //   value: AppConstants.paymentQris,
+                //   child: Text(langProvider.get('QRIS', 'QRIS')),
+                // ),
               ],
               onChanged: (value) {
                 if (value != null) {

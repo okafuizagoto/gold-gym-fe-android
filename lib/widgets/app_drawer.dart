@@ -376,15 +376,14 @@ class _AppDrawerState extends State<AppDrawer> {
           icon: Icons.apps_outlined,
           route: '/request-aplikasi-baru',
         ),
-      // QRIS Saya: penjual menyimpan foto kode QRIS statis milik mereka
-      // sendiri, ditampilkan ke pembeli lewat tombol "Tampilkan QRIS" di
-      // modal pembayaran POS.
-      if (!buyerView && isSeller && !isStaff)
-        MenuItem(
-          title: 'QRIS Saya',
-          icon: Icons.qr_code_2,
-          route: '/qris-saya',
-        ),
+      // QRIS Saya: disembunyikan dari user 2026-09-25 (belum ada payment
+      // gateway yang cocok). Sengaja tidak dihapus agar mudah diaktifkan lagi.
+      // if (!buyerView && isSeller && !isStaff)
+      //   MenuItem(
+      //     title: 'QRIS Saya',
+      //     icon: Icons.qr_code_2,
+      //     route: '/qris-saya',
+      //   ),
       MenuItem(
         title: 'About Us',
         icon: Icons.info,
