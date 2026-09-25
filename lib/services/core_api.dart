@@ -223,4 +223,15 @@ class CoreApi extends ApiClient {
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     return body['url'] as String?;
   }
+
+  /// Pakai foto QRIS outlet lain untuk outlet ini, tanpa upload ulang (disimpan ke database,
+  /// tetap ada setelah logout/login).
+  Future<http.Response> copyOutletQrisPhoto(
+      String toOutletCode, String fromOutletCode) async {
+    final client = ApiClient();
+    return client.post(
+      '/gold-gym/v2/userdata/outlet/$toOutletCode/qris-photo/copy',
+      {'from_outlet_code': fromOutletCode},
+    );
+  }
 }
