@@ -174,7 +174,11 @@ class _StorageScreenState extends State<StorageScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildSummaryCard(summary),
+                if (summary.proofEnabled) ...[
+                  _buildSummaryCard(summary),
+                  const SizedBox(height: 16),
+                ],
+                _buildItemUsageCard(summary),
                 const SizedBox(height: 16),
                 if (summary.entries.isEmpty)
                   const EmptyState(
@@ -193,6 +197,22 @@ class _StorageScreenState extends State<StorageScreen> {
     );
   }
 
+  Widget _buildItemUsageCard(StorageSummary summary) {
+    final textTheme = Theme.of(context).textTheme;
+    final quota = summary.itemQuotaKb > 0
+        ? ' dari ${(summary.itemQuotaKb / 1024).toStringAsFixed(0)} MB'
+        : ' · tidak dibatasi kuota total';
+    return SectionCard(
+      title: 'Foto Produk',
+      icon: Icons.inventory_2_outlined,
+      child: Text(
+        '${(summary.itemUsedKb / 1024).toStringAsFixed(2)} MB terpakai$quota'
+        ' · maks ${(summary.itemMaxKb / 1024).toStringAsFixed(0)} MB per foto',
+        style: textTheme.bodySmall,
+      ),
+    );
+  }
+
   Widget _buildSummaryCard(StorageSummary summary) {
     final textTheme = Theme.of(context).textTheme;
     final fraction = summary.usedFraction;
@@ -202,7 +222,7 @@ class _StorageScreenState extends State<StorageScreen> {
             ? AppColors.warning
             : AppColors.blue;
     return SectionCard(
-      title: 'Penyimpanan Terpakai',
+      title: 'Bukti Pembayaran & QRIS',
       icon: Icons.sd_storage_outlined,
       action: Text(
         '${(fraction * 100).toStringAsFixed(0)}%',
@@ -239,6 +259,10 @@ class _StorageScreenState extends State<StorageScreen> {
     ];
     final widgets = <Widget>[];
     for (final (type, groupLabel) in groups) {
+      if (!(_summary?.proofEnabled ?? true) &&
+          type != StorageEntry.sourceItemPhoto) {
+        continue;
+      }
       final rows = entries.where((e) => e.sourceType == type).toList();
       if (rows.isEmpty) continue;
       widgets.add(Padding(

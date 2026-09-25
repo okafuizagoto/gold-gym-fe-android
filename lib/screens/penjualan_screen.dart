@@ -1498,7 +1498,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
 
             // Transfer Bank: tombol tampilkan kode QRIS milik OUTLET ini (opsional, tetap
             // tercatat sebagai transfer bank -- lihat qris_outlet_screen.dart).
-            if (isBank) ...[
+            if (isBank && _proofFeatureEnabled) ...[
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -2888,6 +2888,30 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
         _receiptController.text.trim().isEmpty) {
       Toast.error(context, 'Nama customer wajib diisi');
       return;
+    }
+    // Fitur foto bukti bayar dimatikan admin: sebagai gantinya kasir wajib mengonfirmasi bahwa
+    // transfer bank benar-benar sudah masuk sebelum transaksi diproses.
+    if (cart.paymentType == AppConstants.paymentBank && !_proofFeatureEnabled) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(langProvider.get(
+              'Confirm Bank Transfer', 'Konfirmasi Transfer Bank')),
+          content: Text(langProvider.get(
+              'Are you sure the bank transfer has been received successfully? Please make sure the funds have entered your account before the transaction is saved.',
+              'Apakah Anda yakin transfer bank telah berhasil diterima? Mohon pastikan dana sudah masuk ke rekening Anda sebelum transaksi disimpan.')),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(langProvider.get('Not yet', 'Belum'))),
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text(langProvider.get(
+                    'Yes, it was successful', 'Ya, sudah berhasil'))),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
     }
     setState(() => _isSaving = true);
     try {

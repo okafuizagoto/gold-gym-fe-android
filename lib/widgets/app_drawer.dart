@@ -1,3 +1,5 @@
+import 'dart:convert';
+import '../services/sales_api.dart';
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../utils/storage.dart';
@@ -56,6 +58,15 @@ class _AppDrawerState extends State<AppDrawer> {
     // di atas, karena ini bukan bagian respons login).
     final menuRequestAplikasiBaruEnabled =
         await FeatureRequestApi().getEnabled();
+    // Fitur foto bukti bayar + QRIS (Akses Admin > Visibilitas Bukti Pembayaran): menu QRIS Outlet
+    // ikut hilang kalau dimatikan untuk user ini. Gagal cek = biarkan tampil.
+    bool proofFeatureEnabled = true;
+    try {
+      final r = await SalesApi().getProofVisibility('');
+      if (r.statusCode == 200) {
+        proofFeatureEnabled = jsonDecode(r.body)['enabled'] != false;
+      }
+    } catch (_) {}
     final isRealBuyer = role == AppConstants.roleBuyer;
     final isAdmin = role == AppConstants.roleAdmin;
     // penjual (retail & therapy sama-sama SELLER; dibedakan outlet_type)
@@ -377,7 +388,7 @@ class _AppDrawerState extends State<AppDrawer> {
           route: '/request-aplikasi-baru',
         ),
       // QRIS Outlet (2026-09-25): menggantikan QRIS Saya per-akun.
-      if (!buyerView && isSeller && !isStaff)
+      if (!buyerView && isSeller && !isStaff && proofFeatureEnabled)
         MenuItem(
           title: 'QRIS Outlet',
           icon: Icons.qr_code_2,

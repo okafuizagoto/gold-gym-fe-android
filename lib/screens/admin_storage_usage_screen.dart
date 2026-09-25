@@ -8,6 +8,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
 import '../widgets/section_card.dart';
+import '../widgets/storage_limit_rules.dart';
 
 /// Admin: penggunaan storage Backblaze B2 lintas semua user -- total
 /// upload/download/simpan per user, batas per user/global, rollup
@@ -67,7 +68,8 @@ class _AdminStorageUsageScreenState extends State<AdminStorageUsageScreen> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal')),
           TextButton(
             onPressed: () {
               final v = double.tryParse(controller.text.replaceAll(',', '.'));
@@ -103,7 +105,8 @@ class _AdminStorageUsageScreenState extends State<AdminStorageUsageScreen> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal')),
           TextButton(
             onPressed: () => Navigator.pop(context, controller.text.trim()),
             child: const Text('Simpan'),
@@ -112,7 +115,8 @@ class _AdminStorageUsageScreenState extends State<AdminStorageUsageScreen> {
       ),
     );
     if (result == null) return;
-    final val = result.isEmpty ? null : double.tryParse(result.replaceAll(',', '.'));
+    final val =
+        result.isEmpty ? null : double.tryParse(result.replaceAll(',', '.'));
     if (result.isNotEmpty && (val == null || val <= 0)) {
       if (mounted) Toast.error(context, 'Isi angka GB yang valid');
       return;
@@ -159,16 +163,20 @@ class _AdminStorageUsageScreenState extends State<AdminStorageUsageScreen> {
                                           children: [
                                             Row(
                                               mainAxisAlignment:
-                                                  MainAxisAlignment.spaceBetween,
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
                                               children: [
-                                                Text(s.environment.toUpperCase(),
+                                                Text(
+                                                    s.environment.toUpperCase(),
                                                     style: const TextStyle(
-                                                        fontWeight: FontWeight.bold)),
+                                                        fontWeight:
+                                                            FontWeight.bold)),
                                                 if (s.alerted)
                                                   const Chip(
-                                                      label: Text('Alert tercapai'),
-                                                      backgroundColor:
-                                                          AppColors.warningLight),
+                                                      label: Text(
+                                                          'Alert tercapai'),
+                                                      backgroundColor: AppColors
+                                                          .warningLight),
                                               ],
                                             ),
                                             Text(
@@ -202,16 +210,22 @@ class _AdminStorageUsageScreenState extends State<AdminStorageUsageScreen> {
                                             contentPadding: EdgeInsets.zero,
                                             title: Text('Gold ID ${u.goldId}'),
                                             subtitle: Text(
-                                                'Simpan ${_gb(u.storageGb)} · Upload ${_gb(u.uploadGb)} · Download ${_gb(u.downloadGb)}\nLimit ${_gb(u.effectiveLimitGb)}${u.hasOverride ? ' (override)' : ''}'),
+                                                'Paket ${u.plan.isEmpty ? '-' : u.plan}\n'
+                                                'Bukti bayar + QRIS ${(u.storageGb * 1024).toStringAsFixed(2)} MB · Foto produk ${(u.itemStorageGb * 1024).toStringAsFixed(2)} MB${u.itemQuotaMb > 0 ? ' / ${u.itemQuotaMb.toStringAsFixed(0)} MB' : ''}\n'
+                                                'Maks/foto: produk ${u.itemMaxMb.toStringAsFixed(0)} MB · bukti ${u.proofMaxMb.toStringAsFixed(0)} MB\n'
+                                                'Upload ${_gb(u.uploadGb)} · Download ${_gb(u.downloadGb)} · Limit ${_gb(u.effectiveLimitGb)}${u.hasOverride ? ' (override)' : ''}'),
                                             isThreeLine: true,
                                             trailing: TextButton(
-                                              onPressed: () => _editUserLimit(u),
+                                              onPressed: () =>
+                                                  _editUserLimit(u),
                                               child: const Text('Atur limit'),
                                             ),
                                           ))
                                       .toList(),
                                 ),
                         ),
+                        const SizedBox(height: 16),
+                        StorageLimitRules(onChanged: _load),
                       ],
                     ),
                   ),

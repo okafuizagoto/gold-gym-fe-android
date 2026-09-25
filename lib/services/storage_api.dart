@@ -70,4 +70,24 @@ class StorageApi extends ApiClient {
     final rows = (body['data'] as List?) ?? [];
     return rows.map((e) => AdminUsageSummary.fromJson(e)).toList();
   }
+
+  /// GET /v2/storage/admin/limits -- semua aturan batas foto produk / bukti bayar.
+  Future<List<LimitRule>?> adminListLimitRules() async {
+    final response = await _client.get('/gold-gym/v2/storage/admin/limits');
+    if (response.statusCode != 200) return null;
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final rows = (body['data'] as List?) ?? [];
+    return rows.map((e) => LimitRule.fromJson(e)).toList();
+  }
+
+  /// PUT /v2/storage/admin/limits -- limitMb null = hapus aturan; kuota 0 = tanpa batas.
+  Future<http.Response> adminSetLimitRule(
+      String scopeType, String scopeKey, String kind, double? limitMb) {
+    return _client.put('/gold-gym/v2/storage/admin/limits', {
+      'scope_type': scopeType,
+      'scope_key': scopeKey,
+      'kind': kind,
+      'limit_mb': limitMb,
+    });
+  }
 }
