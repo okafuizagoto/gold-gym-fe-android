@@ -1,24 +1,55 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'constants.dart';
 
 class Storage {
+  /// Kunci RAHASIA (token sesi) disimpan di penyimpanan aman (Android Keystore lewat
+  /// flutter_secure_storage), BUKAN di SharedPreferences yang berupa file XML tanpa enkripsi dan bisa
+  /// dibaca di perangkat root/backup (Fase 8 keamanan, 2026-09-25). Kunci lain tetap di SharedPreferences.
+  static const Set<String> _secretKeys = {'access_token', 'refresh_token'};
+
+  static const FlutterSecureStorage _secure = FlutterSecureStorage();
+
   static Future<String?> get(String key) async {
+    if (_secretKeys.contains(key)) {
+      final secure = await _secure.read(key: key);
+      if (secure != null) return secure;
+      // Migrasi sekali jalan: token lama (versi aplikasi sebelumnya) ada di SharedPreferences.
+      // Pindahkan ke penyimpanan aman lalu hapus salinan yang tidak terenkripsi.
+      final prefs = await SharedPreferences.getInstance();
+      final legacy = prefs.getString(key);
+      if (legacy != null) {
+        await _secure.write(key: key, value: legacy);
+        await prefs.remove(key);
+      }
+      return legacy;
+    }
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(key);
   }
 
   static Future<void> set(String key, String value) async {
+    if (_secretKeys.contains(key)) {
+      await _secure.write(key: key, value: value);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(key); // pastikan tidak ada sisa salinan tak terenkripsi
+      return;
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(key, value);
   }
 
   static Future<void> delete(String key) async {
+    if (_secretKeys.contains(key)) {
+      await _secure.delete(key: key);
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(key);
   }
 
   static Future<void> clear() async {
+    await _secure.deleteAll();
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
   }
