@@ -86,9 +86,8 @@ class ItemResponse {
       item_status: json["item_status"] ?? "",
       item_photo: json["item_photo"] ?? "",
       // parser aman: backend bisa mengirim "" untuk kolom tanggal NULL
-      item_created_at:
-          DateTime.tryParse('${json["item_created_at"] ?? ''}') ??
-              DateTime.now(),
+      item_created_at: DateTime.tryParse('${json["item_created_at"] ?? ''}') ??
+          DateTime.now(),
       item_updated_at: json["item_updated_at"] == null
           ? null
           : DateTime.tryParse('${json["item_updated_at"]}'),
@@ -133,12 +132,13 @@ class ItemPagination {
 
   factory ItemPagination.fromJson(Map<String, dynamic> json) {
     return ItemPagination(
-      data:
-          (json["data"] as List).map((e) => ItemResponse.fromJson(e)).toList(),
-      page: json["metadata"]["page"],
-      limit: json["metadata"]["limit"],
-      totalData: json["metadata"]["total_data"],
-      totalPage: json["metadata"]["total_page"],
+      data: ((json["data"] ?? []) as List)
+          .map((e) => ItemResponse.fromJson(e))
+          .toList(),
+      page: ((json["metadata"] ?? {})["page"] ?? 1),
+      limit: ((json["metadata"] ?? {})["limit"] ?? 0),
+      totalData: ((json["metadata"] ?? {})["total_data"] ?? 0),
+      totalPage: ((json["metadata"] ?? {})["total_page"] ?? 1),
     );
   }
 }

@@ -89,13 +89,13 @@ class DiscountPagination {
 
   factory DiscountPagination.fromJson(Map<String, dynamic> json) {
     return DiscountPagination(
-      data: (json["data"] as List)
+      data: ((json["data"] ?? []) as List)
           .map((e) => DiscountResponse.fromJson(e))
           .toList(),
-      page: json["metadata"]["page"],
-      limit: json["metadata"]["limit"],
-      totalData: json["metadata"]["total_data"],
-      totalPage: json["metadata"]["total_page"],
+      page: ((json["metadata"] ?? {})["page"] ?? 1),
+      limit: ((json["metadata"] ?? {})["limit"] ?? 0),
+      totalData: ((json["metadata"] ?? {})["total_data"] ?? 0),
+      totalPage: ((json["metadata"] ?? {})["total_page"] ?? 1),
     );
   }
 }
@@ -161,13 +161,13 @@ class DiscountHistoryPagination {
 
   factory DiscountHistoryPagination.fromJson(Map<String, dynamic> json) {
     return DiscountHistoryPagination(
-      data: (json["data"] as List)
+      data: ((json["data"] ?? []) as List)
           .map((e) => DiscountHistoryResponse.fromJson(e))
           .toList(),
-      page: json["metadata"]["page"],
-      limit: json["metadata"]["limit"],
-      totalData: json["metadata"]["total_data"],
-      totalPage: json["metadata"]["total_page"],
+      page: ((json["metadata"] ?? {})["page"] ?? 1),
+      limit: ((json["metadata"] ?? {})["limit"] ?? 0),
+      totalData: ((json["metadata"] ?? {})["total_data"] ?? 0),
+      totalPage: ((json["metadata"] ?? {})["total_page"] ?? 1),
     );
   }
 }
@@ -249,13 +249,13 @@ class VoucherPagination {
 
   factory VoucherPagination.fromJson(Map<String, dynamic> json) {
     return VoucherPagination(
-      data: (json["data"] as List)
+      data: ((json["data"] ?? []) as List)
           .map((e) => VoucherResponse.fromJson(e))
           .toList(),
-      page: json["metadata"]["page"],
-      limit: json["metadata"]["limit"],
-      totalData: json["metadata"]["total_data"],
-      totalPage: json["metadata"]["total_page"],
+      page: ((json["metadata"] ?? {})["page"] ?? 1),
+      limit: ((json["metadata"] ?? {})["limit"] ?? 0),
+      totalData: ((json["metadata"] ?? {})["total_data"] ?? 0),
+      totalPage: ((json["metadata"] ?? {})["total_page"] ?? 1),
     );
   }
 }
@@ -314,13 +314,13 @@ class VoucherHistoryPagination {
 
   factory VoucherHistoryPagination.fromJson(Map<String, dynamic> json) {
     return VoucherHistoryPagination(
-      data: (json["data"] as List)
+      data: ((json["data"] ?? []) as List)
           .map((e) => VoucherHistoryResponse.fromJson(e))
           .toList(),
-      page: json["metadata"]["page"],
-      limit: json["metadata"]["limit"],
-      totalData: json["metadata"]["total_data"],
-      totalPage: json["metadata"]["total_page"],
+      page: ((json["metadata"] ?? {})["page"] ?? 1),
+      limit: ((json["metadata"] ?? {})["limit"] ?? 0),
+      totalData: ((json["metadata"] ?? {})["total_data"] ?? 0),
+      totalPage: ((json["metadata"] ?? {})["total_page"] ?? 1),
     );
   }
 }

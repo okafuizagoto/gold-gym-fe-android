@@ -109,13 +109,13 @@ class OutletPagination {
 
   factory OutletPagination.fromJson(Map<String, dynamic> json) {
     return OutletPagination(
-      data: (json["data"] as List)
+      data: ((json["data"] ?? []) as List)
           .map((e) => OutletResponse.fromJson(e))
           .toList(),
-      page: json["metadata"]["page"],
-      limit: json["metadata"]["limit"],
-      totalData: json["metadata"]["total_data"],
-      totalPage: json["metadata"]["total_page"],
+      page: ((json["metadata"] ?? {})["page"] ?? 1),
+      limit: ((json["metadata"] ?? {})["limit"] ?? 0),
+      totalData: ((json["metadata"] ?? {})["total_data"] ?? 0),
+      totalPage: ((json["metadata"] ?? {})["total_page"] ?? 1),
     );
   }
 }
