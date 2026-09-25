@@ -3,6 +3,7 @@
 class StorageEntry {
   static const String sourceItemPhoto = 'ITEM_PHOTO';
   static const String sourcePaymentProof = 'PAYMENT_PROOF';
+  static const String sourceQrisPhoto = 'QRIS_PHOTO';
 
   final String sourceType;
   final int sourceId;

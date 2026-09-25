@@ -185,4 +185,42 @@ class CoreApi extends ApiClient {
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     return body['url'] as String?;
   }
+
+  // --- QRIS per OUTLET (2026-09-25): menggantikan "QRIS Saya" per-akun di atas -- satu
+  // penjual bisa punya banyak outlet, tiap outlet foto QRIS sendiri. Tetap tercatat sebagai
+  // transfer bank di POS, cuma cara tampil kode QR ke pembeli.
+
+  /// Upload/ganti foto QRIS milik satu outlet (multipart, maks 2 MB).
+  Future<http.Response> uploadOutletQrisPhoto(String outletCode, File file) async {
+    final headers = await getAuthHeaders();
+    final uri = Uri.parse(
+        '${ApiClient.baseUrl}/gold-gym/v2/userdata/outlet/$outletCode/qris-photo');
+    final request = http.MultipartRequest('POST', uri);
+    if (headers['Authorization'] != null) {
+      request.headers['Authorization'] = headers['Authorization']!;
+    }
+    request.files.add(await http.MultipartFile.fromPath('file', file.path));
+    final streamed = await request.send().timeout(ApiClient.timeout);
+    return http.Response.fromStream(streamed);
+  }
+
+  /// Hapus foto QRIS milik satu outlet.
+  Future<http.Response> deleteOutletQrisPhoto(String outletCode) async {
+    final client = ApiClient();
+    return client.delete('/gold-gym/v2/userdata/outlet/$outletCode/qris-photo');
+  }
+
+  /// Presigned URL (B2, berlaku 15 menit) foto QRIS outlet. sellerGoldId kosong = outlet milik
+  /// sendiri (butuh token); diisi = lihat QRIS outlet penjual lain saat checkout.
+  Future<String?> getOutletQrisPhotoUrl(String outletCode,
+      {int? sellerGoldId}) async {
+    final client = ApiClient();
+    final endpoint = sellerGoldId != null
+        ? '/gold-gym/v2/userdata/$sellerGoldId/outlet/$outletCode/qris-photo'
+        : '/gold-gym/v2/userdata/outlet/$outletCode/qris-photo';
+    final response = await client.get(endpoint);
+    if (response.statusCode != 200) return null;
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return body['url'] as String?;
+  }
 }

@@ -59,7 +59,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
   /// hanya kasus itu yang punya satu item_id pasti untuk ditempeli foto
   /// sesudah item dibuat. Lihat _canPickItemPhoto.
   File? _pickedItemPhoto;
-  static const int _maxItemPhotoBytes = 2 * 1024 * 1024;
+  static const int _maxItemPhotoBytes = 5 * 1024 * 1024;
   Map<String, String> _photoHeaders = {};
 
   ValueNotifier<bool> isActiveItems = ValueNotifier(
@@ -457,7 +457,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
     final file = File(picked.path);
     final size = await file.length();
     if (size > _maxItemPhotoBytes) {
-      showToast('Ukuran foto maksimal 2 MB', isError: true);
+      showToast('Ukuran foto maksimal 5 MB', isError: true);
       return;
     }
     setState(() => _pickedItemPhoto = file);
@@ -844,7 +844,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                         Text(
                           langProvider.get(
                               'Tap the box to pick a photo. Max 2 MB',
-                              'Ketuk kotak untuk pilih foto. Maks 2 MB'),
+                              'Ketuk kotak untuk pilih foto. Maks 5 MB'),
                           style: textTheme.bodySmall,
                         ),
                     ],

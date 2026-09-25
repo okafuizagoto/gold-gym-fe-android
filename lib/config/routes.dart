@@ -33,6 +33,7 @@ import '../screens/feature_request_screen.dart';
 import '../screens/app_request_screen.dart';
 import '../screens/admin_feature_request_screen.dart';
 import '../screens/qris_saya_screen.dart';
+import '../screens/qris_outlet_screen.dart';
 import '../screens/seller_menu_access_screen.dart';
 import '../screens/customer_list_screen.dart';
 import '../screens/laporan_screen.dart';
@@ -89,6 +90,7 @@ class AppRoutes {
   static const String laporan = '/laporan';
   static const String storage = '/storage';
   static const String qrisSaya = '/qris-saya';
+  static const String qrisOutlet = '/qris-outlet';
   static const String mejaArea = '/meja-area';
   static const String tambahArea = '/tambah-area';
   static const String tambahMeja = '/tambah-meja';
@@ -143,6 +145,7 @@ class AppRoutes {
         laporan: (context) => const LaporanScreen(),
         storage: (context) => const StorageScreen(),
         qrisSaya: (context) => const QrisSayaScreen(),
+        qrisOutlet: (context) => const QrisOutletScreen(),
         mejaArea: (context) => const MejaAreaScreen(),
         tambahArea: (context) => const AreaFormScreen(),
         tambahMeja: (context) => const MejaFormScreen(),

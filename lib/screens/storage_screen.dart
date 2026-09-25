@@ -181,10 +181,10 @@ class _StorageScreenState extends State<StorageScreen> {
                     icon: Icons.photo_library_outlined,
                     title: 'Belum ada foto tersimpan',
                     description:
-                        'Foto item katalog dan bukti pembayaran yang Anda unggah akan tampil di sini.',
+                        'Foto item katalog, bukti pembayaran, dan QRIS outlet yang Anda unggah akan tampil di sini.',
                   )
                 else
-                  ...summary.entries.map((e) => _buildEntryCard(e)),
+                  ..._buildGroupedEntries(summary.entries),
               ],
             ),
           ),
@@ -230,8 +230,34 @@ class _StorageScreenState extends State<StorageScreen> {
     );
   }
 
+  // Dikelompokkan per kategori (2026-09-25) -- padanan pages/storage/index.tsx.
+  List<Widget> _buildGroupedEntries(List<StorageEntry> entries) {
+    final groups = [
+      (StorageEntry.sourceItemPhoto, 'Foto Item'),
+      (StorageEntry.sourcePaymentProof, 'Bukti Pembayaran'),
+      (StorageEntry.sourceQrisPhoto, 'QRIS Outlet'),
+    ];
+    final widgets = <Widget>[];
+    for (final (type, groupLabel) in groups) {
+      final rows = entries.where((e) => e.sourceType == type).toList();
+      if (rows.isEmpty) continue;
+      widgets.add(Padding(
+        padding: const EdgeInsets.only(bottom: 8, top: 4),
+        child: Text('$groupLabel (${rows.length})',
+            style: Theme.of(context)
+                .textTheme
+                .titleSmall
+                ?.copyWith(color: AppColors.muted)),
+      ));
+      widgets.addAll(rows.map((e) => _buildEntryCard(e)));
+      widgets.add(const SizedBox(height: 8));
+    }
+    return widgets;
+  }
+
   Widget _buildEntryCard(StorageEntry entry) {
     final textTheme = Theme.of(context).textTheme;
+    final isQris = entry.sourceType == StorageEntry.sourceQrisPhoto;
     final sizeLabel = entry.sizeKb / 1024 < 1
         ? '${entry.sizeKb} KB'
         : '${(entry.sizeKb / 1024).toStringAsFixed(2)} MB';
@@ -241,26 +267,37 @@ class _StorageScreenState extends State<StorageScreen> {
         padding: const EdgeInsets.fromLTRB(10, 10, 4, 10),
         child: Row(
           children: [
-            InkWell(
-              onTap: () => _showPreview(entry),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                child: FutureNetworkImage(
-                  urlLoader: () => _storageApi.photoUrl(entry),
-                  width: 56,
-                  height: 56,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context) => Container(
+            isQris
+                ? Container(
                     width: 56,
                     height: 56,
-                    color: AppColors.chipBg,
-                    child: const Icon(Icons.image_not_supported_outlined,
-                        color: AppColors.muted),
+                    decoration: BoxDecoration(
+                      color: AppColors.chipBg,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child:
+                        const Icon(Icons.qr_code_2, color: AppColors.muted),
+                  )
+                : InkWell(
+                    onTap: () => _showPreview(entry),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      child: FutureNetworkImage(
+                        urlLoader: () => _storageApi.photoUrl(entry),
+                        width: 56,
+                        height: 56,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context) => Container(
+                          width: 56,
+                          height: 56,
+                          color: AppColors.chipBg,
+                          child: const Icon(Icons.image_not_supported_outlined,
+                              color: AppColors.muted),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -280,25 +317,30 @@ class _StorageScreenState extends State<StorageScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
-                  Text(sizeLabel, style: textTheme.bodySmall),
+                  Text(
+                      isQris
+                          ? '$sizeLabel · kelola di menu "QRIS Outlet"'
+                          : sizeLabel,
+                      style: textTheme.bodySmall),
                 ],
               ),
             ),
-            _deletingSourceId == entry.sourceId
-                ? const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+            if (!isQris)
+              _deletingSourceId == entry.sourceId
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : IconButton(
+                      tooltip: 'Hapus',
+                      icon: const Icon(Icons.delete_outline_rounded,
+                          color: AppColors.error),
+                      onPressed: () => _confirmDelete(entry),
                     ),
-                  )
-                : IconButton(
-                    tooltip: 'Hapus',
-                    icon: const Icon(Icons.delete_outline_rounded,
-                        color: AppColors.error),
-                    onPressed: () => _confirmDelete(entry),
-                  ),
           ],
         ),
       ),

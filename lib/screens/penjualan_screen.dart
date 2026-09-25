@@ -1366,15 +1366,9 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
       scrollable: true,
       child: StatefulBuilder(builder: (context, setModalState) {
         final isBank = cart.paymentType == AppConstants.paymentBank;
-        // QRIS manual: penjual pakai QRIS statis milik mereka sendiri
-        // (bukan digenerate app), kasir konfirmasi sendiri setelah pembeli
-        // scan & bayar -- foto bukti OPSIONAL (beda dari Transfer Bank yang
-        // wajib), sekadar dokumentasi kalau kasir mau.
-        final isQris = cart.paymentType == AppConstants.paymentQris;
         // Transfer Bank wajib melampirkan foto bukti pembayaran — KECUALI
         // admin menyembunyikan fitur ini (Akses Admin > Visibilitas Bukti
         // Pembayaran), maka tidak ada cara upload jadi tidak diwajibkan.
-        // QRIS manual tidak pernah mewajibkan foto (opsional).
         final canConfirm = cart.canSave &&
             (!isBank || !_proofFeatureEnabled || _proofImage != null);
         return Column(
@@ -1502,9 +1496,9 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                 },
               ),
 
-            // QRIS manual: tombol tampilkan kode QRIS milik toko sendiri
-            // supaya pembeli bisa scan dari HP kasir.
-            if (isQris) ...[
+            // Transfer Bank: tombol tampilkan kode QRIS milik OUTLET ini (opsional, tetap
+            // tercatat sebagai transfer bank -- lihat qris_outlet_screen.dart).
+            if (isBank) ...[
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -1519,7 +1513,10 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                           setModalState(() => _showQris = true);
                           if (_qrisUrl != null) return;
                           setModalState(() => _loadingQris = true);
-                          final url = await CoreApi().getQrisPhotoUrl();
+                          final outcode =
+                              await Storage.get(AppConstants.outcode) ?? '';
+                          final url =
+                              await CoreApi().getOutletQrisPhotoUrl(outcode);
                           setModalState(() {
                             _qrisUrl = url;
                             _loadingQris = false;
@@ -1542,7 +1539,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                       : const Padding(
                           padding: EdgeInsets.all(8),
                           child: Text(
-                            'Belum ada foto QRIS tersimpan. Simpan dulu di menu "QRIS Saya".',
+                            'Belum ada foto QRIS tersimpan untuk outlet ini. Simpan dulu di menu "QRIS Outlet".',
                             style: TextStyle(color: Colors.red),
                           ),
                         ),
@@ -1551,12 +1548,9 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
               const SizedBox(height: 16),
             ],
 
-            // Transfer Bank (wajib) / QRIS manual (opsional): foto bukti
-            // pembayaran, ambil dari kamera atau galeri (lihat
-            // _pickProofImage) — disembunyikan jika admin menonaktifkan
-            // fitur ini. QRIS: langsung buka kamera (directCamera), bukan
-            // dialog pilihan -- lihat doc comment _pickProofImage.
-            if ((isBank || isQris) && _proofFeatureEnabled) ...[
+            // Transfer Bank (wajib): foto bukti pembayaran, ambil dari kamera atau galeri
+            // (lihat _pickProofImage) — disembunyikan jika admin menonaktifkan fitur ini.
+            if (isBank && _proofFeatureEnabled) ...[
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -1581,8 +1575,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                             .withValues(alpha: 0.5)),
                   ),
                   onPressed: () async {
-                    final file =
-                        await _pickProofImage(directCamera: isQris);
+                    final file = await _pickProofImage(directCamera: false);
                     if (file != null) {
                       setModalState(() => _proofImage = file);
                     }
@@ -1591,10 +1584,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 4, left: 4),
-                child: Text(
-                    isBank
-                        ? 'Wajib untuk transfer bank, maksimal 5 MB'
-                        : 'Opsional untuk QRIS, maksimal 5 MB',
+                child: Text('Wajib untuk transfer bank, maksimal 5 MB',
                     style: Theme.of(context).textTheme.bodySmall),
               ),
               if (_proofImage != null)
@@ -2078,18 +2068,24 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                 Text(langProvider.get('Unit Price', 'Harga Satuan'),
                     style: const TextStyle(color: AppColors.muted)),
                 const SizedBox(height: 4),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    TextFormatter.formatRupiah(displayPrice.toDouble()),
-                    maxLines: 1,
-                    style: TextStyle(
-                      fontSize: short ? 28 : 40,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5,
-                      color: displayPrice == 0
-                          ? AppColors.disabled
-                          : AppColors.ink,
+                // SizedBox(width: double.infinity) supaya FittedBox benar-benar dapat lebar
+                // penuh untuk mengecilkan teks, bukan hanya selebar konten -- semua digit yang
+                // diketik (maks 12) selalu kelihatan, tidak terpotong (2026-09-25).
+                SizedBox(
+                  width: double.infinity,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      TextFormatter.formatRupiah(displayPrice.toDouble()),
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: short ? 32 : 44,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.5,
+                        color: displayPrice == 0
+                            ? AppColors.disabled
+                            : AppColors.ink,
+                      ),
                     ),
                   ),
                 ),
@@ -2104,6 +2100,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                 else
                   TextField(
                     controller: _manualNoteController,
+                    minLines: 1,
+                    maxLines: 2,
                     decoration: InputDecoration(
                       labelText: langProvider.get(
                           'Note (item name)', 'Keterangan (nama item)'),
