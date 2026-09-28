@@ -285,6 +285,13 @@ class _AppDrawerState extends State<AppDrawer> {
           icon: Icons.inventory,
           route: '/stock-barang',
         ),
+      // Antrean Transaksi: nota offline yang menunggu dikirim (offline-first).
+      if (!buyerView && !isAdmin && (isSeller || isStaff))
+        MenuItem(
+          title: 'Antrean Transaksi',
+          icon: Icons.sync,
+          route: '/antrean-transaksi',
+        ),
       // Transfer Stok: kirim stok antar outlet + surat jalan (retail saja).
       if (!buyerView && !isAdmin && !isTherapy && (isSeller || isStaff))
         MenuItem(

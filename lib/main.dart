@@ -10,6 +10,9 @@ import 'providers/language_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/buyer_cart_provider.dart';
 import 'providers/buyer_order_provider.dart';
+import 'services/offline/connectivity_monitor.dart';
+import 'services/offline/sales_outbox.dart';
+import 'widgets/offline_banner.dart';
 import '../utils/storage.dart';
 import '../utils/constants.dart';
 import '../utils/navigation.dart';
@@ -106,6 +109,10 @@ Future<void> main() async {
     userProvider.setUserFromToken(accessToken);
   }
 
+  // Offline-first: monitor koneksi (ping /gold-gym/v2/ping) + antrean nota yang menunggu dikirim.
+  ConnectivityMonitor.instance.start();
+  await SalesOutbox.instance.init();
+
   runApp(MyApp(startRoute: initialRoute, userProvider: userProvider));
 }
 
@@ -144,6 +151,9 @@ class MyApp extends StatelessWidget {
         },
         routes: AppRoutes.routes,
         debugShowCheckedModeBanner: false,
+        // Banner offline / antrean transaksi di atas SEMUA layar (offline-first).
+        builder: (context, child) =>
+            OfflineBanner(navigatorKey: navigatorKey, child: child ?? const SizedBox.shrink()),
       ),
     );
   }

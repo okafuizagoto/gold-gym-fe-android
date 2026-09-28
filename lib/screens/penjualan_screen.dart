@@ -1,3 +1,7 @@
+import 'package:http/http.dart' as http;
+import '../services/offline/connectivity_monitor.dart';
+import '../services/offline/sales_outbox.dart';
+import '../services/offline/stock_cache.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
@@ -594,9 +598,12 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     super.dispose();
   }
 
+  /// Stok terakhir dari cache lokal dipakai (bukan dari server) -- tampilkan penanda di UI.
+  final ValueNotifier<DateTime?> stockCachedAt = ValueNotifier<DateTime?>(null);
+
   Future<void> getAllStock(String name, int page, int length) async {
+    final outcode = await Storage.get(AppConstants.outcode) ?? '';
     try {
-      final outcode = await Storage.get(AppConstants.outcode) ?? '';
       final stockApi = StockApi();
 
       final response = await stockApi.getAllStock(name, outcode, page, length);
@@ -608,9 +615,15 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
         final pagination = StockPagination.fromJson(data);
 
         stockPaginationNotifier.value = pagination;
+        stockCachedAt.value = null;
 
         pages = page;
         lengths = length;
+
+        // Simpan katalog lengkap (tanpa pencarian) sebagai cache offline outlet ini.
+        if (name.isEmpty && page == 1) {
+          unawaited(StockCache.save(outcode, (data as Map).cast<String, dynamic>()));
+        }
 
         // Muat diskon aktif outlet ini sekali per load stok -- dipakai
         // auto-apply saat item ditambah ke keranjang (lihat _addToCart).
@@ -620,8 +633,28 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
       }
     } catch (e) {
       print("ERROR: $e");
-      Toast.error(context, "Error fetching items");
+      // Offline-first: gagal karena jaringan -> pakai katalog terakhir dari perangkat (pencarian disaring lokal).
+      if (await _showCachedStock(outcode, name)) {
+        ConnectivityMonitor.instance.reportNetworkFailure();
+        return;
+      }
+      if (mounted) Toast.error(context, "Error fetching items");
     }
+  }
+
+  Future<bool> _showCachedStock(String outcode, String name) async {
+    final cached = await StockCache.load(outcode);
+    if (cached == null) return false;
+    final data = Map<String, dynamic>.from(cached.data);
+    if (name.isNotEmpty) {
+      final q = name.toLowerCase();
+      data['data'] = ((data['data'] ?? []) as List)
+          .where((e) => '${(e as Map)['stock_name']}'.toLowerCase().contains(q))
+          .toList();
+    }
+    stockPaginationNotifier.value = StockPagination.fromJson(data);
+    stockCachedAt.value = cached.savedAt;
+    return true;
   }
 
   Future<void> _loadActiveDiscounts(String outcode) async {
@@ -1896,6 +1929,20 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
             ],
           ),
         ),
+        ValueListenableBuilder<DateTime?>(
+          valueListenable: stockCachedAt,
+          builder: (context, at, _) => at == null
+              ? const SizedBox.shrink()
+              : Container(
+                  width: double.infinity,
+                  color: Colors.amber.shade100,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  child: Text(
+                    'Stok dari perangkat (terakhir diperbarui ${DateFormat('dd MMM HH:mm').format(at)}). Server memeriksa stok saat transaksi dikirim.',
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                ),
+        ),
         Expanded(
           child: ValueListenableBuilder<StockPagination?>(
             valueListenable: stockPaginationNotifier,
@@ -2946,7 +2993,52 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
             : '',
       );
 
-      final response = await _salesApi.insertSales(payload);
+      // Offline-first: transaksi "sederhana" (tanpa voucher/meja/booking/QRIS -- semuanya butuh server) lewat
+      // antrean lokal: disimpan di perangkat DULU, lalu dikirim; bila jaringan putus nota tetap aman dan
+      // dikirim otomatis saat online (sale_id buatan perangkat = kunci idempotensi, tidak pernah dobel).
+      final offlineEligible = cart.voucherCode == null &&
+          !cart.hasMeja &&
+          cart.bookingIds.isEmpty &&
+          (qrisOrderId == null || qrisOrderId.isEmpty);
+      http.Response response;
+      if (offlineEligible) {
+        final r = await SalesOutbox.instance.submit(payload);
+        if (r.outcome == SubmitOutcome.rejected) {
+          if (mounted) {
+            Toast.error(context, r.message ?? 'Gagal menyimpan transaksi');
+          }
+          return;
+        }
+        if (r.outcome == SubmitOutcome.queued) {
+          final hadProof = _proofImage != null;
+          cart.clear();
+          if (mounted) {
+            setState(() {
+              _customTransAt = null;
+              _proofImage = null;
+              _transactionDateController.text = DateTime.now().toString();
+              _activeTab = 0;
+            });
+            Toast.success(
+                context,
+                'Anda offline: transaksi tersimpan di perangkat dan akan dikirim otomatis saat online.' +
+                    (hadProof
+                        ? ' Foto bukti pembayaran tidak ikut -- unggah ulang dari Sales History setelah online.'
+                        : ''));
+          }
+          return;
+        }
+        response = http.Response(jsonEncode({'sale_id': r.saleId}), 200);
+      } else {
+        if (!ConnectivityMonitor.instance.isOnline) {
+          if (mounted) {
+            Toast.error(context,
+                'Anda sedang offline. Voucher, meja, booking, dan QRIS butuh koneksi -- hapus dari keranjang atau tunggu online.');
+          }
+          return;
+        }
+        response = await _salesApi.insertSales(payload);
+      }
 
       if (response.statusCode == 202 || response.statusCode == 200) {
         final body = jsonDecode(response.body);

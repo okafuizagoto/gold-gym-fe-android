@@ -13,6 +13,21 @@ class SalesApi extends ApiClient {
     return _client.post("/gold-gym/v2/sales?type=insertsales", data);
   }
 
+  /// Sinkronisasi offline: apakah nota dengan sale_id ini sudah tersimpan di server? (maks 100 id). null = gagal.
+  Future<Map<String, bool>?> saleStatuses(List<String> saleIds) async {
+    try {
+      final r = await _client.get("/gold-gym/v2/sales", queryParams: {
+        "type": "salestatus",
+        "saleids": saleIds.join(","),
+      });
+      if (r.statusCode != 200) return null;
+      final data = (jsonDecode(r.body)['data'] as Map?) ?? {};
+      return data.map((k, v) => MapEntry('$k', v == true));
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Daftar bukti pembayaran transfer milik satu nota (Sales History).
   Future<http.Response> getPaymentProofs(String saleId) {
     return _client.get("/gold-gym/v2/sales", queryParams: {
