@@ -271,6 +271,12 @@ class _AppDrawerState extends State<AppDrawer> {
                 icon: Icons.event_note_outlined,
                 route: '/absen-staff',
                 feature: 'staff_management'),
+            if (!isTherapy)
+              MenuItem(
+                  title: 'Izin Transfer Stok',
+                  icon: Icons.rule,
+                  route: '/izin-transfer-staff',
+                  feature: 'staff_management'),
           ],
         ),
       if (!buyerView && !isAdmin)
@@ -278,6 +284,13 @@ class _AppDrawerState extends State<AppDrawer> {
           title: 'Stock',
           icon: Icons.inventory,
           route: '/stock-barang',
+        ),
+      // Transfer Stok: kirim stok antar outlet + surat jalan (retail saja).
+      if (!buyerView && !isAdmin && !isTherapy && (isSeller || isStaff))
+        MenuItem(
+          title: 'Transfer Stok',
+          icon: Icons.local_shipping_outlined,
+          route: '/transfer-stok',
         ),
       if (!buyerView && !isAdmin)
         MenuItem(

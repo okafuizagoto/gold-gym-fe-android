@@ -14,6 +14,7 @@ class StaffMenuKeys {
     StaffMenuKeyOption('/meja-area', 'Meja & Area'),
     StaffMenuKeyOption('/kelola-meja', 'Kelola Meja'),
     StaffMenuKeyOption('/stock-barang', 'Stock'),
+    StaffMenuKeyOption('/transfer-stok', 'Transfer Stok'),
     StaffMenuKeyOption('/add-items', 'Add Items'),
     StaffMenuKeyOption('/diskon', 'Diskon'),
     StaffMenuKeyOption('/daftar-customer', 'Daftar Customer'),

@@ -50,6 +50,8 @@ import '../screens/staff_attendance_screen.dart';
 import '../screens/staff_clock_screen.dart';
 import '../screens/check_email_screen.dart';
 import '../screens/expense_screen.dart';
+import '../screens/stock_transfer_list_screen.dart';
+import '../screens/staff_transfer_permission_screen.dart';
 import '../screens/admin_backup_screen.dart';
 
 class AppRoutes {
@@ -105,6 +107,8 @@ class AppRoutes {
   static const String absen = '/absen';
   static const String checkEmail = '/check-email';
   static const String expense = '/expense';
+  static const String transferStok = '/transfer-stok';
+  static const String izinTransferStaff = '/izin-transfer-staff';
   static const String adminBackup = '/admin-backup';
 
   static Map<String, WidgetBuilder> get routes => {
@@ -162,6 +166,8 @@ class AppRoutes {
         absen: (context) => const StaffClockScreen(),
         checkEmail: (context) => const CheckEmailScreen(),
         expense: (context) => const ExpenseScreen(),
+        transferStok: (context) => const StockTransferListScreen(),
+        izinTransferStaff: (context) => const StaffTransferPermissionScreen(),
         adminBackup: (context) => const AdminBackupScreen(),
       };
 }
