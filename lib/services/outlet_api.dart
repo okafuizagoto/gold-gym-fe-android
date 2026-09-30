@@ -45,6 +45,15 @@ class OutletsApi extends ApiClient {
     );
   }
 
+  // PUT /gold-gym/v2/outlet/:code/queue-enabled -- aktif/nonaktifkan antrian POS outlet ini (2026-09-30).
+  Future<http.Response> setQueueEnabled(String code, bool enabled) async {
+    final ApiClient client = ApiClient();
+    return client.put(
+      "/gold-gym/v2/outlet/$code/queue-enabled",
+      {"enabled": enabled},
+    );
+  }
+
   // // GET /gold-gym/v2/userdata?type=getonestock&stockcode=XXX
   // Future<http.Response> getAllItems(
   //     String name, int page, int length) async {

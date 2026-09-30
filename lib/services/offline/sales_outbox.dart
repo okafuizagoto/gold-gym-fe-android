@@ -73,7 +73,9 @@ class SubmitResult {
   final SubmitOutcome outcome;
   final String saleId;
   final String? message;
-  SubmitResult(this.outcome, this.saleId, [this.message]);
+  /// Antrian POS (2026-09-30): diisi kalau outlet mengaktifkan antrian, hanya untuk outcome saved.
+  final int? queueNumber;
+  SubmitResult(this.outcome, this.saleId, [this.message, this.queueNumber]);
 }
 
 /// Antrean nota offline-first. Alur: nota diberi sale_id (UUID) -> DISIMPAN LOKAL DULU -> dikirim. Bila kirim
@@ -91,6 +93,9 @@ class SalesOutbox extends ChangeNotifier {
   bool _loaded = false;
   bool _syncing = false;
   Timer? _timer;
+  // Antrian POS (2026-09-30): diisi _sendOne saat berhasil, dibaca submit() sesaat setelahnya -- sama pola
+  // dengan utils/salesOutbox.ts (lastSavedQueueNumber) supaya tidak mengubah signature _Send di semua caller.
+  int? _lastSavedQueueNumber;
 
   List<OutboxSale> get items => List.unmodifiable(_items);
   int get pendingCount => _items.where((e) => e.status == OutboxStatus.pending).length;
@@ -148,7 +153,7 @@ class SalesOutbox extends ChangeNotifier {
     final res = await _sendOne(entry);
     switch (res) {
       case _Send.saved:
-        return SubmitResult(SubmitOutcome.saved, saleId);
+        return SubmitResult(SubmitOutcome.saved, saleId, null, _lastSavedQueueNumber);
       case _Send.rejected:
         final msg = entry.error;
         _items.remove(entry); // penolakan langsung: kasir masih memegang keranjang, jangan diantre
@@ -169,6 +174,12 @@ class SalesOutbox extends ChangeNotifier {
         if (st != null && st[e.saleId] == true) {
           _items.remove(e);
           await _persist();
+          try {
+            final qn = jsonDecode(resp.body)['queue_number'];
+            _lastSavedQueueNumber = qn is int ? qn : null;
+          } catch (_) {
+            _lastSavedQueueNumber = null;
+          }
           return _Send.saved;
         }
         await _persist();

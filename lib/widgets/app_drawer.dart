@@ -299,6 +299,19 @@ class _AppDrawerState extends State<AppDrawer> {
           icon: Icons.local_shipping_outlined,
           route: '/transfer-stok',
         ),
+      // Antrian POS: papan nomor antrian, aktif/nonaktifkan dari Daftar Outlet (2026-09-30).
+      if (!buyerView && !isAdmin && (isSeller || isStaff))
+        MenuItem(
+          title: 'Antrian POS',
+          icon: Icons.format_list_numbered_rounded,
+          route: '/antrian-pos',
+        ),
+      if (buyerView)
+        MenuItem(
+          title: 'Antrian Saya',
+          icon: Icons.format_list_numbered_rounded,
+          route: '/antrian-saya',
+        ),
       if (!buyerView && !isAdmin)
         MenuItem(
           title: 'Items',

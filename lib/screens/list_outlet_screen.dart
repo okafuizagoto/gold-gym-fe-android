@@ -178,6 +178,27 @@ class _OutletScreenState extends State<ListOutletScreen> {
     }
   }
 
+  Future<void> _toggleQueue(OutletResponse item) async {
+    try {
+      final response =
+          await outletsApi.setQueueEnabled(item.outlet_code, !item.queueEnabled);
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        await getAllOutlet(_outletSearchListController.text, pages, lengths);
+      } else {
+        String message = "Gagal mengubah status antrian";
+        try {
+          final body = jsonDecode(response.body);
+          if (body['error'] != null) message = body['error'];
+        } catch (_) {}
+        Toast.error(context, message);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Toast.error(context, 'Gagal mengubah status antrian');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AuthCard(
@@ -241,6 +262,7 @@ class _OutletScreenState extends State<ListOutletScreen> {
                             onSave: () => _saveEdit(items[i]),
                             onCancel: _cancelEdit,
                             onDelete: () => _confirmDeleteOutlet(items[i]),
+                            onToggleQueue: () => _toggleQueue(items[i]),
                           ),
                         ),
                       const SizedBox(height: 4),
@@ -292,6 +314,7 @@ class _OutletTile extends StatelessWidget {
   final VoidCallback onSave;
   final VoidCallback onCancel;
   final VoidCallback onDelete;
+  final VoidCallback onToggleQueue;
   final bool readOnly;
 
   const _OutletTile({
@@ -304,6 +327,7 @@ class _OutletTile extends StatelessWidget {
     required this.onSave,
     required this.onCancel,
     required this.onDelete,
+    required this.onToggleQueue,
     this.readOnly = false,
   });
 
@@ -457,6 +481,30 @@ class _OutletTile extends StatelessWidget {
                 ),
               ],
             ),
+            if (!item.deleted && !item.locked) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Icon(Icons.format_list_numbered_rounded,
+                      size: 16, color: AppColors.muted),
+                  const SizedBox(width: 6),
+                  const Text('Antrian POS', style: TextStyle(fontSize: 13)),
+                  const Spacer(),
+                  OutlinedButton(
+                    onPressed: readOnly ? null : onToggleQueue,
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor:
+                          item.queueEnabled ? AppColors.successLight : null,
+                      foregroundColor:
+                          item.queueEnabled ? AppColors.successDark : null,
+                      minimumSize: const Size(0, 32),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    child: Text(item.queueEnabled ? 'AKTIF' : 'NONAKTIF'),
+                  ),
+                ],
+              ),
+            ],
             if (!readOnly && !item.deleted) ...[
               const SizedBox(height: 10),
               Row(

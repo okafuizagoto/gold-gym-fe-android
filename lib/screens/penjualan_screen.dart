@@ -3028,7 +3028,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
           }
           return;
         }
-        response = http.Response(jsonEncode({'sale_id': r.saleId}), 200);
+        response = http.Response(
+            jsonEncode({'sale_id': r.saleId, 'queue_number': r.queueNumber}), 200);
       } else {
         if (!ConnectivityMonitor.instance.isOnline) {
           if (mounted) {
@@ -3043,6 +3044,10 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
       if (response.statusCode == 202 || response.statusCode == 200) {
         final body = jsonDecode(response.body);
         final saleId = body['sale_id']?.toString() ?? '';
+        final queueNumber = body['queue_number'];
+        if (queueNumber is int && mounted) {
+          Toast.success(context, 'Nomor antrian: $queueNumber');
+        }
         // simpan info pembayaran & total SEBELUM cart di-reset (cart.total
         // jadi 0 setelah cart.clear())
         // Transfer Bank & QRIS manual sama-sama bisa punya foto bukti

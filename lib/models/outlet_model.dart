@@ -40,6 +40,9 @@ class OutletResponse {
   /// true = sudah dihapus (hapus lunak): tetap tampil, nonaktif, tidak bisa diubah.
   final bool deleted;
 
+  /// Antrian POS (2026-09-30): kalau true, tiap nota di outlet ini dapat nomor antrian acak.
+  final bool queueEnabled;
+
   OutletResponse({
     required this.outlet_id,
     required this.outlet_gold_id,
@@ -52,6 +55,7 @@ class OutletResponse {
     this.updated_at,
     this.locked = false,
     this.deleted = false,
+    this.queueEnabled = false,
   });
 
   /// JSON → Object
@@ -72,6 +76,7 @@ class OutletResponse {
           : DateTime.tryParse('${json["updated_at"]}'),
       locked: json["locked"] == true,
       deleted: json["outlet_deleted_at"] != null,
+      queueEnabled: json["outlet_queue_enabled"] == true,
     );
   }
 

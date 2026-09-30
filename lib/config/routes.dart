@@ -55,6 +55,8 @@ import '../screens/stock_transfer_list_screen.dart';
 import '../screens/staff_transfer_permission_screen.dart';
 import '../screens/admin_backup_screen.dart';
 import '../screens/forgot_password_screen.dart';
+import '../screens/pos_queue_screen.dart';
+import '../screens/my_queue_screen.dart';
 
 class AppRoutes {
   static const String home = '/';
@@ -114,6 +116,8 @@ class AppRoutes {
   static const String izinTransferStaff = '/izin-transfer-staff';
   static const String adminBackup = '/admin-backup';
   static const String lupaPassword = '/lupa-password';
+  static const String antrianPos = '/antrian-pos';
+  static const String antrianSaya = '/antrian-saya';
 
   static Map<String, WidgetBuilder> get routes => {
         home: (context) => const HomeScreen(),
@@ -175,5 +179,7 @@ class AppRoutes {
         izinTransferStaff: (context) => const StaffTransferPermissionScreen(),
         adminBackup: (context) => const AdminBackupScreen(),
         lupaPassword: (context) => const ForgotPasswordScreen(),
+        antrianPos: (context) => const PosQueueScreen(),
+        antrianSaya: (context) => const MyQueueScreen(),
       };
 }
