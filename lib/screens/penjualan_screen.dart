@@ -3041,7 +3041,11 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
         response = await _salesApi.insertSales(payload);
       }
 
-      if (response.statusCode == 202 || response.statusCode == 200) {
+      // 201 = nota baru tersimpan (jalur voucher/meja/booking/QRIS memanggil backend langsung dan menerima
+      // 201 asli, BUKAN 200/202 -- bug lama, baru ketahuan 2026-09-30: nota tersimpan tapi tampil "gagal").
+      if (response.statusCode == 202 ||
+          response.statusCode == 201 ||
+          response.statusCode == 200) {
         final body = jsonDecode(response.body);
         final saleId = body['sale_id']?.toString() ?? '';
         final queueNumber = body['queue_number'];
