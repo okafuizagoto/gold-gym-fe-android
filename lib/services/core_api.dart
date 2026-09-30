@@ -64,6 +64,30 @@ class CoreApi extends ApiClient {
         .timeout(ApiClient.timeout);
   }
 
+  // PUT /gold-gym/v2/userdata?type=updateotp (public, tanpa token) -- kirim
+  // OTP 6 digit lupa password ke email (dipakai ForgotPasswordScreen).
+  Future<http.Response> requestPasswordResetOtp(String email) async {
+    final url = Uri.parse(
+        '${ApiClient.baseUrl}/gold-gym/v2/userdata?type=updateotp&email=${Uri.encodeQueryComponent(email)}');
+    return await http.put(url).timeout(ApiClient.timeout);
+  }
+
+  // PUT /gold-gym/v2/userdata?type=updatepassword (public, tanpa token) --
+  // cek OTP & ganti password sekaligus.
+  Future<http.Response> confirmPasswordReset(
+      String email, String otp, String newPassword) async {
+    final url = Uri.parse(
+        '${ApiClient.baseUrl}/gold-gym/v2/userdata?type=updatepassword');
+    final body = {
+      "gold_email": email,
+      "gold_otp": otp,
+      "gold_password": newPassword,
+    };
+    return await http
+        .put(url, body: jsonEncode(body))
+        .timeout(ApiClient.timeout);
+  }
+
   // GET /gold-gym/v2/userdata?type=getregistrationmode (public, tanpa token)
   // Dipanggil layar Register sebelum login, jadi TIDAK pakai ApiClient().get()
   // (itu wajib token & akan memaksa balik ke /login kalau belum ada sesi).

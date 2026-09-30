@@ -8,6 +8,7 @@ import '../utils/storage.dart';
 import '../utils/toast.dart';
 import '../utils/constants.dart';
 import '../providers/user_provider.dart';
+import '../providers/language_provider.dart';
 import '../config/env.dart';
 import '../config/theme.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -201,148 +202,186 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return AuthCard(
-      title: 'Masuk',
-      subtitle: 'Silakan masuk untuk mulai menggunakan aplikasi',
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _userController,
-              decoration: const InputDecoration(
-                labelText: 'Email / Username',
-                hintText: 'contoh: nama@email.com',
-                prefixIcon: Icon(Icons.person_outline_rounded),
-              ),
-              keyboardType: TextInputType.emailAddress,
-              autofillHints: const [AutofillHints.username],
-              textInputAction: TextInputAction.next,
-              onChanged: (_) => setState(() {}),
-              onSubmitted: (_) => _passwordFocus.requestFocus(),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _passwordController,
-              focusNode: _passwordFocus,
-              decoration: InputDecoration(
-                labelText: 'Password',
-                prefixIcon: const Icon(Icons.lock_outline_rounded),
-                suffixIcon: IconButton(
-                  tooltip: _obscurePassword
-                      ? 'Tampilkan password'
-                      : 'Sembunyikan password',
-                  icon: Icon(
-                    _obscurePassword
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
+    return Consumer<LanguageProvider>(
+      builder: (context, lang, child) => AuthCard(
+        title: lang.get('Log In', 'Masuk'),
+        subtitle: lang.get('Please log in to start using the app',
+            'Silakan masuk untuk mulai menggunakan aplikasi'),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => lang.setLanguage('ID'),
+                    child: Text('🇮🇩 ID',
+                        style: TextStyle(
+                            fontWeight: lang.isIndonesian
+                                ? FontWeight.bold
+                                : FontWeight.normal)),
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _obscurePassword = !_obscurePassword;
-                    });
-                  },
-                ),
+                  Text('/', style: TextStyle(color: AppColors.disabled)),
+                  TextButton(
+                    onPressed: () => lang.setLanguage('EN'),
+                    child: Text('🇬🇧 EN',
+                        style: TextStyle(
+                            fontWeight: lang.isEnglish
+                                ? FontWeight.bold
+                                : FontWeight.normal)),
+                  ),
+                ],
               ),
-              obscureText: _obscurePassword,
-              autofillHints: const [AutofillHints.password],
-              textInputAction: TextInputAction.done,
-              onChanged: (_) => setState(() {}),
-              onSubmitted: (_) => _handleLogin(),
-            ),
-            if (_needTotp) ...[
-              const SizedBox(height: 12),
               TextField(
-                controller: _totpController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Kode verifikasi 2 langkah',
-                  helperText:
-                      'Kode 6 digit dari authenticator, atau kode pemulihan',
-                  prefixIcon: Icon(Icons.verified_user_outlined),
+                controller: _userController,
+                decoration: InputDecoration(
+                  labelText: 'Email / Username',
+                  hintText: 'contoh: nama@email.com',
+                  prefixIcon: const Icon(Icons.person_outline_rounded),
                 ),
-                autofillHints: const [AutofillHints.oneTimeCode],
+                keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.username],
+                textInputAction: TextInputAction.next,
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) => _passwordFocus.requestFocus(),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _passwordController,
+                focusNode: _passwordFocus,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                  suffixIcon: IconButton(
+                    tooltip: _obscurePassword
+                        ? 'Tampilkan password'
+                        : 'Sembunyikan password',
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
+                ),
+                obscureText: _obscurePassword,
+                autofillHints: const [AutofillHints.password],
+                textInputAction: TextInputAction.done,
                 onChanged: (_) => setState(() {}),
                 onSubmitted: (_) => _handleLogin(),
               ),
-            ],
-            const SizedBox(height: 20),
-            SizedBox(
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _isLoading || !_canSubmit ? null : _handleLogin,
-                child: _isLoading
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text('MASUK'),
-              ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 48,
-              child: OutlinedButton(
-                onPressed: () {
-                  Navigator.pushReplacementNamed(context, '/');
-                },
-                child: const Text('KEMBALI'),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              alignment: WrapAlignment.center,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text(
-                  'Belum punya akun? ',
-                  style: textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () =>
+                      Navigator.pushNamed(context, '/lupa-password'),
+                  child: Text(lang.get('Forgot password?', 'Lupa password?')),
                 ),
-                InkWell(
-                  onTap: () => Navigator.pushNamed(context, '/register'),
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                    child: Text(
-                      'Daftarkan akunmu segera',
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: AppColors.blue,
-                        fontWeight: FontWeight.w600,
+              ),
+              if (_needTotp) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _totpController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: lang.get('2-step verification code',
+                        'Kode verifikasi 2 langkah'),
+                    helperText: lang.get(
+                        'Open your authenticator app, or use a recovery code.',
+                        'Kode 6 digit dari authenticator, atau kode pemulihan'),
+                    prefixIcon: const Icon(Icons.verified_user_outlined),
+                  ),
+                  autofillHints: const [AutofillHints.oneTimeCode],
+                  onChanged: (_) => setState(() {}),
+                  onSubmitted: (_) => _handleLogin(),
+                ),
+              ],
+              const SizedBox(height: 20),
+              SizedBox(
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: _isLoading || !_canSubmit ? null : _handleLogin,
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(lang.get('LOG IN', 'MASUK')),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 48,
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.pushReplacementNamed(context, '/');
+                  },
+                  child: Text(lang.get('BACK', 'KEMBALI')),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    '${lang.get("Don't have an account?", "Belum punya akun?")} ',
+                    style:
+                        textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+                  ),
+                  InkWell(
+                    onTap: () => Navigator.pushNamed(context, '/register'),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 2, vertical: 4),
+                      child: Text(
+                        lang.get('Register now', 'Daftarkan akunmu segera'),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: AppColors.blue,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Wrap(
-              alignment: WrapAlignment.center,
-              children: [
-                for (final (label, path) in const [
-                  ('Kebijakan Privasi', '/kebijakan-privasi'),
-                  ('Syarat & Ketentuan', '/syarat-ketentuan'),
-                  ('Hapus Akun', '/hapus-akun'),
-                ])
-                  TextButton(
-                    onPressed: () => launchUrl(_webUri(path),
-                        mode: LaunchMode.externalApplication),
-                    child: Text(label, style: textTheme.bodySmall),
-                  ),
-              ],
-            ),
-            Text(
-              '${AppConstants.appName} v${AppConstants.version}',
-              textAlign: TextAlign.center,
-              style: textTheme.bodySmall?.copyWith(color: AppColors.disabled),
-            ),
-          ],
+                ],
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                alignment: WrapAlignment.center,
+                children: [
+                  for (final (label, path) in [
+                    (lang.get('Privacy Policy', 'Kebijakan Privasi'),
+                        '/kebijakan-privasi'),
+                    (lang.get('Terms & Conditions', 'Syarat & Ketentuan'),
+                        '/syarat-ketentuan'),
+                    (lang.get('Delete Account', 'Hapus Akun'), '/hapus-akun'),
+                  ])
+                    TextButton(
+                      onPressed: () => launchUrl(_webUri(path),
+                          mode: LaunchMode.externalApplication),
+                      child: Text(label, style: textTheme.bodySmall),
+                    ),
+                ],
+              ),
+              Text(
+                '${AppConstants.appName} v${AppConstants.version}',
+                textAlign: TextAlign.center,
+                style: textTheme.bodySmall?.copyWith(color: AppColors.disabled),
+              ),
+            ],
+          ),
         ),
       ),
     );
