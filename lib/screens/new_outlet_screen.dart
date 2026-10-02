@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/outlet_api.dart';
 import '../models/outlet_model.dart';
+import '../models/location_model.dart';
 import '../utils/roles.dart';
 import '../utils/toast.dart';
 import '../widgets/auth_card.dart';
+import '../widgets/location_picker.dart';
 
 class NewOutletScreen extends StatefulWidget {
   const NewOutletScreen({super.key});
@@ -23,6 +25,8 @@ class _OutletScreenState extends State<NewOutletScreen> {
   bool _isLoading = false;
 
   ValueNotifier<bool> isActiveOutlet = ValueNotifier(true);
+  // Lokasi (2026-10-03, opsional) -- field terbaru dari LocationPicker, dibaca saat addItem/_handleOutlet.
+  LocationSelection _location = LocationSelection();
 
   @override
   void initState() {
@@ -55,6 +59,7 @@ class _OutletScreenState extends State<NewOutletScreen> {
         outlet_name: _outletNameController.text,
         outlet_address: _outletAddressController.text,
         outlet_status: isActiveOutlet.value,
+        location: _location.copy(),
       );
 
       outletsArrNotifier.value = [
@@ -64,7 +69,7 @@ class _OutletScreenState extends State<NewOutletScreen> {
 
       _outletNameController.clear();
       _outletAddressController.clear();
-      setState(() {});
+      setState(() => _location = LocationSelection());
     } else {
       Toast.error(context, 'Isi nama dan alamat outlet terlebih dahulu.');
     }
@@ -86,6 +91,7 @@ class _OutletScreenState extends State<NewOutletScreen> {
         outlet_name: _outletNameController.text,
         outlet_address: _outletAddressController.text,
         outlet_status: isActiveOutlet.value,
+        location: _location,
       );
       arrayOneOutlet = [
         ...arrayOneOutlet,
@@ -97,6 +103,7 @@ class _OutletScreenState extends State<NewOutletScreen> {
                   "outlet_name": item.outlet_name,
                   "outlet_address": item.outlet_address,
                   "outlet_status": item.outlet_status ? "ACTIVE" : "NON ACTIVE",
+                  ...?item.location?.toJson(),
                 })
             .toList()
       };
@@ -107,6 +114,7 @@ class _OutletScreenState extends State<NewOutletScreen> {
                   "outlet_name": item.outlet_name,
                   "outlet_address": item.outlet_address,
                   "outlet_status": item.outlet_status ? "ACTIVE" : "NON ACTIVE",
+                  ...?item.location?.toJson(),
                 })
             .toList()
       };
@@ -126,6 +134,7 @@ class _OutletScreenState extends State<NewOutletScreen> {
         outletsArrNotifier.value = [];
         _outletNameController.clear();
         _outletAddressController.clear();
+        _location = LocationSelection();
         Toast.success(context, 'Outlet berhasil disimpan');
         Navigator.pushReplacementNamed(context, '/outlet');
       } else {
@@ -173,6 +182,10 @@ class _OutletScreenState extends State<NewOutletScreen> {
                 alignLabelWithHint: true,
               ),
               onChanged: (_) => setState(() {}),
+            ),
+            LocationPicker(
+              key: ValueKey('loc-picker-${outletsArrNotifier.value.length}'),
+              onChanged: (sel) => _location = sel,
             ),
             const SizedBox(height: 10),
 
