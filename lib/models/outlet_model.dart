@@ -1,22 +1,28 @@
 // import 'dart:nativewrappers/_internal/vm/lib/ffi_native_type_patch.dart';
 import 'dart:typed_data';
+import 'location_model.dart';
 
 class Outlet {
   String outlet_name;
   String outlet_address;
   bool outlet_status;
 
+  /// Lokasi (2026-10-03, opsional) -- lihat lib/widgets/location_picker.dart.
+  LocationSelection? location;
+
   Outlet({
     required this.outlet_name,
     required this.outlet_address,
     required this.outlet_status,
+    this.location,
   });
 
   Map<String, dynamic> toJson() {
     return {
       "outlet_name": outlet_name,
       "outlet_address": outlet_address,
-      "outlet_status": outlet_status
+      "outlet_status": outlet_status,
+      ...?location?.toJson(),
     };
   }
 }
@@ -43,6 +49,10 @@ class OutletResponse {
   /// Antrian POS (2026-09-30): kalau true, tiap nota di outlet ini dapat nomor antrian acak.
   final bool queueEnabled;
 
+  /// Lokasi (2026-10-03, opsional): nama wilayah gabungan, mis. "Dago, Coblong, Kota Bandung, Jawa
+  /// Barat" -- kosong kalau outlet belum diisi lokasi. Dihitung backend, bukan disimpan.
+  final String locationLabel;
+
   OutletResponse({
     required this.outlet_id,
     required this.outlet_gold_id,
@@ -56,6 +66,7 @@ class OutletResponse {
     this.locked = false,
     this.deleted = false,
     this.queueEnabled = false,
+    this.locationLabel = '',
   });
 
   /// JSON → Object
@@ -77,6 +88,7 @@ class OutletResponse {
       locked: json["locked"] == true,
       deleted: json["outlet_deleted_at"] != null,
       queueEnabled: json["outlet_queue_enabled"] == true,
+      locationLabel: json["location_label"] ?? "",
     );
   }
 

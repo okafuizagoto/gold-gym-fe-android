@@ -481,6 +481,25 @@ class _OutletTile extends StatelessWidget {
                 ),
               ],
             ),
+            // Lokasi (2026-10-03, opsional): bedakan outlet bernama sama di kota berbeda.
+            if (item.locationLabel.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.map_outlined, size: 16, color: AppColors.muted),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      item.locationLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             if (!item.deleted && !item.locked) ...[
               const SizedBox(height: 10),
               Row(
