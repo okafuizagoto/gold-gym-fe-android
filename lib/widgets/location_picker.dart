@@ -15,7 +15,8 @@ class LocationPicker extends StatefulWidget {
   final void Function(LocationSelection) onChanged;
   final int? initialDivisionId;
 
-  const LocationPicker({super.key, required this.onChanged, this.initialDivisionId});
+  const LocationPicker(
+      {super.key, required this.onChanged, this.initialDivisionId});
 
   @override
   State<LocationPicker> createState() => _LocationPickerState();
@@ -77,7 +78,8 @@ class _LocationPickerState extends State<LocationPicker> {
     }
   }
 
-  Future<void> _loadLevel(int levelIndex, {required int? parentId, bool keepSelection = false}) async {
+  Future<void> _loadLevel(int levelIndex,
+      {required int? parentId, bool keepSelection = false}) async {
     setState(() => _loading[levelIndex] = true);
     try {
       final res = await _api.getDivisions(
@@ -129,45 +131,113 @@ class _LocationPickerState extends State<LocationPicker> {
       level2Id: _selected[1],
       level3Id: _selected[2],
       level4Id: _selected[3],
-      postalCode: _postalController.text.trim().isEmpty ? null : _postalController.text.trim(),
+      postalCode: _postalController.text.trim().isEmpty
+          ? null
+          : _postalController.text.trim(),
     );
     widget.onChanged(sel);
   }
 
-  static const _levelLabels = ['Provinsi', 'Kabupaten/Kota', 'Kecamatan', 'Kelurahan/Desa'];
+  static const _levelLabels = [
+    'Provinsi',
+    'Kabupaten/Kota',
+    'Kecamatan',
+    'Kelurahan/Desa'
+  ];
+
+  // Level 2 (index 1) dipisah jadi 2 dropdown terpisah -- Kabupaten & Kota -- bukan 1 daftar gabungan,
+  // supaya user tidak perlu scroll campur aduk 514 nama. Nama di sumber data SELALU diawali kata
+  // "Kabupaten" atau "Kota" (diverifikasi: 416 Kabupaten, 98 Kota, tidak ada pengecualian), jadi aman
+  // dipisah murni dari prefix nama, bukan field terpisah di API.
+  List<LocationDivision> get _kabupatenOptions =>
+      _options[1].where((d) => d.name.startsWith('Kabupaten')).toList();
+  List<LocationDivision> get _kotaOptions =>
+      _options[1].where((d) => d.name.startsWith('Kota')).toList();
+
+  Widget _buildDropdown({
+    required String label,
+    required List<LocationDivision> options,
+    required int? value,
+    required bool loading,
+    required void Function(int?) onChanged,
+    required Key key,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: DropdownButtonFormField<int>(
+        key: key,
+        initialValue: value,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: const Icon(Icons.map_outlined),
+          suffixIcon: loading
+              ? const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2)),
+                )
+              : null,
+        ),
+        items: [
+          for (final d in options)
+            DropdownMenuItem(value: d.divisionId, child: Text(d.name)),
+        ],
+        onChanged: loading ? null : onChanged,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     if (_initLoading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
-        child: Center(child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+        child: Center(
+            child: SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2))),
       );
     }
+    final selectedIsKabupaten =
+        _kabupatenOptions.any((d) => d.divisionId == _selected[1]);
+    final selectedIsKota =
+        _kotaOptions.any((d) => d.divisionId == _selected[1]);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (var level = 0; level < 4; level++) ...[
           if (level == 0 || _selected[level - 1] != null) ...[
-            if (_options[level].isNotEmpty || _loading[level]) ...[
-              const SizedBox(height: 14),
-              DropdownButtonFormField<int>(
-                key: ValueKey('loc-level-$level-${_selected[level - 1].toString()}'),
-                initialValue: _selected[level],
-                decoration: InputDecoration(
-                  labelText: _levelLabels[level],
-                  prefixIcon: const Icon(Icons.map_outlined),
-                  suffixIcon: _loading[level]
-                      ? const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                        )
-                      : null,
+            if (level == 1) ...[
+              if (_kabupatenOptions.isNotEmpty || _loading[1])
+                _buildDropdown(
+                  key: ValueKey('loc-kabupaten-${_selected[0]}'),
+                  label: 'Kabupaten',
+                  options: _kabupatenOptions,
+                  value: selectedIsKabupaten ? _selected[1] : null,
+                  loading: _loading[1],
+                  onChanged: (v) => _onSelect(1, v),
                 ),
-                items: [
-                  for (final d in _options[level]) DropdownMenuItem(value: d.divisionId, child: Text(d.name)),
-                ],
-                onChanged: _loading[level] ? null : (v) => _onSelect(level, v),
+              if (_kotaOptions.isNotEmpty || _loading[1])
+                _buildDropdown(
+                  key: ValueKey('loc-kota-${_selected[0]}'),
+                  label: 'Kota',
+                  options: _kotaOptions,
+                  value: selectedIsKota ? _selected[1] : null,
+                  loading: _loading[1],
+                  onChanged: (v) => _onSelect(1, v),
+                ),
+            ] else if (_options[level].isNotEmpty || _loading[level]) ...[
+              _buildDropdown(
+                key: ValueKey(
+                    'loc-level-$level-${_selected[level - 1].toString()}'),
+                label: _levelLabels[level],
+                options: _options[level],
+                value: _selected[level],
+                loading: _loading[level],
+                onChanged: (v) => _onSelect(level, v),
               ),
             ],
           ],
