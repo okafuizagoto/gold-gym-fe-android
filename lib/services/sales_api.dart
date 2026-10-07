@@ -93,7 +93,8 @@ class SalesApi extends ApiClient {
   }
 
   /// ADMIN: simpan akses POS-tanpa-customer untuk sekumpulan outlet yang tampil.
-  Future<http.Response> savePosCustomerAccess(List<Map<String, dynamic>> items) {
+  Future<http.Response> savePosCustomerAccess(
+      List<Map<String, dynamic>> items) {
     return _client
         .post("/gold-gym/v2/sales?type=savecustomeraccess", {"items": items});
   }
@@ -115,8 +116,8 @@ class SalesApi extends ApiClient {
 
   /// ADMIN: nyalakan/matikan fitur bukti pembayaran untuk SEMUA user.
   Future<http.Response> saveProofAccessGlobal(bool enabled) {
-    return _client.post(
-        "/gold-gym/v2/sales?type=saveproofglobal", {"enabled": enabled});
+    return _client
+        .post("/gold-gym/v2/sales?type=saveproofglobal", {"enabled": enabled});
   }
 
   /// ADMIN: daftar SEMUA outlet (RETAIL & THERAPY) + status aktif/nonaktif
@@ -135,6 +136,14 @@ class SalesApi extends ApiClient {
         .post("/gold-gym/v2/sales?type=saveproofoutlets", {"items": items});
   }
 
+  /// ADMIN: nyalakan/matikan fitur bukti pembayaran untuk SEMUA outlet
+  /// sekaligus (2026-10-07) -- beda dari saveProofAccessOutlets yang
+  /// terikat hasil pencarian yang sedang tampil.
+  Future<http.Response> saveProofAccessOutletsAll(bool enabled) {
+    return _client.post(
+        "/gold-gym/v2/sales?type=saveproofoutletsall", {"enabled": enabled});
+  }
+
   /// ADMIN: daftar user (penjual retail/therapy & pembeli) + status
   /// aktif/nonaktif fitur bukti pembayaran. name mencocokkan nama ATAU email.
   Future<http.Response> getProofAccessUsers(String name) {
@@ -145,10 +154,17 @@ class SalesApi extends ApiClient {
 
   /// ADMIN: simpan status aktif/nonaktif fitur bukti pembayaran untuk
   /// sekumpulan user yang sedang tampil.
-  Future<http.Response> saveProofAccessUsers(
-      List<Map<String, dynamic>> items) {
+  Future<http.Response> saveProofAccessUsers(List<Map<String, dynamic>> items) {
     return _client
         .post("/gold-gym/v2/sales?type=saveproofusers", {"items": items});
+  }
+
+  /// ADMIN: nyalakan/matikan fitur bukti pembayaran untuk SEMUA user
+  /// sekaligus (2026-10-07) -- beda dari saveProofAccessUsers yang terikat
+  /// hasil pencarian yang sedang tampil.
+  Future<http.Response> saveProofAccessUsersAll(bool enabled) {
+    return _client.post(
+        "/gold-gym/v2/sales?type=saveproofusersall", {"enabled": enabled});
   }
 
   Future<http.Response> getAllSales(
@@ -187,8 +203,7 @@ class SalesApi extends ApiClient {
   /// Dashboard tren penjualan: total harian (gap-filled) + KPI ringkas +
   /// perbandingan periode sebelumnya + top 5 item. `from`/`to` kosong ->
   /// backend default 30 hari terakhir.
-  Future<http.Response> getSalesTrend(
-      String outcode, String from, String to) {
+  Future<http.Response> getSalesTrend(String outcode, String from, String to) {
     final query = {"type": "dashboardtrend", "code": outcode};
     if (from.isNotEmpty) query["from"] = from;
     if (to.isNotEmpty) query["to"] = to;
@@ -210,8 +225,7 @@ class SalesApi extends ApiClient {
 
   /// Admin/penjual menandai transaksi BELUM LUNAS menjadi LUNAS.
   Future<http.Response> markPaid(String saleId) {
-    return _client.put(
-        "/gold-gym/v2/sales?type=markpaid&saleid=$saleId", {});
+    return _client.put("/gold-gym/v2/sales?type=markpaid&saleid=$saleId", {});
   }
 
   /// Ambil nota PDF dari backend. Return null jika belum tersedia/gagal.
