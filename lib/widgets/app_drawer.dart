@@ -372,6 +372,15 @@ class _AppDrawerState extends State<AppDrawer> {
           icon: Icons.swap_horiz,
           route: '/switch-buyer',
         ),
+      // Daftar Penjual (2026-10-07, kebalikan Daftar Pembeli): hanya untuk akun yang BENAR-BENAR
+      // BUYER (bukan SELLER yang sedang buyerView) -- upgrade gold_role jadi SELLER, tetap bisa
+      // pakai Mode Pembeli setelahnya.
+      if (isRealBuyer)
+        MenuItem(
+          title: 'Daftar Penjual',
+          icon: Icons.storefront_outlined,
+          route: '/daftar-penjual',
+        ),
       if (!isRealBuyer && buyerView && !isAdmin && !isStaff)
         MenuItem(
           title: 'Mode Penjual',

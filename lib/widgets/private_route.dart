@@ -10,11 +10,20 @@ import '../utils/subscription_state.dart';
 /// - [sellerOnly] true dan role BUYER → redirect ke layar belanja pembeli
 ///   (menu khusus penjual/admin: dashboard, POS penjual, stock, add items,
 ///   daftar pembeli, add menu)
+/// - [buyerOnly] true dan role BUKAN BUYER → redirect ke dashboard (menu
+///   "Daftar Penjual", 2026-10-07 — kebalikan sellerOnly, akun yang sudah
+///   SELLER tidak relevan dengan layar ini)
 class PrivateRoute extends StatefulWidget {
   final Widget child;
   final bool sellerOnly;
+  final bool buyerOnly;
 
-  const PrivateRoute({super.key, required this.child, this.sellerOnly = false});
+  const PrivateRoute({
+    super.key,
+    required this.child,
+    this.sellerOnly = false,
+    this.buyerOnly = false,
+  });
 
   @override
   State<PrivateRoute> createState() => _PrivateRouteState();
@@ -145,6 +154,14 @@ class _PrivateRouteState extends State<PrivateRoute> {
             snapshot.data?['role'] == AppConstants.roleBuyer) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Navigator.pushReplacementNamed(context, '/belanja');
+          });
+          return const SizedBox.shrink();
+        }
+
+        if (widget.buyerOnly &&
+            snapshot.data?['role'] != AppConstants.roleBuyer) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Navigator.pushReplacementNamed(context, '/');
           });
           return const SizedBox.shrink();
         }

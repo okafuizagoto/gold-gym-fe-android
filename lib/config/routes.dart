@@ -16,6 +16,7 @@ import '../screens/forbidden_403_screen.dart';
 import '../screens/register_screen.dart';
 import '../screens/booking_screen.dart';
 import '../screens/seller_register_buyer_screen.dart';
+import '../screens/buyer_register_seller_screen.dart';
 import '../screens/buyer_catalog_screen.dart';
 import '../screens/buyer_choose_outlet_screen.dart';
 import '../screens/buyer_order_shop_screen.dart';
@@ -77,6 +78,7 @@ class AppRoutes {
   static const String booking = '/booking';
   static const String belanja = '/belanja';
   static const String daftarPembeli = '/daftar-pembeli';
+  static const String daftarPenjual = '/daftar-penjual';
   static const String listBarang = '/list-barang';
   static const String pilihOutlet = '/pilih-outlet';
   static const String pesananSaya = '/pesanan-saya';
@@ -138,6 +140,7 @@ class AppRoutes {
         booking: (context) => const BookingScreen(),
         belanja: (context) => const BuyerOrderShopScreen(),
         daftarPembeli: (context) => const SellerRegisterBuyerScreen(),
+        daftarPenjual: (context) => const BuyerRegisterSellerScreen(),
         listBarang: (context) => const BuyerCatalogScreen(),
         pilihOutlet: (context) => const BuyerChooseOutletScreen(),
         pesananSaya: (context) => const BuyerOrdersScreen(),
