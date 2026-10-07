@@ -201,6 +201,121 @@ class _AdminProofAccessScreenState extends State<AdminProofAccessScreen>
     }
   }
 
+  /// Tombol "Aktifkan/Nonaktifkan SEMUA outlet" (2026-10-07) -- beda dari
+  /// _saveOutlets yang cuma menyentuh outlet yang sedang tampil di pencarian,
+  /// ini menimpa SEMUA outlet aktif sekaligus. Dikonfirmasi dulu karena
+  /// dampaknya luas & langsung (tidak lewat tombol SIMPAN terpisah).
+  Future<void> _toggleAllOutlets(bool enabled) async {
+    final confirmed = await _confirmBulk(
+      title: enabled ? 'Aktifkan SEMUA outlet?' : 'Nonaktifkan SEMUA outlet?',
+      message: enabled
+          ? 'Fitur bukti pembayaran akan diaktifkan untuk SEMUA outlet, '
+              'terlepas dari pencarian yang sedang tampil.'
+          : 'Fitur bukti pembayaran akan dinonaktifkan untuk SEMUA outlet, '
+              'terlepas dari pencarian yang sedang tampil.',
+    );
+    if (!confirmed) return;
+    setState(() => _outletsSaving = true);
+    try {
+      final resp = await _salesApi.saveProofAccessOutletsAll(enabled);
+      if (resp.statusCode == 200) {
+        if (mounted) {
+          Toast.success(
+              context,
+              enabled
+                  ? 'Semua outlet diaktifkan'
+                  : 'Semua outlet dinonaktifkan');
+        }
+        await _loadOutlets(_outletSearchController.text);
+      } else if (mounted) {
+        Toast.error(context, 'Gagal menyimpan');
+      }
+    } catch (_) {
+      if (mounted) Toast.error(context, 'Gagal menyimpan');
+    } finally {
+      if (mounted) setState(() => _outletsSaving = false);
+    }
+  }
+
+  /// Tombol "Aktifkan/Nonaktifkan SEMUA user" (2026-10-07) -- padanan
+  /// _toggleAllOutlets, untuk tab Per User.
+  Future<void> _toggleAllUsers(bool enabled) async {
+    final confirmed = await _confirmBulk(
+      title: enabled ? 'Aktifkan SEMUA user?' : 'Nonaktifkan SEMUA user?',
+      message: enabled
+          ? 'Fitur bukti pembayaran akan diaktifkan untuk SEMUA akun '
+              '(penjual & pembeli), terlepas dari pencarian yang sedang tampil.'
+          : 'Fitur bukti pembayaran akan dinonaktifkan untuk SEMUA akun '
+              '(penjual & pembeli), terlepas dari pencarian yang sedang tampil.',
+    );
+    if (!confirmed) return;
+    setState(() => _usersSaving = true);
+    try {
+      final resp = await _salesApi.saveProofAccessUsersAll(enabled);
+      if (resp.statusCode == 200) {
+        if (mounted) {
+          Toast.success(context,
+              enabled ? 'Semua user diaktifkan' : 'Semua user dinonaktifkan');
+        }
+        await _loadUsers(_userSearchController.text);
+      } else if (mounted) {
+        Toast.error(context, 'Gagal menyimpan');
+      }
+    } catch (_) {
+      if (mounted) Toast.error(context, 'Gagal menyimpan');
+    } finally {
+      if (mounted) setState(() => _usersSaving = false);
+    }
+  }
+
+  Future<bool> _confirmBulk(
+      {required String title, required String message}) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('BATAL'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('YA, LANJUTKAN'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  Widget _bulkToggleButtons(
+      {required bool busy,
+      required VoidCallback onEnableAll,
+      required VoidCallback onDisableAll}) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: busy ? null : onEnableAll,
+            icon: const Icon(Icons.visibility_outlined, size: 18),
+            label: const Text('AKTIFKAN SEMUA'),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(foregroundColor: AppColors.error),
+            onPressed: busy ? null : onDisableAll,
+            icon: const Icon(Icons.visibility_off_outlined, size: 18),
+            label: const Text('NONAKTIFKAN SEMUA'),
+          ),
+        ),
+      ],
+    );
+  }
+
   Future<void> _loadUsers(String search) async {
     setState(() => _usersLoading = true);
     try {
@@ -343,6 +458,12 @@ class _AdminProofAccessScreenState extends State<AdminProofAccessScreen>
                       const Duration(milliseconds: 450), () => _loadOutlets(v));
                 },
               ),
+              const SizedBox(height: 8),
+              _bulkToggleButtons(
+                busy: _outletsSaving,
+                onEnableAll: () => _toggleAllOutlets(true),
+                onDisableAll: () => _toggleAllOutlets(false),
+              ),
               if (!context.isShort) ...[
                 const SizedBox(height: 6),
                 Text(
@@ -412,6 +533,12 @@ class _AdminProofAccessScreenState extends State<AdminProofAccessScreen>
                   _userDebounce = Timer(
                       const Duration(milliseconds: 450), () => _loadUsers(v));
                 },
+              ),
+              const SizedBox(height: 8),
+              _bulkToggleButtons(
+                busy: _usersSaving,
+                onEnableAll: () => _toggleAllUsers(true),
+                onDisableAll: () => _toggleAllUsers(false),
               ),
               if (!context.isShort) ...[
                 const SizedBox(height: 6),
