@@ -31,6 +31,15 @@ class CoreApi extends ApiClient {
     return client.put("/gold-gym/v2/userdata/buyer", {});
   }
 
+  // PUT /gold-gym/v2/userdata/seller (wajib token, hanya role BUYER) — konfirmasi "daftar sebagai
+  // penjual" (2026-10-07, kebalikan registerAsBuyer): ubah gold_role jadi SELLER (gold_buyer_yn
+  // TETAP Y, tetap bisa pakai Mode Pembeli). Respons berbentuk sama seperti login (data+metadata)
+  // karena backend menerbitkan token baru -- lihat LoginResponseModel.fromJson.
+  Future<http.Response> upgradeToSeller() async {
+    final ApiClient client = ApiClient();
+    return client.put("/gold-gym/v2/userdata/seller", {});
+  }
+
   // PUT /gold-gym/v2/userdata/toko (wajib token) — simpan nama toko akun
   // sendiri; saat belanja sebagai pembeli, nota menampilkan nama toko ini.
   Future<http.Response> setToko(String toko) async {
@@ -217,7 +226,8 @@ class CoreApi extends ApiClient {
   // transfer bank di POS, cuma cara tampil kode QR ke pembeli.
 
   /// Upload/ganti foto QRIS milik satu outlet (multipart, maks 2 MB).
-  Future<http.Response> uploadOutletQrisPhoto(String outletCode, File file) async {
+  Future<http.Response> uploadOutletQrisPhoto(
+      String outletCode, File file) async {
     final headers = await getAuthHeaders();
     final uri = Uri.parse(
         '${ApiClient.baseUrl}/gold-gym/v2/userdata/outlet/$outletCode/qris-photo');
