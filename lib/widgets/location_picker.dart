@@ -213,7 +213,13 @@ class _LocationPickerState extends State<LocationPicker> {
             if (level == 1) ...[
               if (_kabupatenOptions.isNotEmpty || _loading[1])
                 _buildDropdown(
-                  key: ValueKey('loc-kabupaten-${_selected[0]}'),
+                  // KOREKSI 2026-10-09: key HARUS ikut nilai yang ditampilkan widget ini sendiri
+                  // (bukan cuma induknya) -- DropdownButtonFormField.initialValue TIDAK reaktif
+                  // (dibaca cuma sekali saat widget dibuat), jadi tanpa ini, berpindah Kabupaten<->Kota
+                  // (yang berbagi slot _selected[1] yang sama) tidak memicu Flutter membuat ulang
+                  // widget & tampilan desync/tampak "terhapus" dari yang sebenarnya tersimpan.
+                  key: ValueKey(
+                      'loc-kabupaten-${_selected[0]}-${selectedIsKabupaten ? _selected[1] : null}'),
                   label: 'Kabupaten',
                   options: _kabupatenOptions,
                   value: selectedIsKabupaten ? _selected[1] : null,
@@ -222,7 +228,8 @@ class _LocationPickerState extends State<LocationPicker> {
                 ),
               if (_kotaOptions.isNotEmpty || _loading[1])
                 _buildDropdown(
-                  key: ValueKey('loc-kota-${_selected[0]}'),
+                  key: ValueKey(
+                      'loc-kota-${_selected[0]}-${selectedIsKota ? _selected[1] : null}'),
                   label: 'Kota',
                   options: _kotaOptions,
                   value: selectedIsKota ? _selected[1] : null,
@@ -232,7 +239,7 @@ class _LocationPickerState extends State<LocationPicker> {
             ] else if (_options[level].isNotEmpty || _loading[level]) ...[
               _buildDropdown(
                 key: ValueKey(
-                    'loc-level-$level-${_selected[level - 1].toString()}'),
+                    'loc-level-$level-${_selected[level - 1].toString()}-${_selected[level]}'),
                 label: _levelLabels[level],
                 options: _options[level],
                 value: _selected[level],
