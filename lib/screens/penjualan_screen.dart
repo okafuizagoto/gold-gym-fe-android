@@ -122,8 +122,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
           title: const Text('Foto Bukti Pembayaran'),
           children: [
             SimpleDialogOption(
-              onPressed: () =>
-                  Navigator.pop(dialogContext, ImageSource.camera),
+              onPressed: () => Navigator.pop(dialogContext, ImageSource.camera),
               child: const Row(children: [
                 Icon(Icons.photo_camera),
                 SizedBox(width: 8),
@@ -328,26 +327,36 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
               selected: manual,
               onSelected: (_) => setState(() => _customerMode = 'MANUAL'),
             ),
+            ChoiceChip(
+              label: Text(langProvider.get('No Name', 'Tanpa Nama')),
+              selected: _customerMode == 'TANPA_NAMA',
+              onSelected: (_) => setState(() {
+                _customerMode = 'TANPA_NAMA';
+                _receiptController.clear();
+              }),
+            ),
           ],
         ),
         const SizedBox(height: 8),
-        TextField(
-          controller: _receiptController,
-          readOnly: !manual,
-          style: const TextStyle(fontSize: 13),
-          onTap: manual
-              ? null
-              : () =>
-                  _customerMode == 'PESERTA' ? _pickPeserta() : _pickCustomer(),
-          decoration: InputDecoration(
-            isDense: true,
-            labelText: (_customerRequired && !isTherapy)
-                ? '${langProvider.get('Customer Name', 'Nama Customer')} *'
-                : langProvider.get('Customer Name', 'Nama Customer'),
-            prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
-            suffixIcon: manual ? null : const Icon(Icons.search_rounded),
+        if (_customerMode != 'TANPA_NAMA')
+          TextField(
+            controller: _receiptController,
+            readOnly: !manual,
+            style: const TextStyle(fontSize: 13),
+            onTap: manual
+                ? null
+                : () => _customerMode == 'PESERTA'
+                    ? _pickPeserta()
+                    : _pickCustomer(),
+            decoration: InputDecoration(
+              isDense: true,
+              labelText: (_customerRequired && !isTherapy)
+                  ? '${langProvider.get('Customer Name', 'Nama Customer')} *'
+                  : langProvider.get('Customer Name', 'Nama Customer'),
+              prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
+              suffixIcon: manual ? null : const Icon(Icons.search_rounded),
+            ),
           ),
-        ),
         if (isTherapy) ...[
           const SizedBox(height: 4),
           SwitchListTile(
@@ -622,7 +631,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
 
         // Simpan katalog lengkap (tanpa pencarian) sebagai cache offline outlet ini.
         if (name.isEmpty && page == 1) {
-          unawaited(StockCache.save(outcode, (data as Map).cast<String, dynamic>()));
+          unawaited(
+              StockCache.save(outcode, (data as Map).cast<String, dynamic>()));
         }
 
         // Muat diskon aktif outlet ini sekali per load stok -- dipakai
@@ -1936,7 +1946,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
               : Container(
                   width: double.infinity,
                   color: Colors.amber.shade100,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   child: Text(
                     'Stok dari perangkat (terakhir diperbarui ${DateFormat('dd MMM HH:mm').format(at)}). Server memeriksa stok saat transaksi dikirim.',
                     style: const TextStyle(fontSize: 11),
@@ -2001,7 +2012,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                   : ClipRRect(
                       borderRadius: BorderRadius.circular(10),
                       child: FutureNetworkImage(
-                        urlLoader: () => ItemsApi().itemPhotoUrl(stock.stock_item_id),
+                        urlLoader: () =>
+                            ItemsApi().itemPhotoUrl(stock.stock_item_id),
                         fit: BoxFit.cover,
                         errorBuilder: (_) => Icon(
                           stock.isTherapy
@@ -2929,9 +2941,11 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
   /// backend memasukkan ke antrian Kafka lalu consumer insert ke database.
   Future<void> _saveTransaction(BuildContext context, CartProvider cart,
       LanguageProvider langProvider) async {
-    // customer wajib untuk RETAIL yang belum diberi akses "POS tanpa customer"
+    // customer wajib untuk RETAIL yang belum diberi akses "POS tanpa customer" --
+    // KECUALI kasir sengaja memilih "Tanpa Nama" (pilihan eksplisit, bukan field kosong tak sengaja).
     if (_customerRequired &&
         _outletType != AppConstants.outletTherapy &&
+        _customerMode != 'TANPA_NAMA' &&
         _receiptController.text.trim().isEmpty) {
       Toast.error(context, 'Nama customer wajib diisi');
       return;
@@ -2979,9 +2993,11 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
       final payload = cart.buildInsertPayload(
         outcode: outcode,
         salesPerson: _salesPersonController.text,
-        salesCustomer: _receiptController.text,
-        customerSource:
-            _receiptController.text.trim().isEmpty ? '' : _customerMode,
+        salesCustomer:
+            _customerMode == 'TANPA_NAMA' ? '' : _receiptController.text,
+        customerSource: _customerMode == 'TANPA_NAMA'
+            ? 'TANPA_NAMA'
+            : (_receiptController.text.trim().isEmpty ? '' : _customerMode),
         customerShow: _customerShow ? 'Y' : 'N',
         qrisOrderId: qrisOrderId,
         // waktu transaksi manual (khusus ADMIN); kosong = live
@@ -3029,7 +3045,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
           return;
         }
         response = http.Response(
-            jsonEncode({'sale_id': r.saleId, 'queue_number': r.queueNumber}), 200);
+            jsonEncode({'sale_id': r.saleId, 'queue_number': r.queueNumber}),
+            200);
       } else {
         if (!ConnectivityMonitor.instance.isOnline) {
           if (mounted) {

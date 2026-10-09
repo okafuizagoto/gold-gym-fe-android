@@ -36,6 +36,17 @@ class BackupApi extends ApiClient {
     return rows.map((e) => BackupRecord.fromJson(e)).toList();
   }
 
+  /// GET /gold-gym/v2/backup/total-by-environment (2026-10-10) -- total ukuran backup SUKSES
+  /// (bytes) per environment, dipakai menu admin "Penggunaan Storage".
+  Future<Map<String, int>> totalByEnvironment() async {
+    final response =
+        await _client.get('/gold-gym/v2/backup/total-by-environment');
+    if (response.statusCode != 200) return {};
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = (body['data'] as Map?) ?? {};
+    return data.map((k, v) => MapEntry(k.toString(), (v as num).toInt()));
+  }
+
   /// GET /gold-gym/v2/backup/:id/download -- presigned URL B2.
   Future<String?> downloadUrl(int backupId) async {
     final response =

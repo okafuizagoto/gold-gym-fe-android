@@ -192,6 +192,11 @@ class _AppDrawerState extends State<AppDrawer> {
               route: '/admin-langganan-tampilan',
             ),
             MenuItem(
+              title: 'Harga & Diskon Paket',
+              icon: Icons.sell_outlined,
+              route: '/admin-plan-pricing',
+            ),
+            MenuItem(
               title: 'Akses Daftar Pembeli',
               icon: Icons.person_add_alt,
               route: '/admin-akses-daftar-pembeli',

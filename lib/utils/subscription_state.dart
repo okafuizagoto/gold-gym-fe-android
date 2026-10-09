@@ -83,6 +83,12 @@ class PlanDef {
   final int maxOutlets;
   final int maxUsers;
   final List<String> features;
+  // Diisi backend HANYA kalau diskon aktif (menu admin "Harga & Diskon Paket", 2026-10-10) --
+  // priceMonthly/priceYearly DI ATAS SUDAH harga final (setelah diskon); dua field ini harga
+  // ASLI sebelum diskon, untuk ditampilkan dicoret.
+  final int originalPriceMonthly;
+  final int originalPriceYearly;
+  final double discountPercent;
 
   const PlanDef({
     required this.id,
@@ -92,7 +98,12 @@ class PlanDef {
     required this.maxOutlets,
     required this.maxUsers,
     required this.features,
+    this.originalPriceMonthly = 0,
+    this.originalPriceYearly = 0,
+    this.discountPercent = 0,
   });
+
+  bool get hasDiscount => discountPercent > 0;
 
   factory PlanDef.fromJson(Map<String, dynamic> d) => PlanDef(
         id: '${d['id'] ?? ''}',
@@ -107,6 +118,15 @@ class PlanDef {
         features: (d['features'] is List)
             ? (d['features'] as List).map((e) => '$e').toList()
             : const <String>[],
+        originalPriceMonthly: d['original_price_monthly'] is num
+            ? (d['original_price_monthly'] as num).toInt()
+            : 0,
+        originalPriceYearly: d['original_price_yearly'] is num
+            ? (d['original_price_yearly'] as num).toInt()
+            : 0,
+        discountPercent: d['discount_percent'] is num
+            ? (d['discount_percent'] as num).toDouble()
+            : 0,
       );
 }
 
