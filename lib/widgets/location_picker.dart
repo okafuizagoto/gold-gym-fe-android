@@ -1,22 +1,39 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/location_model.dart';
+import '../providers/language_provider.dart';
 import '../services/location_api.dart';
 
-/// 4 dropdown berjenjang (negara disembunyikan selama cuma Indonesia yang didukung -- lihat
-/// rancangan deploy-notes/.../30-RANCANGAN-FITUR-LOKASI-OUTLET.md §6). Tiap dropdown anak
-/// disabled+kosong sampai induknya dipilih. Level 3/4 otomatis tidak tampil kalau backend belum
-/// punya data untuk level itu (mis. kecamatan/kelurahan belum di-seed) -- tidak di-hardcode "cuma
-/// 2 level", murni mengikuti apa yang dikembalikan API.
+/// Dropdown berjenjang lokasi (negara disembunyikan selama cuma Indonesia yang didukung -- lihat
+/// rancangan deploy-notes/.../30-RANCANGAN-FITUR-LOKASI-OUTLET.md §6).
 ///
-/// Opsional: isi [initialSelection] (division_level4_id atau level terdalam yang tersedia) untuk
-/// layar EDIT -- widget akan panggil breadcrumb sekali lalu isi semua dropdown sekaligus.
+/// 2026-10-09: Kabupaten & Kota SEKARANG field independen (state terpisah) -- sebelumnya keduanya
+/// menulis ke satu slot `_selected[1]` yang sama, jadi memilih salah satu membuat field lainnya
+/// tampak "kosong/terhapus" di layar -- membingungkan meski secara data memang benar keduanya
+/// sejajar (satu wilayah cuma salah satu, lihat contoh Kabupaten Tangerang vs Kota Tangerang
+/// Selatan, keduanya anak langsung Provinsi Banten, bukan satu di dalam yang lain). Kecamatan
+/// mengikuti SIAPAPUN (Kabupaten atau Kota) yang terakhir dipilih sebagai induknya. Saat dikirim ke
+/// backend, division_level2_id = kabupaten ?? kota (satu kolom yang sama).
+///
+/// Urutan tampilan (permintaan user, 2026-10-09): Provinsi, Kabupaten, Kecamatan, Kota,
+/// Kelurahan/Desa (otomatis sembunyi kalau belum ada data), Kode Pos.
+///
+/// Validasi wajib/opsional per level: tiap level WAJIB diisi HANYA KALAU benar-benar ada opsi yang
+/// bisa dipilih (query sukses, bukan gagal/error, dan hasilnya tidak kosong). Level tanpa data
+/// (mis. Kelurahan/Desa belum di-seed) otomatis tidak ditampilkan sehingga otomatis opsional.
+/// [onValidityChange] memberi tahu parent apakah semua level yang punya data sudah terisi.
 class LocationPicker extends StatefulWidget {
   final void Function(LocationSelection) onChanged;
+  final void Function(bool complete)? onValidityChange;
   final int? initialDivisionId;
 
-  const LocationPicker(
-      {super.key, required this.onChanged, this.initialDivisionId});
+  const LocationPicker({
+    super.key,
+    required this.onChanged,
+    this.onValidityChange,
+    this.initialDivisionId,
+  });
 
   @override
   State<LocationPicker> createState() => _LocationPickerState();
@@ -26,14 +43,33 @@ class _LocationPickerState extends State<LocationPicker> {
   final _api = LocationApi();
   final _postalController = TextEditingController();
 
-  // Indonesia hardcode sementara -- satu-satunya negara yang sudah di-seed (lihat migrasi
-  // 20261003_location_hierarchy_seed_id.sql). Ganti ke dropdown negara begitu negara lain ditambah.
   static const int _indonesiaCountryId = 1;
 
-  final List<List<LocationDivision>> _options = [[], [], [], []];
-  final List<int?> _selected = [null, null, null, null];
-  final List<bool> _loading = [false, false, false, false];
+  List<LocationDivision> _provinsiOptions = [];
+  List<LocationDivision> _level2Options =
+      []; // kabupaten+kota mentah, difilter di bawah
+  List<LocationDivision> _kecamatanOptions = [];
+  List<LocationDivision> _kelurahanOptions = [];
+
+  int? _provinsi;
+  int? _kabupaten;
+  int? _kota;
+  int? _kecamatan;
+  int? _kelurahan;
+
+  // Induk Kecamatan: siapapun (Kabupaten/Kota) yang terakhir dipilih.
+  int? _level2ActiveParent;
+
+  bool _loadingLevel2 = false;
+  bool _loadingKecamatan = false;
+  bool _loadingKelurahan = false;
   bool _initLoading = true;
+
+  // "Loaded": true setelah query level itu SELESAI (sukses), terlepas hasilnya kosong atau tidak
+  // -- membedakan "belum sempat dicek" vs "sudah dicek, memang tidak ada data".
+  bool _level2Loaded = false;
+  bool _kecamatanLoaded = false;
+  bool _kelurahanLoaded = false;
 
   @override
   void initState() {
@@ -49,12 +85,104 @@ class _LocationPickerState extends State<LocationPicker> {
   }
 
   Future<void> _bootstrap() async {
+    await _loadProvinsi();
     if (widget.initialDivisionId != null) {
       await _loadFromBreadcrumb(widget.initialDivisionId!);
-    } else {
-      await _loadLevel(0, parentId: null);
     }
     if (mounted) setState(() => _initLoading = false);
+    _emitValidity();
+  }
+
+  Future<void> _loadProvinsi() async {
+    try {
+      final res = await _api.getDivisions(
+          countryId: _indonesiaCountryId, parentId: null, level: 1);
+      if (res.statusCode == 200) {
+        final rows = ((jsonDecode(res.body)['data'] ?? []) as List)
+            .map((e) => LocationDivision.fromJson(e))
+            .toList()
+          ..sort((a, b) => a.name.compareTo(b.name));
+        if (mounted) setState(() => _provinsiOptions = rows);
+      }
+    } catch (_) {
+      // gagal muat -- dropdown tetap kosong, tidak memblokir sisa form.
+    }
+  }
+
+  Future<void> _loadLevel2(int parentId) async {
+    if (mounted) setState(() => _loadingLevel2 = true);
+    try {
+      final res = await _api.getDivisions(
+          countryId: _indonesiaCountryId, parentId: parentId, level: 2);
+      if (res.statusCode == 200) {
+        final rows = ((jsonDecode(res.body)['data'] ?? []) as List)
+            .map((e) => LocationDivision.fromJson(e))
+            .toList()
+          ..sort((a, b) => a.name.compareTo(b.name));
+        if (mounted) {
+          setState(() {
+            _level2Options = rows;
+            _level2Loaded = true;
+          });
+        }
+      }
+    } catch (_) {
+      // gagal muat (error jaringan/server) -- JANGAN tandai loaded, supaya tidak dianggap "memang
+      // tidak ada data" padahal cuma gagal query.
+    } finally {
+      if (mounted) setState(() => _loadingLevel2 = false);
+      _emitValidity();
+    }
+  }
+
+  Future<void> _loadKecamatan(int parentId) async {
+    if (mounted) setState(() => _loadingKecamatan = true);
+    try {
+      final res = await _api.getDivisions(
+          countryId: _indonesiaCountryId, parentId: parentId, level: 3);
+      if (res.statusCode == 200) {
+        final rows = ((jsonDecode(res.body)['data'] ?? []) as List)
+            .map((e) => LocationDivision.fromJson(e))
+            .toList()
+          ..sort((a, b) => a.name.compareTo(b.name));
+        if (mounted) {
+          setState(() {
+            _kecamatanOptions = rows;
+            _kecamatanLoaded = true;
+          });
+        }
+      }
+    } catch (_) {
+      // gagal muat -- jangan tandai loaded.
+    } finally {
+      if (mounted) setState(() => _loadingKecamatan = false);
+      _emitValidity();
+    }
+  }
+
+  Future<void> _loadKelurahan(int parentId) async {
+    if (mounted) setState(() => _loadingKelurahan = true);
+    try {
+      final res = await _api.getDivisions(
+          countryId: _indonesiaCountryId, parentId: parentId, level: 4);
+      if (res.statusCode == 200) {
+        final rows = ((jsonDecode(res.body)['data'] ?? []) as List)
+            .map((e) => LocationDivision.fromJson(e))
+            .toList()
+          ..sort((a, b) => a.name.compareTo(b.name));
+        if (mounted) {
+          setState(() {
+            _kelurahanOptions = rows;
+            _kelurahanLoaded = true;
+          });
+        }
+      }
+    } catch (_) {
+      // gagal muat -- jangan tandai loaded (otomatis tidak tampil kalau memang tidak ada data).
+    } finally {
+      if (mounted) setState(() => _loadingKelurahan = false);
+      _emitValidity();
+    }
   }
 
   Future<void> _loadFromBreadcrumb(int divisionId) async {
@@ -64,95 +192,150 @@ class _LocationPickerState extends State<LocationPicker> {
       final chain = ((jsonDecode(res.body)['data'] ?? []) as List)
           .map((e) => LocationDivision.fromJson(e))
           .toList();
-      // isi tiap level dari rantai (level 1-indexed di API, 0-indexed di _selected).
-      for (final d in chain) {
-        if (d.level >= 1 && d.level <= 4) _selected[d.level - 1] = d.divisionId;
+      final byLevel = <int, LocationDivision>{
+        for (final d in chain) d.level: d,
+      };
+      if (byLevel[1] != null) _provinsi = byLevel[1]!.divisionId;
+      if (byLevel[2] != null) {
+        final d2 = byLevel[2]!;
+        if (d2.name.startsWith('Kota')) {
+          _kota = d2.divisionId;
+        } else {
+          _kabupaten = d2.divisionId;
+        }
+        _level2ActiveParent = d2.divisionId;
+        await _loadLevel2(byLevel[1]?.divisionId ?? 0);
+        await _loadKecamatan(d2.divisionId);
       }
-      // muat opsi tiap level supaya dropdown bisa menampilkan nama yang sudah terpilih.
-      await _loadLevel(0, parentId: null, keepSelection: true);
-      for (var i = 1; i < chain.length; i++) {
-        await _loadLevel(i, parentId: _selected[i - 1], keepSelection: true);
+      if (byLevel[3] != null) {
+        _kecamatan = byLevel[3]!.divisionId;
+        await _loadKelurahan(byLevel[3]!.divisionId);
       }
+      if (byLevel[4] != null) _kelurahan = byLevel[4]!.divisionId;
+      if (mounted) setState(() {});
     } catch (_) {
       // gagal muat breadcrumb -- biarkan kosong, user bisa pilih manual dari awal.
     }
   }
 
-  Future<void> _loadLevel(int levelIndex,
-      {required int? parentId, bool keepSelection = false}) async {
-    setState(() => _loading[levelIndex] = true);
-    try {
-      final res = await _api.getDivisions(
-        countryId: _indonesiaCountryId,
-        parentId: parentId,
-        level: levelIndex + 1,
-      );
-      if (res.statusCode == 200) {
-        final rows = ((jsonDecode(res.body)['data'] ?? []) as List)
-            .map((e) => LocationDivision.fromJson(e))
-            .toList()
-          ..sort((a, b) => a.name.compareTo(b.name));
-        if (mounted) {
-          setState(() {
-            _options[levelIndex] = rows;
-            if (!keepSelection) {
-              for (var i = levelIndex; i < 4; i++) {
-                if (i != levelIndex) _selected[i] = null;
-              }
-            }
-          });
-        }
-      }
-    } catch (_) {
-      // gagal muat -- dropdown level ini tetap kosong, tidak memblokir sisa form.
-    } finally {
-      if (mounted) setState(() => _loading[levelIndex] = false);
-    }
-  }
-
-  void _onSelect(int levelIndex, int? divisionId) {
-    setState(() {
-      _selected[levelIndex] = divisionId;
-      for (var i = levelIndex + 1; i < 4; i++) {
-        _selected[i] = null;
-        _options[i] = [];
-      }
-    });
-    _emitChange();
-    if (divisionId != null && levelIndex < 3) {
-      _loadLevel(levelIndex + 1, parentId: divisionId);
-    }
-  }
-
   void _emitChange() {
     final sel = LocationSelection(
-      countryId: _selected[0] != null ? _indonesiaCountryId : null,
-      level1Id: _selected[0],
-      level2Id: _selected[1],
-      level3Id: _selected[2],
-      level4Id: _selected[3],
+      countryId: _provinsi != null ? _indonesiaCountryId : null,
+      level1Id: _provinsi,
+      level2Id: _kabupaten ?? _kota,
+      level3Id: _kecamatan,
+      level4Id: _kelurahan,
       postalCode: _postalController.text.trim().isEmpty
           ? null
           : _postalController.text.trim(),
     );
     widget.onChanged(sel);
+    _emitValidity();
   }
 
-  static const _levelLabels = [
-    'Provinsi',
-    'Kabupaten/Kota',
-    'Kecamatan',
-    'Kelurahan/Desa'
-  ];
+  // Lengkap = semua level yang TERBUKTI punya data (query sukses & hasilnya tidak kosong) sudah
+  // terisi. Level tanpa data (belum di-seed) tidak ikut dihitung sama sekali -- otomatis opsional.
+  void _emitValidity() {
+    if (widget.onValidityChange == null) return;
+    bool complete = _provinsi != null;
+    if (complete && _level2Loaded) {
+      final needKabupaten = _kabupatenOptions.isNotEmpty;
+      final needKota = _kotaOptions.isNotEmpty;
+      if (needKabupaten && needKota) {
+        complete = _kabupaten != null || _kota != null;
+      } else if (needKabupaten) {
+        complete = _kabupaten != null;
+      } else if (needKota) {
+        complete = _kota != null;
+      }
+    } else if (complete) {
+      complete =
+          false; // level2 belum selesai dicek -- belum bisa dianggap lengkap
+    }
+    final level2Picked = _kabupaten != null || _kota != null;
+    if (complete && level2Picked) {
+      if (!_kecamatanLoaded) {
+        complete = false;
+      } else if (_kecamatanOptions.isNotEmpty) {
+        complete = _kecamatan != null;
+      }
+    }
+    if (complete && _kecamatan != null) {
+      if (!_kelurahanLoaded) {
+        complete = false;
+      } else if (_kelurahanOptions.isNotEmpty) {
+        complete = _kelurahan != null;
+      }
+    }
+    widget.onValidityChange!(complete);
+  }
 
-  // Level 2 (index 1) dipisah jadi 2 dropdown terpisah -- Kabupaten & Kota -- bukan 1 daftar gabungan,
-  // supaya user tidak perlu scroll campur aduk 514 nama. Nama di sumber data SELALU diawali kata
-  // "Kabupaten" atau "Kota" (diverifikasi: 416 Kabupaten, 98 Kota, tidak ada pengecualian), jadi aman
-  // dipisah murni dari prefix nama, bukan field terpisah di API.
-  List<LocationDivision> get _kabupatenOptions =>
-      _options[1].where((d) => d.name.startsWith('Kabupaten')).toList();
-  List<LocationDivision> get _kotaOptions =>
-      _options[1].where((d) => d.name.startsWith('Kota')).toList();
+  void _onSelectProvinsi(int? id) {
+    setState(() {
+      _provinsi = id;
+      _kabupaten = null;
+      _kota = null;
+      _kecamatan = null;
+      _kelurahan = null;
+      _level2ActiveParent = null;
+      _level2Options = [];
+      _kecamatanOptions = [];
+      _kelurahanOptions = [];
+      _level2Loaded = false;
+      _kecamatanLoaded = false;
+      _kelurahanLoaded = false;
+    });
+    _emitChange();
+    if (id != null) _loadLevel2(id);
+  }
+
+  void _onSelectKabupaten(int? id) {
+    setState(() {
+      _kabupaten = id;
+      if (id != null) {
+        _level2ActiveParent = id;
+        _kecamatan = null;
+        _kelurahan = null;
+        _kelurahanOptions = [];
+        _kecamatanLoaded = false;
+        _kelurahanLoaded = false;
+      }
+    });
+    _emitChange();
+    if (id != null) _loadKecamatan(id);
+  }
+
+  void _onSelectKota(int? id) {
+    setState(() {
+      _kota = id;
+      if (id != null) {
+        _level2ActiveParent = id;
+        _kecamatan = null;
+        _kelurahan = null;
+        _kelurahanOptions = [];
+        _kecamatanLoaded = false;
+        _kelurahanLoaded = false;
+      }
+    });
+    _emitChange();
+    if (id != null) _loadKecamatan(id);
+  }
+
+  void _onSelectKecamatan(int? id) {
+    setState(() {
+      _kecamatan = id;
+      _kelurahan = null;
+      _kelurahanOptions = [];
+      _kelurahanLoaded = false;
+    });
+    _emitChange();
+    if (id != null) _loadKelurahan(id);
+  }
+
+  void _onSelectKelurahan(int? id) {
+    setState(() => _kelurahan = id);
+    _emitChange();
+  }
 
   Widget _buildDropdown({
     required String label,
@@ -191,6 +374,7 @@ class _LocationPickerState extends State<LocationPicker> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = Provider.of<LanguageProvider>(context);
     if (_initLoading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
@@ -201,66 +385,78 @@ class _LocationPickerState extends State<LocationPicker> {
                 child: CircularProgressIndicator(strokeWidth: 2))),
       );
     }
-    final selectedIsKabupaten =
-        _kabupatenOptions.any((d) => d.divisionId == _selected[1]);
-    final selectedIsKota =
-        _kotaOptions.any((d) => d.divisionId == _selected[1]);
+    final requiredSuffix = ' (${lang.get('required', 'wajib')})';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var level = 0; level < 4; level++) ...[
-          if (level == 0 || _selected[level - 1] != null) ...[
-            if (level == 1) ...[
-              if (_kabupatenOptions.isNotEmpty || _loading[1])
-                _buildDropdown(
-                  // KOREKSI 2026-10-09: key HARUS ikut nilai yang ditampilkan widget ini sendiri
-                  // (bukan cuma induknya) -- DropdownButtonFormField.initialValue TIDAK reaktif
-                  // (dibaca cuma sekali saat widget dibuat), jadi tanpa ini, berpindah Kabupaten<->Kota
-                  // (yang berbagi slot _selected[1] yang sama) tidak memicu Flutter membuat ulang
-                  // widget & tampilan desync/tampak "terhapus" dari yang sebenarnya tersimpan.
-                  key: ValueKey(
-                      'loc-kabupaten-${_selected[0]}-${selectedIsKabupaten ? _selected[1] : null}'),
-                  label: 'Kabupaten',
-                  options: _kabupatenOptions,
-                  value: selectedIsKabupaten ? _selected[1] : null,
-                  loading: _loading[1],
-                  onChanged: (v) => _onSelect(1, v),
-                ),
-              if (_kotaOptions.isNotEmpty || _loading[1])
-                _buildDropdown(
-                  key: ValueKey(
-                      'loc-kota-${_selected[0]}-${selectedIsKota ? _selected[1] : null}'),
-                  label: 'Kota',
-                  options: _kotaOptions,
-                  value: selectedIsKota ? _selected[1] : null,
-                  loading: _loading[1],
-                  onChanged: (v) => _onSelect(1, v),
-                ),
-            ] else if (_options[level].isNotEmpty || _loading[level]) ...[
-              _buildDropdown(
-                key: ValueKey(
-                    'loc-level-$level-${_selected[level - 1].toString()}-${_selected[level]}'),
-                label: _levelLabels[level],
-                options: _options[level],
-                value: _selected[level],
-                loading: _loading[level],
-                onChanged: (v) => _onSelect(level, v),
-              ),
-            ],
-          ],
-        ],
-        if (_selected[0] != null) ...[
+        _buildDropdown(
+          key: const ValueKey('loc-provinsi'),
+          label: lang.get('Province', 'Provinsi'),
+          options: _provinsiOptions,
+          value: _provinsi,
+          loading: false,
+          onChanged: _onSelectProvinsi,
+        ),
+        if (_provinsi != null &&
+            (_kabupatenOptions.isNotEmpty || _loadingLevel2))
+          _buildDropdown(
+            key: ValueKey('loc-kabupaten-$_provinsi-$_kabupaten'),
+            label: lang.get('Regency', 'Kabupaten') + requiredSuffix,
+            options: _kabupatenOptions,
+            value: _kabupaten,
+            loading: _loadingLevel2,
+            onChanged: _onSelectKabupaten,
+          ),
+        if (_provinsi != null &&
+            _level2ActiveParent != null &&
+            (_kecamatanOptions.isNotEmpty || _loadingKecamatan))
+          _buildDropdown(
+            key: ValueKey('loc-kecamatan-$_level2ActiveParent-$_kecamatan'),
+            label: lang.get('District', 'Kecamatan') + requiredSuffix,
+            options: _kecamatanOptions,
+            value: _kecamatan,
+            loading: _loadingKecamatan,
+            onChanged: _onSelectKecamatan,
+          ),
+        if (_provinsi != null && (_kotaOptions.isNotEmpty || _loadingLevel2))
+          _buildDropdown(
+            key: ValueKey('loc-kota-$_provinsi-$_kota'),
+            label: lang.get('City', 'Kota') + requiredSuffix,
+            options: _kotaOptions,
+            value: _kota,
+            loading: _loadingLevel2,
+            onChanged: _onSelectKota,
+          ),
+        if (_kecamatan != null &&
+            (_kelurahanOptions.isNotEmpty || _loadingKelurahan))
+          _buildDropdown(
+            key: ValueKey('loc-kelurahan-$_kecamatan-$_kelurahan'),
+            label: lang.get('Village', 'Kelurahan/Desa') + requiredSuffix,
+            options: _kelurahanOptions,
+            value: _kelurahan,
+            loading: _loadingKelurahan,
+            onChanged: _onSelectKelurahan,
+          ),
+        if (_provinsi != null) ...[
           const SizedBox(height: 14),
           TextField(
             controller: _postalController,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Kode Pos (opsional)',
-              prefixIcon: Icon(Icons.local_post_office_outlined),
+            decoration: InputDecoration(
+              labelText:
+                  lang.get('Postal Code (optional)', 'Kode Pos (opsional)'),
+              prefixIcon: const Icon(Icons.local_post_office_outlined),
             ),
           ),
         ],
       ],
     );
   }
+
+  // Nama di sumber data SELALU diawali kata "Kabupaten" atau "Kota" (diverifikasi: 416 Kabupaten,
+  // 98 Kota, tidak ada pengecualian) -- aman dipisah murni dari prefix nama.
+  List<LocationDivision> get _kabupatenOptions =>
+      _level2Options.where((d) => d.name.startsWith('Kabupaten')).toList();
+  List<LocationDivision> get _kotaOptions =>
+      _level2Options.where((d) => d.name.startsWith('Kota')).toList();
 }

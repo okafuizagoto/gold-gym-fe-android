@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../config/theme.dart';
+import '../providers/language_provider.dart';
 import '../services/outlet_api.dart';
 import '../models/outlet_model.dart';
 import '../models/location_model.dart';
@@ -27,6 +29,10 @@ class _OutletScreenState extends State<NewOutletScreen> {
   ValueNotifier<bool> isActiveOutlet = ValueNotifier(true);
   // Lokasi (2026-10-03, opsional) -- field terbaru dari LocationPicker, dibaca saat addItem/_handleOutlet.
   LocationSelection _location = LocationSelection();
+  // Lokasi (2026-10-09): dihitung oleh LocationPicker sendiri -- lengkap berarti SEMUA level yang
+  // terbukti punya data (hasil query tidak kosong) sudah terisi. Level tanpa data otomatis tidak
+  // ikut dihitung -- opsional, bukan diwajibkan.
+  bool _locationComplete = false;
 
   @override
   void initState() {
@@ -34,7 +40,11 @@ class _OutletScreenState extends State<NewOutletScreen> {
     // STAFF tidak boleh membuat outlet (backend 403) -- jangan tampilkan formnya.
     isStaffRole().then((v) {
       if (mounted && v) {
-        Toast.error(context, 'Hanya pemilik yang boleh membuat outlet.');
+        final lang = context.read<LanguageProvider>();
+        Toast.error(
+            context,
+            lang.get('Only owners can create outlets.',
+                'Hanya pemilik yang boleh membuat outlet.'));
         Navigator.of(context).maybePop();
       }
     });
@@ -53,22 +63,21 @@ class _OutletScreenState extends State<NewOutletScreen> {
       _outletNameController.text.trim().isNotEmpty &&
       _outletAddressController.text.trim().isNotEmpty;
 
-  // Lokasi (2026-10-09): provinsi, kabupaten/kota, DAN kecamatan WAJIB terisi -- sebelumnya
-  // opsional sepenuhnya, jadi outlet bisa tersimpan tanpa lokasi lengkap. Kelurahan/Desa (level4)
-  // tetap opsional karena backend belum punya data seed untuk level itu (lihat LocationPicker).
-  bool get _locationFilled =>
-      _location.level1Id != null &&
-      _location.level2Id != null &&
-      _location.level3Id != null;
-
   Future<void> addItem() async {
+    final lang = context.read<LanguageProvider>();
     if (!_formFilled) {
-      Toast.error(context, 'Isi nama dan alamat outlet terlebih dahulu.');
+      Toast.error(
+          context,
+          lang.get('Please fill in the outlet name and address.',
+              'Isi nama dan alamat outlet terlebih dahulu.'));
       return;
     }
-    if (!_locationFilled) {
-      Toast.error(context,
-          'Lengkapi lokasi outlet (provinsi, kabupaten/kota, dan kecamatan).');
+    if (!_locationComplete) {
+      Toast.error(
+          context,
+          lang.get(
+              'Please complete the outlet location (only fields with available data are required).',
+              'Lengkapi lokasi outlet (hanya field yang memang ada datanya yang wajib diisi).'));
       return;
     }
     {
@@ -135,13 +144,20 @@ class _OutletScreenState extends State<NewOutletScreen> {
       };
     }
 
+    final lang = context.read<LanguageProvider>();
     if (outletsArrNotifier.value.isEmpty && !_formFilled) {
-      Toast.error(context, 'Isi nama dan alamat outlet terlebih dahulu.');
+      Toast.error(
+          context,
+          lang.get('Please fill in the outlet name and address.',
+              'Isi nama dan alamat outlet terlebih dahulu.'));
       return;
     }
-    if (outletsArrNotifier.value.isEmpty && !_locationFilled) {
-      Toast.error(context,
-          'Lengkapi lokasi outlet (provinsi, kabupaten/kota, dan kecamatan).');
+    if (outletsArrNotifier.value.isEmpty && !_locationComplete) {
+      Toast.error(
+          context,
+          lang.get(
+              'Please complete the outlet location (only fields with available data are required).',
+              'Lengkapi lokasi outlet (hanya field yang memang ada datanya yang wajib diisi).'));
       return;
     }
 
@@ -155,14 +171,19 @@ class _OutletScreenState extends State<NewOutletScreen> {
         _outletNameController.clear();
         _outletAddressController.clear();
         _location = LocationSelection();
-        Toast.success(context, 'Outlet berhasil disimpan');
+        Toast.success(context,
+            lang.get('Outlet saved successfully', 'Outlet berhasil disimpan'));
         Navigator.pushReplacementNamed(context, '/outlet');
       } else {
         outletsArrNotifier.value = [];
-        Toast.error(context, 'Gagal menyimpan outlet');
+        Toast.error(context,
+            lang.get('Failed to save outlet', 'Gagal menyimpan outlet'));
       }
     } catch (e) {
-      if (mounted) Toast.error(context, 'Gagal menyimpan outlet');
+      if (mounted) {
+        Toast.error(context,
+            lang.get('Failed to save outlet', 'Gagal menyimpan outlet'));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -171,9 +192,11 @@ class _OutletScreenState extends State<NewOutletScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final lang = Provider.of<LanguageProvider>(context);
     return AuthCard(
-      title: 'Daftar Outlet',
-      subtitle: 'Buat satu outlet, atau tambah beberapa sekaligus',
+      title: lang.get('Register Outlet', 'Daftar Outlet'),
+      subtitle: lang.get('Create one outlet, or add several at once',
+          'Buat satu outlet, atau tambah beberapa sekaligus'),
       maxWidth: 520,
       child: Form(
         key: _formKey,
@@ -184,28 +207,32 @@ class _OutletScreenState extends State<NewOutletScreen> {
             TextField(
               controller: _outletNameController,
               textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                labelText: 'Nama Outlet',
-                prefixIcon: Icon(Icons.storefront_outlined),
+              decoration: InputDecoration(
+                labelText: lang.get('Outlet Name', 'Nama Outlet'),
+                prefixIcon: const Icon(Icons.storefront_outlined),
               ),
               textInputAction: TextInputAction.next,
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              maxLines: 4,
-              minLines: 3,
-              controller: _outletAddressController,
-              decoration: const InputDecoration(
-                labelText: 'Alamat Outlet',
-                hintText: 'Tulis alamat lengkap outlet...',
-                alignLabelWithHint: true,
-              ),
               onChanged: (_) => setState(() {}),
             ),
             LocationPicker(
               key: ValueKey('loc-picker-${outletsArrNotifier.value.length}'),
               onChanged: (sel) => _location = sel,
+              onValidityChange: (complete) =>
+                  setState(() => _locationComplete = complete),
+            ),
+            // Alamat diisi TERAKHIR (2026-10-09) -- di bawah lokasi/kode pos, bukan di atas.
+            const SizedBox(height: 14),
+            TextField(
+              maxLines: 4,
+              minLines: 3,
+              controller: _outletAddressController,
+              decoration: InputDecoration(
+                labelText: lang.get('Outlet Address', 'Alamat Outlet'),
+                hintText: lang.get('Write the full outlet address...',
+                    'Tulis alamat lengkap outlet...'),
+                alignLabelWithHint: true,
+              ),
+              onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 10),
 
@@ -225,9 +252,12 @@ class _OutletScreenState extends State<NewOutletScreen> {
                     onChanged: (v) => isActiveOutlet.value = v,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                     secondary: const Icon(Icons.toggle_on_outlined),
-                    title: Text('Status Outlet', style: textTheme.titleSmall),
+                    title: Text(lang.get('Outlet Status', 'Status Outlet'),
+                        style: textTheme.titleSmall),
                     subtitle: Text(
-                      value ? 'Aktif' : 'Non Aktif',
+                      value
+                          ? lang.get('Active', 'Aktif')
+                          : lang.get('Inactive', 'Non Aktif'),
                       style: textTheme.bodySmall?.copyWith(
                         color: value ? AppColors.successDark : AppColors.muted,
                         fontWeight: FontWeight.w600,
@@ -250,7 +280,8 @@ class _OutletScreenState extends State<NewOutletScreen> {
                   children: [
                     const SizedBox(height: 20),
                     Text(
-                      'Outlet yang akan disimpan (${items.length})',
+                      lang.get('Outlets to be saved (${items.length})',
+                          'Outlet yang akan disimpan (${items.length})'),
                       style: textTheme.titleSmall,
                     ),
                     const SizedBox(height: 8),
@@ -283,7 +314,7 @@ class _OutletScreenState extends State<NewOutletScreen> {
                         ),
                       )
                     : const Icon(Icons.save_outlined, size: 20),
-                label: const Text('SIMPAN'),
+                label: Text(lang.get('SAVE', 'SIMPAN')),
               ),
             ),
             const SizedBox(height: 10),
@@ -292,7 +323,7 @@ class _OutletScreenState extends State<NewOutletScreen> {
               child: OutlinedButton.icon(
                 onPressed: _isLoading ? null : addItem,
                 icon: const Icon(Icons.add_rounded, size: 20),
-                label: const Text('TAMBAH LAGI'),
+                label: Text(lang.get('ADD MORE', 'TAMBAH LAGI')),
               ),
             ),
             const SizedBox(height: 10),
@@ -303,7 +334,7 @@ class _OutletScreenState extends State<NewOutletScreen> {
                   Navigator.pushReplacementNamed(context, '/outlet');
                 },
                 icon: const Icon(Icons.arrow_back_rounded, size: 20),
-                label: const Text('KEMBALI'),
+                label: Text(lang.get('BACK', 'KEMBALI')),
               ),
             ),
           ],
