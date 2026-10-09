@@ -8,21 +8,42 @@ import '../services/location_api.dart';
 /// Dropdown berjenjang lokasi (negara disembunyikan selama cuma Indonesia yang didukung -- lihat
 /// rancangan deploy-notes/.../30-RANCANGAN-FITUR-LOKASI-OUTLET.md §6).
 ///
-/// 2026-10-09: Kabupaten & Kota SEKARANG field independen (state terpisah) -- sebelumnya keduanya
-/// menulis ke satu slot `_selected[1]` yang sama, jadi memilih salah satu membuat field lainnya
-/// tampak "kosong/terhapus" di layar -- membingungkan meski secara data memang benar keduanya
-/// sejajar (satu wilayah cuma salah satu, lihat contoh Kabupaten Tangerang vs Kota Tangerang
-/// Selatan, keduanya anak langsung Provinsi Banten, bukan satu di dalam yang lain). Kecamatan
-/// mengikuti SIAPAPUN (Kabupaten atau Kota) yang terakhir dipilih sebagai induknya. Saat dikirim ke
-/// backend, division_level2_id = kabupaten ?? kota (satu kolom yang sama).
+/// Kabupaten & Kota adalah field independen (state terpisah, tidak berbagi 1 slot) -- memilih
+/// salah satu TIDAK menghapus tampilan yang lain. Kecamatan mengikuti SIAPAPUN (Kabupaten atau
+/// Kota) yang terakhir dipilih sebagai induknya. Saat dikirim ke backend, division_level2_id =
+/// kabupaten ?? kota (satu kolom yang sama).
 ///
-/// Urutan tampilan (permintaan user, 2026-10-09): Provinsi, Kabupaten, Kecamatan, Kota,
-/// Kelurahan/Desa (otomatis sembunyi kalau belum ada data), Kode Pos.
+/// Urutan tampilan: Provinsi, Kabupaten, Kota, Kecamatan, Kelurahan/Desa, Kode Pos.
 ///
-/// Validasi wajib/opsional per level: tiap level WAJIB diisi HANYA KALAU benar-benar ada opsi yang
-/// bisa dipilih (query sukses, bukan gagal/error, dan hasilnya tidak kosong). Level tanpa data
-/// (mis. Kelurahan/Desa belum di-seed) otomatis tidak ditampilkan sehingga otomatis opsional.
-/// [onValidityChange] memberi tahu parent apakah semua level yang punya data sudah terisi.
+/// 2026-10-09 (gating bertahap): SEMUA field SELALU tampil sejak awal -- tapi DISABLED sampai
+/// field sebelum yang mewajibkannya terisi. Hanya Provinsi yang aktif di awal. Field BARU
+/// disembunyikan sepenuhnya kalau query-nya SUDAH SELESAI (sukses) dan hasilnya terbukti kosong
+/// (bukan karena belum dicek) -- itulah tanda "memang tidak ada data seed-nya".
+class _FieldState {
+  final bool visible;
+  final bool enabled;
+  final bool loading;
+  const _FieldState(
+      {required this.visible, required this.enabled, required this.loading});
+
+  factory _FieldState.compute(
+      bool precondition, bool loaded, bool loading, int optionsLen) {
+    if (!precondition) {
+      return const _FieldState(visible: true, enabled: false, loading: false);
+    }
+    if (loading) {
+      return const _FieldState(visible: true, enabled: false, loading: true);
+    }
+    if (loaded && optionsLen == 0) {
+      return const _FieldState(visible: false, enabled: false, loading: false);
+    }
+    if (loaded && optionsLen > 0) {
+      return const _FieldState(visible: true, enabled: true, loading: false);
+    }
+    return const _FieldState(visible: true, enabled: false, loading: false);
+  }
+}
+
 class LocationPicker extends StatefulWidget {
   final void Function(LocationSelection) onChanged;
   final void Function(bool complete)? onValidityChange;
@@ -65,8 +86,7 @@ class _LocationPickerState extends State<LocationPicker> {
   bool _loadingKelurahan = false;
   bool _initLoading = true;
 
-  // "Loaded": true setelah query level itu SELESAI (sukses), terlepas hasilnya kosong atau tidak
-  // -- membedakan "belum sempat dicek" vs "sudah dicek, memang tidak ada data".
+  // "Loaded": true setelah query level itu SELESAI (sukses), terlepas hasilnya kosong atau tidak.
   bool _level2Loaded = false;
   bool _kecamatanLoaded = false;
   bool _kelurahanLoaded = false;
@@ -127,8 +147,7 @@ class _LocationPickerState extends State<LocationPicker> {
         }
       }
     } catch (_) {
-      // gagal muat (error jaringan/server) -- JANGAN tandai loaded, supaya tidak dianggap "memang
-      // tidak ada data" padahal cuma gagal query.
+      // gagal muat -- jangan tandai loaded.
     } finally {
       if (mounted) setState(() => _loadingLevel2 = false);
       _emitValidity();
@@ -249,8 +268,7 @@ class _LocationPickerState extends State<LocationPicker> {
         complete = _kota != null;
       }
     } else if (complete) {
-      complete =
-          false; // level2 belum selesai dicek -- belum bisa dianggap lengkap
+      complete = false;
     }
     final level2Picked = _kabupaten != null || _kota != null;
     if (complete && level2Picked) {
@@ -341,7 +359,7 @@ class _LocationPickerState extends State<LocationPicker> {
     required String label,
     required List<LocationDivision> options,
     required int? value,
-    required bool loading,
+    required _FieldState state,
     required void Function(int?) onChanged,
     required Key key,
   }) {
@@ -353,7 +371,7 @@ class _LocationPickerState extends State<LocationPicker> {
         decoration: InputDecoration(
           labelText: label,
           prefixIcon: const Icon(Icons.map_outlined),
-          suffixIcon: loading
+          suffixIcon: state.loading
               ? const Padding(
                   padding: EdgeInsets.all(12),
                   child: SizedBox(
@@ -367,7 +385,7 @@ class _LocationPickerState extends State<LocationPicker> {
           for (final d in options)
             DropdownMenuItem(value: d.divisionId, child: Text(d.name)),
         ],
-        onChanged: loading ? null : onChanged,
+        onChanged: state.enabled ? onChanged : null,
       ),
     );
   }
@@ -386,6 +404,17 @@ class _LocationPickerState extends State<LocationPicker> {
       );
     }
     final requiredSuffix = ' (${lang.get('required', 'wajib')})';
+
+    final kabupatenState = _FieldState.compute(_provinsi != null, _level2Loaded,
+        _loadingLevel2, _kabupatenOptions.length);
+    final kotaState = _FieldState.compute(
+        _provinsi != null, _level2Loaded, _loadingLevel2, _kotaOptions.length);
+    final level2Picked = _kabupaten != null || _kota != null;
+    final kecamatanState = _FieldState.compute(level2Picked, _kecamatanLoaded,
+        _loadingKecamatan, _kecamatanOptions.length);
+    final kelurahanState = _FieldState.compute(_kecamatan != null,
+        _kelurahanLoaded, _loadingKelurahan, _kelurahanOptions.length);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -394,61 +423,57 @@ class _LocationPickerState extends State<LocationPicker> {
           label: lang.get('Province', 'Provinsi'),
           options: _provinsiOptions,
           value: _provinsi,
-          loading: false,
+          state:
+              const _FieldState(visible: true, enabled: true, loading: false),
           onChanged: _onSelectProvinsi,
         ),
-        if (_provinsi != null &&
-            (_kabupatenOptions.isNotEmpty || _loadingLevel2))
+        if (kabupatenState.visible)
           _buildDropdown(
             key: ValueKey('loc-kabupaten-$_provinsi-$_kabupaten'),
             label: lang.get('Regency', 'Kabupaten') + requiredSuffix,
             options: _kabupatenOptions,
             value: _kabupaten,
-            loading: _loadingLevel2,
+            state: kabupatenState,
             onChanged: _onSelectKabupaten,
           ),
-        if (_provinsi != null &&
-            _level2ActiveParent != null &&
-            (_kecamatanOptions.isNotEmpty || _loadingKecamatan))
-          _buildDropdown(
-            key: ValueKey('loc-kecamatan-$_level2ActiveParent-$_kecamatan'),
-            label: lang.get('District', 'Kecamatan') + requiredSuffix,
-            options: _kecamatanOptions,
-            value: _kecamatan,
-            loading: _loadingKecamatan,
-            onChanged: _onSelectKecamatan,
-          ),
-        if (_provinsi != null && (_kotaOptions.isNotEmpty || _loadingLevel2))
+        if (kotaState.visible)
           _buildDropdown(
             key: ValueKey('loc-kota-$_provinsi-$_kota'),
             label: lang.get('City', 'Kota') + requiredSuffix,
             options: _kotaOptions,
             value: _kota,
-            loading: _loadingLevel2,
+            state: kotaState,
             onChanged: _onSelectKota,
           ),
-        if (_kecamatan != null &&
-            (_kelurahanOptions.isNotEmpty || _loadingKelurahan))
+        if (kecamatanState.visible)
+          _buildDropdown(
+            key: ValueKey('loc-kecamatan-$_level2ActiveParent-$_kecamatan'),
+            label: lang.get('District', 'Kecamatan') + requiredSuffix,
+            options: _kecamatanOptions,
+            value: _kecamatan,
+            state: kecamatanState,
+            onChanged: _onSelectKecamatan,
+          ),
+        if (kelurahanState.visible)
           _buildDropdown(
             key: ValueKey('loc-kelurahan-$_kecamatan-$_kelurahan'),
             label: lang.get('Village', 'Kelurahan/Desa') + requiredSuffix,
             options: _kelurahanOptions,
             value: _kelurahan,
-            loading: _loadingKelurahan,
+            state: kelurahanState,
             onChanged: _onSelectKelurahan,
           ),
-        if (_provinsi != null) ...[
-          const SizedBox(height: 14),
-          TextField(
-            controller: _postalController,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText:
-                  lang.get('Postal Code (optional)', 'Kode Pos (opsional)'),
-              prefixIcon: const Icon(Icons.local_post_office_outlined),
-            ),
+        const SizedBox(height: 14),
+        TextField(
+          controller: _postalController,
+          enabled: _provinsi != null,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText:
+                lang.get('Postal Code (optional)', 'Kode Pos (opsional)'),
+            prefixIcon: const Icon(Icons.local_post_office_outlined),
           ),
-        ],
+        ),
       ],
     );
   }
