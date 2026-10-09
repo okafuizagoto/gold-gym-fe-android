@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../models/storage_model.dart';
+import '../services/backup_api.dart';
 import '../services/storage_api.dart';
 import '../utils/toast.dart';
 import '../widgets/app_bar_custom.dart';
@@ -23,10 +24,14 @@ class AdminStorageUsageScreen extends StatefulWidget {
 
 class _AdminStorageUsageScreenState extends State<AdminStorageUsageScreen> {
   final _storageApi = StorageApi();
+  final _backupApi = BackupApi();
   bool _loading = true;
   bool _forbidden = false;
   List<AdminUserUsage> _users = [];
   List<AdminUsageSummary> _summary = [];
+  // Total ukuran backup DATABASE (bukan foto) sukses per environment (2026-10-10) -- gold_id ->
+  // tidak relevan di sini, kuncinya environment ("local"/"staging"/"production").
+  Map<String, int> _backupTotals = {};
 
   @override
   void initState() {
@@ -38,6 +43,7 @@ class _AdminStorageUsageScreenState extends State<AdminStorageUsageScreen> {
     setState(() => _loading = true);
     final users = await _storageApi.adminListUsers();
     final summary = await _storageApi.adminGetUsageSummary();
+    final backupTotals = await _backupApi.totalByEnvironment();
     if (mounted) {
       setState(() {
         if (users == null || summary == null) {
@@ -45,12 +51,16 @@ class _AdminStorageUsageScreenState extends State<AdminStorageUsageScreen> {
         } else {
           _users = users;
           _summary = summary;
+          _backupTotals = backupTotals;
           _forbidden = false;
         }
         _loading = false;
       });
     }
   }
+
+  String _bytesToGb(int bytes) =>
+      (bytes / (1024 * 1024 * 1024)).toStringAsFixed(3);
 
   String _gb(double n) => '${n.toStringAsFixed(3)} GB';
 
@@ -189,6 +199,27 @@ class _AdminStorageUsageScreenState extends State<AdminStorageUsageScreen> {
                                     ))
                                 .toList(),
                           ),
+                        ),
+                        const SizedBox(height: 16),
+                        SectionCard(
+                          title: 'Total backup database',
+                          icon: Icons.backup_outlined,
+                          child: _backupTotals.isEmpty
+                              ? const Padding(
+                                  padding: EdgeInsets.all(8),
+                                  child: Text('Belum ada backup tersimpan'),
+                                )
+                              : Column(
+                                  children: _backupTotals.entries
+                                      .map((e) => ListTile(
+                                            contentPadding: EdgeInsets.zero,
+                                            dense: true,
+                                            title: Text(e.key.toUpperCase()),
+                                            trailing: Text(
+                                                '${_bytesToGb(e.value)} GB'),
+                                          ))
+                                      .toList(),
+                                ),
                         ),
                         const SizedBox(height: 16),
                         SectionCard(

@@ -444,6 +444,37 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       label: Text('Direkomendasikan')),
               ],
             ),
+            if (p.hasDiscount) ...[
+              Row(
+                children: [
+                  Text(
+                    formatRupiah(_yearly
+                        ? p.originalPriceYearly
+                        : p.originalPriceMonthly),
+                    style: textTheme.bodyMedium?.copyWith(
+                        color: AppColors.muted,
+                        decoration: TextDecoration.lineThrough),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: AppColors.errorLight,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '-${p.discountPercent.toStringAsFixed(0)}%',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.error),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+            ],
             RichText(
               text: TextSpan(
                 style: textTheme.headlineSmall?.copyWith(

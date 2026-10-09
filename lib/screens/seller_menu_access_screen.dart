@@ -370,6 +370,39 @@ class _SellerMenuAccessScreenState extends State<SellerMenuAccessScreen> {
     await _load(_searchController.text);
   }
 
+  // 2026-10-10: "Daftar Pembeli" & "Mode Pembeli" sebenarnya satu kesatuan fitur (mode pembeli
+  // tidak berguna kalau akses daftar pembeli sendiri mati, begitu juga sebaliknya) -- tandai kalau
+  // kedua flag untuk penjual yang sama TIDAK sinkron (satu Y satu N), supaya admin tidak lupa
+  // menyamakan keduanya. Murni informasi, tidak memblokir toggle.
+  bool _isMismatched(SellerMenuAccessRow o) =>
+      o.daftarPembeliActive != o.modePembeliActive;
+
+  Widget _mismatchChip() => Tooltip(
+        message:
+            'Daftar Pembeli dan Mode Pembeli tidak sinkron untuk penjual ini',
+        child: Container(
+          margin: const EdgeInsets.only(left: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: AppColors.warningLight,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.warning_amber_rounded,
+                  size: 13, color: AppColors.warningDark),
+              SizedBox(width: 3),
+              Text('Tidak sinkron',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.warningDark)),
+            ],
+          ),
+        ),
+      );
+
   Widget _outletTile(SellerMenuAccessRow o) {
     final key = '${o.outletGoldId}|${o.outletCode}';
     final selected = _selectedOutletKeys.contains(key);
@@ -385,8 +418,15 @@ class _SellerMenuAccessScreenState extends State<SellerMenuAccessScreen> {
           }
         }),
       ),
-      title: Text(o.outletName.toUpperCase(),
-          maxLines: 2, overflow: TextOverflow.ellipsis),
+      title: Row(
+        children: [
+          Flexible(
+            child: Text(o.outletName.toUpperCase(),
+                maxLines: 2, overflow: TextOverflow.ellipsis),
+          ),
+          if (_isMismatched(o)) _mismatchChip(),
+        ],
+      ),
       subtitle: Text(
         'Penjual: ${o.ownerName.isEmpty ? "-" : o.ownerName} • ${o.outletCode}',
         maxLines: 2,
@@ -429,6 +469,7 @@ class _SellerMenuAccessScreenState extends State<SellerMenuAccessScreen> {
             : outlets.first.ownerName;
         final activeCount = outlets.where(_activeOf).length;
         final allActive = activeCount == outlets.length;
+        final mismatched = outlets.any(_isMismatched);
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
           child: ExpansionTile(
@@ -449,10 +490,17 @@ class _SellerMenuAccessScreenState extends State<SellerMenuAccessScreen> {
                     color: AppColors.tealDark),
               ],
             ),
-            title: Text(ownerName.toUpperCase(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w700)),
+            title: Row(
+              children: [
+                Flexible(
+                  child: Text(ownerName.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                ),
+                if (mismatched) _mismatchChip(),
+              ],
+            ),
             subtitle: Text(
                 '${outlets.length} outlet • $_menuLabel aktif $activeCount/${outlets.length}'),
             childrenPadding: const EdgeInsets.only(bottom: 8),
@@ -538,6 +586,32 @@ class _SellerMenuAccessScreenState extends State<SellerMenuAccessScreen> {
                     ],
                   ),
                 ),
+                if (!_loading &&
+                    _groupBySeller().values.any((os) => os.any(_isMismatched)))
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(pad, 0, pad, 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.warningLight,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded,
+                              size: 18, color: AppColors.warningDark),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${_groupBySeller().values.where((os) => os.any(_isMismatched)).length} penjual punya Daftar Pembeli dan Mode Pembeli yang tidak sinkron.',
+                              style: const TextStyle(
+                                  fontSize: 12, color: AppColors.warningDark),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 if (!_loading && _rows.isNotEmpty)
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: pad),

@@ -21,4 +21,24 @@ class SubscriptionApi extends ApiClient {
   Future<http.Response> adminSetPricingUI(Map<String, dynamic> body) {
     return _client.patch('/gold-gym/v2/userdata/admin/pricing-ui', body);
   }
+
+  /// GET /admin/plan-pricing (ADMIN, 2026-10-10): baris override harga + diskon tiap paket.
+  Future<http.Response> adminGetPlanPricing() {
+    return _client.get('/gold-gym/v2/userdata/admin/plan-pricing');
+  }
+
+  /// PUT /admin/plan-pricing (ADMIN): ubah harga dasar dan/atau diskon 1 paket.
+  Future<http.Response> adminSetPlanPricing({
+    required String planId,
+    int? priceMonthlyOverride,
+    int? priceYearlyOverride,
+    required double discountPercent,
+  }) {
+    return _client.put('/gold-gym/v2/userdata/admin/plan-pricing', {
+      'plan_id': planId,
+      'price_monthly_override': priceMonthlyOverride,
+      'price_yearly_override': priceYearlyOverride,
+      'discount_percent': discountPercent,
+    });
+  }
 }

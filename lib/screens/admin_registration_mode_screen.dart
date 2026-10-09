@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
+import '../models/seller_access_model.dart';
 import '../services/core_api.dart';
+import '../services/seller_access_api.dart';
 import '../utils/responsive.dart';
 import '../utils/toast.dart';
 import '../widgets/app_bar_custom.dart';
@@ -24,9 +26,33 @@ class AdminRegistrationModeScreen extends StatefulWidget {
 class _AdminRegistrationModeScreenState
     extends State<AdminRegistrationModeScreen> {
   final _coreApi = CoreApi();
+  final _sellerAccessApi = SellerAccessApi();
   String _mode = 'BOTH';
   bool _loading = true;
   bool _saving = false;
+  // 2026-10-10: "Daftar Akun" (mode global pendaftaran) dan "Akses Daftar Pembeli" (per-penjual)
+  // sama-sama soal pendaftaran pembeli -- kalau mode global MENGIZINKAN pembeli (BOTH/BUYER_ONLY)
+  // tapi ada penjual dengan akses Daftar Pembeli mati (atau sebaliknya, mode SELLER_ONLY tapi ada
+  // penjual yang aksesnya masih nyala), tandai sebagai tidak sinkron -- murni informasi.
+  List<SellerMenuAccessRow> _sellerRows = [];
+
+  List<int> _distinctSellerIds(List<SellerMenuAccessRow> rows) {
+    final seen = <int>{};
+    for (final r in rows) {
+      seen.add(r.outletGoldId);
+    }
+    return seen.toList();
+  }
+
+  int get _mismatchedSellerCount {
+    final buyerAllowed = _mode == 'BOTH' || _mode == 'BUYER_ONLY';
+    var mismatched = 0;
+    for (final goldId in _distinctSellerIds(_sellerRows)) {
+      final access = _sellerRows.firstWhere((r) => r.outletGoldId == goldId);
+      if (access.daftarPembeliActive != buyerAllowed) mismatched++;
+    }
+    return mismatched;
+  }
 
   static const _options = [
     (
@@ -57,12 +83,12 @@ class _AdminRegistrationModeScreenState
 
   Future<void> _load() async {
     setState(() => _loading = true);
+    String mode = _mode;
     try {
       final resp = await _coreApi.getRegistrationMode();
       if (resp.statusCode == 200) {
         final body = jsonDecode(resp.body);
-        final mode = (body['data']?['mode'] ?? 'BOTH') as String;
-        if (mounted) setState(() => _mode = mode);
+        mode = (body['data']?['mode'] ?? 'BOTH') as String;
       } else if (mounted) {
         Toast.error(context, 'Gagal memuat pengaturan, memakai default');
       }
@@ -71,7 +97,23 @@ class _AdminRegistrationModeScreenState
         Toast.error(context, 'Gagal memuat pengaturan, memakai default');
       }
     }
+    await _loadSellerRows();
+    if (mounted) setState(() => _mode = mode);
     if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _loadSellerRows() async {
+    try {
+      final resp = await _sellerAccessApi.getList('');
+      if (resp.statusCode != 200) return;
+      final body = jsonDecode(resp.body);
+      final rows = ((body['data'] ?? []) as List)
+          .map((e) => SellerMenuAccessRow.fromJson(e))
+          .toList();
+      if (mounted) setState(() => _sellerRows = rows);
+    } catch (_) {
+      // gagal muat -- banner tidak tampil, tidak memblokir layar utama
+    }
   }
 
   Future<void> _save() async {
@@ -116,6 +158,30 @@ class _AdminRegistrationModeScreenState
                           '"Daftar Akun" (tanpa OTP).',
                       icon: Icons.how_to_reg_rounded,
                     ),
+                    if (_mismatchedSellerCount > 0)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.warningLight,
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.warning_amber_rounded,
+                                size: 18, color: AppColors.warningDark),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '$_mismatchedSellerCount akun penjual tidak sinkron dengan mode pendaftaran saat ini. '
+                                'Cek menu "Akses Daftar Pembeli".',
+                                style: const TextStyle(
+                                    fontSize: 12, color: AppColors.warningDark),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     SectionCard(
                       title: 'Mode pendaftaran',
                       icon: Icons.tune_rounded,

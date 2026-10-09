@@ -7,4 +7,9 @@ class UsageStatsApi extends ApiClient {
 
   Future<http.Response> getReport() =>
       _c.get('/gold-gym/v2/userdata/admin/usage-stats');
+
+  /// GET /gold-gym/v2/userdata/admin/usage-stats/online-now (2026-10-10) -- daftar akun "online
+  /// sekarang", untuk tombol "Detail" di kartu Live Sekarang.
+  Future<http.Response> getOnlineNowUsers() =>
+      _c.get('/gold-gym/v2/userdata/admin/usage-stats/online-now');
 }

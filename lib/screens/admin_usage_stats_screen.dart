@@ -11,6 +11,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/page_header.dart';
 import '../widgets/private_route.dart';
 import '../widgets/section_card.dart';
+import 'admin_online_now_users_screen.dart';
 
 String _dur(num sec) {
   if (sec <= 0) return '-';
@@ -118,6 +119,15 @@ class _AdminUsageStatsScreenState extends State<AdminUsageStatsScreen> {
                     title: lang.get('Online now (active < 5 min)',
                         'Live sekarang (aktif < 5 menit)'),
                     icon: Icons.circle,
+                    action: TextButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AdminOnlineNowUsersScreen(),
+                        ),
+                      ),
+                      child: Text(lang.get('Detail', 'Detail')),
+                    ),
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
