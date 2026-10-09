@@ -21,6 +21,7 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _namaController = TextEditingController();
+  final _namaPTController = TextEditingController();
   final _emailController = TextEditingController();
   final _hpController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -62,6 +63,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     _namaController.dispose();
+    _namaPTController.dispose();
     _emailController.dispose();
     _hpController.dispose();
     _passwordController.dispose();
@@ -94,6 +96,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         password: _passwordController.text,
         nomorHp: _hpController.text,
         role: _role,
+        namaPT: _namaPTController.text,
       );
 
       if (response.statusCode == 201) {
@@ -177,6 +180,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
               prefixIcon: Icon(Icons.person_outline_rounded),
             ),
             onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _namaPTController,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(
+              labelText: 'Nama PT (opsional)',
+              prefixIcon: Icon(Icons.business_outlined),
+            ),
           ),
           const SizedBox(height: 14),
           TextField(
