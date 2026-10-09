@@ -241,7 +241,13 @@ class _LocationPickerState extends State<LocationPicker> {
     final sel = LocationSelection(
       countryId: _provinsi != null ? _indonesiaCountryId : null,
       level1Id: _provinsi,
-      level2Id: _kabupaten ?? _kota,
+      // _level2ActiveParent (BUKAN _kabupaten ?? _kota) -- ketemu nyata 2026-10-09: kalau user
+      // mengisi Kabupaten DULU lalu Kota (field independen, tidak saling menghapus), "kabupaten ??
+      // kota" selalu memprioritaskan Kabupaten meski Kecamatan/Kelurahan yang sebenarnya dipilih
+      // adalah anak dari Kota -- payload jadi rantai lokasi TIDAK KONSISTEN (level2 dari Kabupaten,
+      // level3/4 dari Kota) dan backend menolaknya (500, sekarang diperbaiki jadi 400 juga).
+      // _level2ActiveParent SELALU menunjuk induk yang benar-benar dipakai memuat Kecamatan.
+      level2Id: _level2ActiveParent,
       level3Id: _kecamatan,
       level4Id: _kelurahan,
       postalCode: _postalController.text.trim().isEmpty
