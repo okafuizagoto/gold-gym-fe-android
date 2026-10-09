@@ -53,8 +53,25 @@ class _OutletScreenState extends State<NewOutletScreen> {
       _outletNameController.text.trim().isNotEmpty &&
       _outletAddressController.text.trim().isNotEmpty;
 
+  // Lokasi (2026-10-09): provinsi, kabupaten/kota, DAN kecamatan WAJIB terisi -- sebelumnya
+  // opsional sepenuhnya, jadi outlet bisa tersimpan tanpa lokasi lengkap. Kelurahan/Desa (level4)
+  // tetap opsional karena backend belum punya data seed untuk level itu (lihat LocationPicker).
+  bool get _locationFilled =>
+      _location.level1Id != null &&
+      _location.level2Id != null &&
+      _location.level3Id != null;
+
   Future<void> addItem() async {
-    if (_formFilled) {
+    if (!_formFilled) {
+      Toast.error(context, 'Isi nama dan alamat outlet terlebih dahulu.');
+      return;
+    }
+    if (!_locationFilled) {
+      Toast.error(context,
+          'Lengkapi lokasi outlet (provinsi, kabupaten/kota, dan kecamatan).');
+      return;
+    }
+    {
       final outlet = Outlet(
         outlet_name: _outletNameController.text,
         outlet_address: _outletAddressController.text,
@@ -70,8 +87,6 @@ class _OutletScreenState extends State<NewOutletScreen> {
       _outletNameController.clear();
       _outletAddressController.clear();
       setState(() => _location = LocationSelection());
-    } else {
-      Toast.error(context, 'Isi nama dan alamat outlet terlebih dahulu.');
     }
   }
 
@@ -122,6 +137,11 @@ class _OutletScreenState extends State<NewOutletScreen> {
 
     if (outletsArrNotifier.value.isEmpty && !_formFilled) {
       Toast.error(context, 'Isi nama dan alamat outlet terlebih dahulu.');
+      return;
+    }
+    if (outletsArrNotifier.value.isEmpty && !_locationFilled) {
+      Toast.error(context,
+          'Lengkapi lokasi outlet (provinsi, kabupaten/kota, dan kecamatan).');
       return;
     }
 
