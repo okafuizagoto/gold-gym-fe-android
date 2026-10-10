@@ -3055,6 +3055,66 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
 
   /// Simpan transaksi: seluruh item cart (array) dikirim sekali ke backend,
   /// backend memasukkan ke antrian Kafka lalu consumer insert ke database.
+  /// Validasi stok real-time (2026-10-10, QA POS #6): sisa stok di layar POS adalah snapshot
+  /// yang bisa basi (kasir lain sudah menjual sebagian sejak produk ditambahkan ke keranjang).
+  /// Dicek ulang ke server TEPAT SEBELUM simpan -- kalau kurang, kasir diberi tahu LEBIH DULU
+  /// (nama item + sisa sebenarnya) ketimbang baru tahu lewat error setelah tap SIMPAN. Backend
+  /// tetap menjadi penjaga terakhir (guard atomik saat insert), ini murni untuk UX.
+  Future<bool> _recheckStockAvailability(
+      BuildContext context, CartProvider cart, String outcode) async {
+    if (outcode.isEmpty) return true;
+
+    // qty diminta per item_id, gabungkan baris yang sama; lewati booking (tidak punya stok).
+    final requestedByItemId = <int, int>{};
+    for (final item in cart.items) {
+      if (item.isBooking) continue;
+      final itemId = int.tryParse(item.stockCode);
+      if (itemId == null) continue;
+      requestedByItemId[itemId] = (requestedByItemId[itemId] ?? 0) + item.stockQty;
+    }
+    if (requestedByItemId.isEmpty) return true;
+
+    try {
+      final resp =
+          await StockApi().checkStock(outcode, requestedByItemId.keys.toList());
+      if (resp.statusCode != 200) return true; // gagal cek -> jangan blokir, backend tetap jaga
+      final rows = (jsonDecode(resp.body)['data'] ?? []) as List;
+      final current = <int, StockResponse>{};
+      for (final row in rows) {
+        final s = StockResponse.fromJson(Map<String, dynamic>.from(row));
+        current[s.stock_item_id] = s;
+      }
+
+      final shortages = <String>[];
+      requestedByItemId.forEach((itemId, requestedQty) {
+        final stock = current[itemId];
+        if (stock == null) {
+          // tidak ditemukan sekarang (mis. dihapus) -- anggap sisa 0, kecuali memang jasa
+          // (baris jasa manual biasanya tidak punya item_id valid sehingga tidak sampai sini).
+          return;
+        }
+        if (stock.isTherapy) return; // jasa: stok tak dibatasi
+        if (requestedQty > stock.stock_qty) {
+          final name = cart.items
+              .firstWhere((i) => int.tryParse(i.stockCode) == itemId,
+                  orElse: () => cart.items.first)
+              .stockName;
+          shortages.add('$name (sisa ${stock.stock_qty}, di keranjang $requestedQty)');
+        }
+      });
+
+      if (shortages.isNotEmpty) {
+        if (context.mounted) {
+          Toast.error(context, 'Stok sudah berubah: ${shortages.join(', ')}. Sesuaikan jumlah di keranjang.');
+        }
+        return false;
+      }
+      return true;
+    } catch (_) {
+      return true; // gagal cek (jaringan dll) -- jangan blokir, backend tetap jaga saat simpan
+    }
+  }
+
   Future<void> _saveTransaction(BuildContext context, CartProvider cart,
       LanguageProvider langProvider) async {
     // customer wajib untuk RETAIL yang belum diberi akses "POS tanpa customer" --
@@ -3090,9 +3150,15 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
       );
       if (confirmed != true) return;
     }
+
+    final outcodeForCheck = await Storage.get(AppConstants.outcode) ?? '';
+    if (!await _recheckStockAvailability(context, cart, outcodeForCheck)) {
+      return;
+    }
+
     setState(() => _isSaving = true);
     try {
-      final outcode = await Storage.get(AppConstants.outcode) ?? '';
+      final outcode = outcodeForCheck;
 
       // --- QRIS Midtrans DINONAKTIFKAN SEMENTARA (2026-09-10) -- lihat
       // deploy-notes/k8s-midtrans-secret/notes-delayed-feature/README.md.

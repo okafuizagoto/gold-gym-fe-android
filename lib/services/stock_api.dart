@@ -72,4 +72,15 @@ class StockApi extends ApiClient {
       "barcode": barcode,
     });
   }
+
+  /// Validasi stok real-time (2026-10-10, QA POS #6): sisa stok TERKINI untuk item_id yang
+  /// diminta -- dicek ulang sebelum SIMPAN transaksi. Item yang tidak ada di hasil = sisa 0.
+  Future<http.Response> checkStock(String outcode, List<int> itemIds) async {
+    final ApiClient client = ApiClient();
+    return client.get("/gold-gym/v2/stock", queryParams: {
+      "type": "checkstock",
+      "code": outcode,
+      "itemids": itemIds.join(','),
+    });
+  }
 }
