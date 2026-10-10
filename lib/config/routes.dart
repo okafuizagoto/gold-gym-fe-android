@@ -29,6 +29,7 @@ import '../screens/admin_proof_access_screen.dart';
 import '../screens/admin_registration_mode_screen.dart';
 import '../screens/admin_plan_pricing_screen.dart';
 import '../screens/cashier_shift_screen.dart';
+import '../screens/thermal_printer_screen.dart';
 import '../screens/admin_pricing_ui_screen.dart';
 import '../screens/admin_usage_stats_screen.dart';
 import '../screens/keamanan_akun_screen.dart';
@@ -93,6 +94,7 @@ class AppRoutes {
   static const String adminLanggananTampilan = '/admin-langganan-tampilan';
   static const String adminPlanPricing = '/admin-plan-pricing';
   static const String cashierShift = '/cashier-shift';
+  static const String thermalPrinter = '/thermal-printer';
   static const String adminPaymentReport = '/admin-payment-report';
   static const String adminStorageUsage = '/admin-storage-usage';
   static const String adminStatistikPengguna = '/admin-statistik-pengguna';
@@ -157,6 +159,7 @@ class AppRoutes {
         adminLanggananTampilan: (context) => const AdminPricingUiScreen(),
         adminPlanPricing: (context) => const AdminPlanPricingScreen(),
         cashierShift: (context) => const CashierShiftScreen(),
+        thermalPrinter: (context) => const ThermalPrinterScreen(),
         adminPaymentReport: (context) => const AdminPaymentReportScreen(),
         adminStorageUsage: (context) => const AdminStorageUsageScreen(),
         adminStatistikPengguna: (context) => const AdminUsageStatsScreen(),

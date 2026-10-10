@@ -13,6 +13,10 @@ class AppConstants {
   // Harus sama dengan key yang ditulis outlet_screen ('outcode'); dulu 'out_code'
   // sehingga main.dart tidak pernah menemukan outlet tersimpan.
   static const String outcode = 'outcode';
+  // MAC address printer thermal Bluetooth terakhir dipakai (2026-10-10, QA POS #11).
+  static const String thermalPrinterAddressKey = 'thermal_printer_address';
+  // Lebar kertas thermal dalam mm ('58' atau '80'), default '58' kalau belum diatur.
+  static const String thermalPaperWidthKey = 'thermal_paper_width_mm';
   static const String userRoleKey = 'user_role';
   static const String outletTypeKey = 'outlet_type';
   static const String userGoldIdKey = 'user_gold_id';

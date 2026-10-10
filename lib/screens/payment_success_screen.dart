@@ -1,10 +1,14 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:printing/printing.dart';
 import '../config/theme.dart';
+import '../models/sales_model.dart';
 import '../services/sales_api.dart';
+import '../services/thermal_printer.dart';
 import '../utils/constants.dart';
+import '../utils/receipt_escpos.dart';
 import '../utils/responsive.dart';
 import '../utils/text_formatter.dart';
 import '../utils/toast.dart';
@@ -83,7 +87,37 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> {
     }
   }
 
-  Future<void> _handleCetakStruk() async {
+  /// Pilih "Cetak PDF" (dialog print OS, seperti sebelumnya) atau "Cetak Thermal" (ESC/POS
+  /// langsung ke printer Bluetooth tersimpan -- 2026-10-10, QA POS #11).
+  Future<void> _chooseCetakStruk() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: const Text('Cetak PDF'),
+              onTap: () => Navigator.pop(context, 'pdf'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.print_outlined),
+              title: const Text('Cetak Thermal (Bluetooth)'),
+              onTap: () => Navigator.pop(context, 'thermal'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == 'pdf') {
+      await _handleCetakStrukPdf();
+    } else if (choice == 'thermal') {
+      await _handleCetakStrukThermal();
+    }
+  }
+
+  Future<void> _handleCetakStrukPdf() async {
     setState(() => _printing = true);
     try {
       final btOn = await _ensureBluetoothOn();
@@ -96,6 +130,33 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> {
       await Printing.layoutPdf(onLayout: (format) async => pdfBytes);
     } catch (e) {
       if (mounted) Toast.error(context, 'Gagal mencetak struk');
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  /// Cetak struk ESC/POS LANGSUNG ke printer thermal Bluetooth tersimpan (2026-10-10, QA POS
+  /// #11) -- ambil detail nota (header+detail+outlet) lalu render jadi byte ESC/POS & kirim.
+  Future<void> _handleCetakStrukThermal() async {
+    setState(() => _printing = true);
+    try {
+      final resp = await _salesApi.getSaleDetail(widget.saleId);
+      if (resp.statusCode != 200) {
+        if (mounted) Toast.error(context, 'Nota belum siap, coba lagi');
+        return;
+      }
+      final detail = SaleDetailResponse.fromJson(jsonDecode(resp.body));
+      final paperWidth = await ThermalPrinter.paperWidthMm;
+      final bytes = await ReceiptEscPos.build(detail, paperWidthMm: paperWidth);
+      final error = await ThermalPrinter.printBytes(bytes);
+      if (!mounted) return;
+      if (error != null) {
+        Toast.error(context, error);
+      } else {
+        Toast.success(context, 'Struk terkirim ke printer');
+      }
+    } catch (e) {
+      if (mounted) Toast.error(context, 'Gagal mencetak struk thermal');
     } finally {
       if (mounted) setState(() => _printing = false);
     }
@@ -237,7 +298,7 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> {
                                 Expanded(
                                   child: OutlinedButton.icon(
                                     onPressed:
-                                        _printing ? null : _handleCetakStruk,
+                                        _printing ? null : _chooseCetakStruk,
                                     style: whiteOutline,
                                     icon: _printing
                                         ? const SizedBox(

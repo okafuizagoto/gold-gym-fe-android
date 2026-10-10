@@ -67,10 +67,16 @@ dependencies:
   # yang muncul di aplikasi tujuan rapi, mis. "nota-TRX123.pdf")
   path_provider: ^2.1.4
 
-  # Cek & minta aktifkan Bluetooth sebelum Cetak Struk (adapter-state saja,
-  # BUKAN untuk scan/pairing raw print -- printer tetap dipilih lewat dialog
-  # print native Android seperti sekarang, via package printing di atas)
+  # Cek & minta aktifkan Bluetooth sebelum Cetak Struk (adapter-state saja) --
+  # dipakai jalur PDF (dialog print native) di atas.
   flutter_blue_plus: ^1.35.3
+
+  # Cetak struk ESC/POS LANGSUNG ke printer thermal Bluetooth (2026-10-10,
+  # QA POS #11) -- tanpa dialog print OS, tanpa driver printer: generate
+  # perintah ESC/POS lalu kirim byte mentah lewat Bluetooth Classic (SPP),
+  # cara kerja printer thermal 58mm/80mm murah yang umum dipakai warung/toko.
+  esc_pos_utils_plus: ^2.0.4
+  print_bluetooth_thermal: ^1.1.1
 
   # Simpan PDF struk ke penyimpanan lokal ("Unduh Struk") -- aman lintas
   # Android API level (scoped storage API 29+, fallback di bawahnya)

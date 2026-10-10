@@ -118,6 +118,14 @@ class _AppDrawerState extends State<AppDrawer> {
           icon: Icons.point_of_sale_outlined,
           route: '/cashier-shift',
         ),
+      // Printer Thermal (2026-10-10): pilih/ingat printer Bluetooth untuk cetak struk
+      // ESC/POS langsung, sama kondisi tampil dgn POS.
+      if (!buyerView && !isAdmin)
+        MenuItem(
+          title: 'Printer Thermal',
+          icon: Icons.print_outlined,
+          route: '/thermal-printer',
+        ),
       // mode pembeli: pilih outlet penjual dulu, lalu pesan barang
       if (buyerView)
         MenuItem(

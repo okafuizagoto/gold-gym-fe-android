@@ -10,7 +10,9 @@ import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
 import '../widgets/search_field.dart';
 import '../services/sales_api.dart';
+import '../services/thermal_printer.dart';
 import '../models/sales_model.dart';
+import '../utils/receipt_escpos.dart';
 import '../providers/language_provider.dart';
 import '../utils/responsive.dart';
 import '../utils/text_formatter.dart';
@@ -127,6 +129,36 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     } catch (e) {
       debugPrint('Error printing receipt: $e');
       if (mounted) Toast.error(context, 'Gagal cetak nota');
+    } finally {
+      if (mounted) setState(() => _printingSaleId = null);
+    }
+  }
+
+  /// Cetak struk ESC/POS LANGSUNG ke printer thermal Bluetooth tersimpan (2026-10-10, QA POS
+  /// #11) -- tanpa dialog print OS. Ambil ulang detail nota (header+detail+outlet) karena data
+  /// itemnya tidak ikut terbawa di SaleHistoryModel (daftar ringkas), lalu render jadi byte
+  /// ESC/POS & kirim.
+  Future<void> _printReceiptThermal(SaleHistoryModel sale) async {
+    setState(() => _printingSaleId = sale.saleId);
+    try {
+      final resp = await _salesApi.getSaleDetail(sale.saleId);
+      if (resp.statusCode != 200) {
+        if (mounted) Toast.error(context, 'Gagal memuat detail nota');
+        return;
+      }
+      final detail = SaleDetailResponse.fromJson(jsonDecode(resp.body));
+      final paperWidth = await ThermalPrinter.paperWidthMm;
+      final bytes = await ReceiptEscPos.build(detail, paperWidthMm: paperWidth);
+      final error = await ThermalPrinter.printBytes(bytes);
+      if (!mounted) return;
+      if (error != null) {
+        Toast.error(context, error);
+      } else {
+        Toast.success(context, 'Struk terkirim ke printer');
+      }
+    } catch (e) {
+      debugPrint('Error printing thermal receipt: $e');
+      if (mounted) Toast.error(context, 'Gagal cetak struk thermal');
     } finally {
       if (mounted) setState(() => _printingSaleId = null);
     }
@@ -452,11 +484,22 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               ),
       _printingSaleId == sale.saleId
           ? spinner()
-          : action(
-              icon: Icons.print_outlined,
-              color: AppColors.ink,
+          : PopupMenuButton<String>(
+              icon: const Icon(Icons.print_outlined,
+                  size: 20, color: AppColors.ink),
               tooltip: langProvider.get('Print receipt', 'Cetak nota'),
-              onPressed: () => _printReceipt(sale),
+              onSelected: (value) => value == 'pdf'
+                  ? _printReceipt(sale)
+                  : _printReceiptThermal(sale),
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                    value: 'pdf',
+                    child: Text(langProvider.get('Print PDF', 'Cetak PDF'))),
+                PopupMenuItem(
+                    value: 'thermal',
+                    child: Text(langProvider.get(
+                        'Print thermal (Bluetooth)', 'Cetak Thermal (Bluetooth)'))),
+              ],
             ),
     ];
 

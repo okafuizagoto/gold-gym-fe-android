@@ -155,12 +155,35 @@ class SaleDetailLineModel {
   }
 }
 
+/// Kop nota (2026-10-10, QA POS #11) -- dipakai cetak struk ESC/POS langsung ke printer
+/// thermal (beda dari cetak PDF via dialog print OS yang sudah ada).
+class SaleOutletInfoModel {
+  final String outletCode;
+  final String outletName;
+  final String outletAddress;
+
+  SaleOutletInfoModel({
+    required this.outletCode,
+    required this.outletName,
+    required this.outletAddress,
+  });
+
+  factory SaleOutletInfoModel.fromJson(Map<String, dynamic> json) {
+    return SaleOutletInfoModel(
+      outletCode: json['outlet_code'] ?? '',
+      outletName: json['outlet_name'] ?? '',
+      outletAddress: json['outlet_address'] ?? '',
+    );
+  }
+}
+
 /// Response gabungan header (th_sale) + detail (td_sale) untuk layar Detail Sales.
 class SaleDetailResponse {
   final SaleHistoryModel header;
   final List<SaleDetailLineModel> detail;
+  final SaleOutletInfoModel? outlet;
 
-  SaleDetailResponse({required this.header, required this.detail});
+  SaleDetailResponse({required this.header, required this.detail, this.outlet});
 
   factory SaleDetailResponse.fromJson(Map<String, dynamic> json) {
     final data = json['data'] as Map<String, dynamic>? ?? {};
@@ -170,6 +193,10 @@ class SaleDetailResponse {
       detail: ((data['detail'] as List?) ?? [])
           .map((e) => SaleDetailLineModel.fromJson(e))
           .toList(),
+      outlet: data['outlet'] == null
+          ? null
+          : SaleOutletInfoModel.fromJson(
+              Map<String, dynamic>.from(data['outlet'])),
     );
   }
 }
