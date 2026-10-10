@@ -51,6 +51,9 @@ dependencies:
   # Pilih foto bukti pembayaran (kamera/galeri)
   image_picker: ^1.1.2
 
+  # Scan barcode produk di POS (2026-10-10, QA POS #4)
+  mobile_scanner: ^5.2.3
+
   # Simpan foto bukti pembayaran ke galeri (download dari Sales History)
   gal: ^2.3.0
 

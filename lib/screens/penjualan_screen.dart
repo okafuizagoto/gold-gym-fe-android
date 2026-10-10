@@ -31,6 +31,7 @@ import '../services/customer_api.dart';
 import '../services/discount_api.dart';
 import '../services/items_api.dart';
 import '../services/core_api.dart';
+import 'barcode_scanner_screen.dart';
 import '../models/stock_model.dart';
 import '../models/sales_item_model.dart';
 import '../models/discount_model.dart';
@@ -1304,6 +1305,36 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     return total;
   }
 
+  /// Scan barcode (2026-10-10, QA POS #4): buka kamera, cari item via barcode cetak di outlet
+  /// ini, langsung tambahkan ke keranjang (sama jalur dgn tap kartu katalog) kalau ketemu.
+  Future<void> _scanBarcodeAndAdd(BuildContext context) async {
+    final code = await scanBarcode(context);
+    if (code == null || code.isEmpty) return;
+    if (!context.mounted) return;
+    final outcode = await Storage.get(AppConstants.outcode) ?? '';
+    if (outcode.isEmpty) return;
+    try {
+      final resp = await StockApi().scanBarcode(outcode, code);
+      if (!context.mounted) return;
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body)['data'];
+        if (data == null) {
+          Toast.error(context, 'Barcode tidak ditemukan');
+          return;
+        }
+        final stock = StockResponse.fromJson(data);
+        _quickAdd(stock);
+        Toast.success(context, '${stock.stock_name} ditambahkan');
+      } else if (resp.statusCode == 404) {
+        Toast.error(context, 'Barcode tidak ditemukan');
+      } else {
+        Toast.error(context, 'Gagal mencari barcode');
+      }
+    } catch (_) {
+      if (context.mounted) Toast.error(context, 'Gagal mencari barcode');
+    }
+  }
+
   /// Tambah cepat dari katalog: gabung ke baris yang sama kalau sudah ada
   /// (qty + 1), atau buat baris baru dengan harga default (diskon aktif
   /// tetap otomatis diterapkan lewat _buildSalesItem).
@@ -1792,6 +1823,13 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
           return Scaffold(
             appBar: AppBarCustom(
               title: langProvider.get('Point of Sale', 'Penjualan'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.qr_code_scanner_rounded),
+                  tooltip: langProvider.get('Scan barcode', 'Scan Barcode'),
+                  onPressed: () => _scanBarcodeAndAdd(context),
+                ),
+              ],
             ),
             drawer: const AppDrawer(),
             body: SafeArea(

@@ -11,6 +11,9 @@ class Item {
   String item_description;
   bool item_status;
   String item_email;
+  // Barcode cetak produk (EAN/UPC/kode toko sendiri), opsional -- scan kamera di POS mencari
+  // lewat field ini (2026-10-10, QA POS #4). Beda dari item_code (nomor urut auto-generate).
+  String item_barcode;
 
   Item({
     required this.item_name,
@@ -22,6 +25,7 @@ class Item {
     required this.item_description,
     required this.item_status,
     required this.item_email,
+    this.item_barcode = '',
   });
 
   Map<String, dynamic> toJson() {
@@ -35,6 +39,7 @@ class Item {
       "item_description": item_description,
       "item_status": item_status ? "ACTIVE" : "NON ACTIVE",
       "item_email": item_email,
+      "item_barcode": item_barcode,
     };
   }
 }
@@ -52,6 +57,7 @@ class ItemResponse {
   final String item_description;
   final String item_status;
   final String item_photo;
+  final String item_barcode;
   final DateTime item_created_at;
   final DateTime? item_updated_at;
 
@@ -67,6 +73,7 @@ class ItemResponse {
     required this.item_description,
     required this.item_status,
     this.item_photo = '',
+    this.item_barcode = '',
     required this.item_created_at,
     this.item_updated_at,
   });
@@ -85,6 +92,7 @@ class ItemResponse {
       item_description: json["item_description"] ?? "",
       item_status: json["item_status"] ?? "",
       item_photo: json["item_photo"] ?? "",
+      item_barcode: json["item_barcode"] ?? "",
       // parser aman: backend bisa mengirim "" untuk kolom tanggal NULL
       item_created_at: DateTime.tryParse('${json["item_created_at"] ?? ''}') ??
           DateTime.now(),

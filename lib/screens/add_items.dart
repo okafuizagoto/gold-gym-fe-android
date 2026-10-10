@@ -41,6 +41,8 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
   final _itemPriceController = TextEditingController();
   final _itemBrandController = TextEditingController();
   final _itemDescriptionController = TextEditingController();
+  // Barcode cetak produk (opsional) -- dicari saat scan kamera di POS (2026-10-10, QA POS #4).
+  final _itemBarcodeController = TextEditingController();
   final itemsArrNotifier = ValueNotifier<List<Item>>([]);
   int lengths = 0;
   int pages = 0;
@@ -91,6 +93,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
         item_description: _itemDescriptionController.text,
         item_status: isActiveItems.value,
         item_email: email,
+        item_barcode: _itemBarcodeController.text.trim(),
       );
       arrayOneItem = [
         ...arrayOneItem,
@@ -108,6 +111,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                   "item_description": item.item_description,
                   "item_status": item.item_status ? "ACTIVE" : "NON ACTIVE",
                   "item_email": item.item_email,
+                  "item_barcode": item.item_barcode,
                 })
             .toList(),
         "apply_all_outlets": _applyAllOutlets,
@@ -125,6 +129,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                   "item_description": item.item_description,
                   "item_status": item.item_status ? "ACTIVE" : "NON ACTIVE",
                   "item_email": item.item_email,
+                  "item_barcode": item.item_barcode,
                 })
             .toList(),
         "apply_all_outlets": _applyAllOutlets,
@@ -151,6 +156,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
           _itemPriceController.clear();
           _itemBrandController.clear();
           _itemDescriptionController.clear();
+          _itemBarcodeController.clear();
           _resetBrandDefault();
           setState(() => _pickedItemPhoto = null);
           app_toast.Toast.success(context, "Item successfully saved");
@@ -190,6 +196,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
         "item_status": statusEditNotifier.value,
         "item_outcode": outcode,
         "item_id": item.item_id,
+        "item_barcode": _itemBarcodeController.text.trim(),
       }
     };
 
@@ -248,6 +255,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
       item_description: _itemDescriptionController.text,
       item_status: isActiveItems.value,
       item_email: email,
+      item_barcode: _itemBarcodeController.text.trim(),
     );
 
     itemsArrNotifier.value = [
@@ -261,6 +269,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
     _itemPriceController.clear();
     _itemBrandController.clear();
     _itemDescriptionController.clear();
+    _itemBarcodeController.clear();
     _resetBrandDefault();
   }
 
@@ -382,6 +391,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
     _itemPriceController.dispose();
     _itemBrandController.dispose();
     _itemDescriptionController.dispose();
+    _itemBarcodeController.dispose();
     super.dispose();
   }
 
@@ -499,6 +509,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
     _itemPriceController.text = item.item_price.toString();
     _itemBrandController.text = item.item_brand;
     _itemDescriptionController.text = item.item_description;
+    _itemBarcodeController.text = item.item_barcode;
 
     statusEditNotifier.value =
         item.item_status.isEmpty ? "ACTIVE" : item.item_status;
@@ -511,6 +522,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
     _itemPriceController.clear();
     _itemBrandController.clear();
     _itemDescriptionController.clear();
+    _itemBarcodeController.clear();
   }
 
   Future<void> _saveEdit(ItemResponse item) async {
@@ -615,6 +627,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                             priceController: _itemPriceController,
                             brandController: _itemBrandController,
                             descriptionController: _itemDescriptionController,
+                            barcodeController: _itemBarcodeController,
                             statusNotifier: statusEditNotifier,
                             onEdit: () => _startEdit(i, items[i]),
                             onSave: () => _saveEdit(items[i]),
@@ -718,6 +731,20 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                     controller: _itemPackController,
                     decoration: InputDecoration(
                       hintText: langProvider.get('Enter unit', 'Isi satuan'),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Barcode (opsional, 2026-10-10, scan barcode POS -- QA #4)
+                _FieldRow(
+                  label: langProvider.get('Barcode', 'Barcode'),
+                  child: TextField(
+                    controller: _itemBarcodeController,
+                    decoration: InputDecoration(
+                      hintText: langProvider.get(
+                          'Optional, scan at checkout',
+                          'Opsional, dipakai saat scan di kasir'),
                     ),
                   ),
                 ),
@@ -1058,6 +1085,7 @@ class _ItemTile extends StatelessWidget {
   final TextEditingController priceController;
   final TextEditingController brandController;
   final TextEditingController descriptionController;
+  final TextEditingController barcodeController;
   final ValueNotifier<String> statusNotifier;
   final VoidCallback onEdit;
   final VoidCallback onSave;
@@ -1075,6 +1103,7 @@ class _ItemTile extends StatelessWidget {
     required this.priceController,
     required this.brandController,
     required this.descriptionController,
+    required this.barcodeController,
     required this.statusNotifier,
     required this.onEdit,
     required this.onSave,
@@ -1158,6 +1187,10 @@ class _ItemTile extends StatelessWidget {
               TextField(
                 controller: brandController,
                 decoration: const InputDecoration(labelText: 'Merek'),
+              ),
+              TextField(
+                controller: barcodeController,
+                decoration: const InputDecoration(labelText: 'Barcode'),
               ),
               ValueListenableBuilder<String>(
                 valueListenable: statusNotifier,

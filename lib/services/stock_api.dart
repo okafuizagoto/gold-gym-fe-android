@@ -62,4 +62,14 @@ class StockApi extends ApiClient {
     }
     return client.get("/gold-gym/v2/stock", queryParams: queryParams);
   }
+
+  /// Cari item via barcode cetak (2026-10-10, scan barcode POS). 404 = tidak ketemu.
+  Future<http.Response> scanBarcode(String outcode, String barcode) async {
+    final ApiClient client = ApiClient();
+    return client.get("/gold-gym/v2/stock", queryParams: {
+      "type": "scanbarcode",
+      "code": outcode,
+      "barcode": barcode,
+    });
+  }
 }
