@@ -215,6 +215,10 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
   // Payment modal controllers
   final _cashAmountController = TextEditingController();
   final _voucherCodeController = TextEditingController();
+  // Pembayaran split/campuran (2026-10-10): tunai + transfer bank sekaligus
+  bool _splitPaymentMode = false;
+  final _splitCashController = TextEditingController();
+  final _splitBankController = TextEditingController();
   final _salesNameController = TextEditingController();
   final _salesStockIDController = TextEditingController();
 
@@ -601,6 +605,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     _qtyController.dispose();
     _cashAmountController.dispose();
     _voucherCodeController.dispose();
+    _splitCashController.dispose();
+    _splitBankController.dispose();
     _customPriceController.dispose();
     _manualNoteController.dispose();
     _debouncer.dispose();
@@ -1400,6 +1406,17 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
   void _showPaymentModal(
       BuildContext context, LanguageProvider langProvider, CartProvider cart) {
     _cashAmountController.clear();
+    _splitPaymentMode = cart.isSplitPayment;
+    _splitCashController.text =
+        (cart.splitPayments[AppConstants.paymentCash] ?? 0) == 0
+            ? ''
+            : (cart.splitPayments[AppConstants.paymentCash] ?? 0)
+                .toStringAsFixed(0);
+    _splitBankController.text =
+        (cart.splitPayments[AppConstants.paymentBank] ?? 0) == 0
+            ? ''
+            : (cart.splitPayments[AppConstants.paymentBank] ?? 0)
+                .toStringAsFixed(0);
     _proofImage = null;
     _showQris = false;
     _qrisUrl = null;
@@ -1456,11 +1473,72 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
               ],
               onChanged: (value) {
                 if (value != null) {
+                  _splitPaymentMode = false;
                   cart.setPaymentType(value);
                   setModalState(() {});
                 }
               },
             ),
+            const SizedBox(height: 8),
+
+            // Pembayaran split/campuran (2026-10-10): sebagian tunai, sisanya transfer bank.
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              dense: true,
+              title: Text(langProvider.get(
+                  'Mixed payment (cash + bank transfer)',
+                  'Bayar campur (tunai + transfer bank)')),
+              value: _splitPaymentMode,
+              onChanged: (checked) {
+                _splitPaymentMode = checked ?? false;
+                if (_splitPaymentMode) {
+                  cart.setPaymentType('');
+                } else {
+                  cart.clearSplitPayments();
+                }
+                setModalState(() {});
+              },
+            ),
+            if (_splitPaymentMode) ...[
+              CurrencyInput(
+                controller: _splitCashController,
+                labelText: langProvider.get('Cash amount', 'Jumlah tunai'),
+                onChanged: (value) {
+                  cart.setSplitPayment(AppConstants.paymentCash, value);
+                  setModalState(() {});
+                },
+              ),
+              const SizedBox(height: 8),
+              CurrencyInput(
+                controller: _splitBankController,
+                labelText:
+                    langProvider.get('Bank transfer amount', 'Jumlah transfer bank'),
+                onChanged: (value) {
+                  cart.setSplitPayment(AppConstants.paymentBank, value);
+                  setModalState(() {});
+                },
+              ),
+              const SizedBox(height: 4),
+              Builder(builder: (context) {
+                final diff = cart.grandTotal - cart.splitPaymentsTotal;
+                final ok = diff == 0;
+                return Text(
+                  ok
+                      ? langProvider.get('Total matches', 'Jumlah sudah pas')
+                      : langProvider.get(
+                          'Remaining: ',
+                          'Sisa: ') +
+                          TextFormatter.formatRupiah(diff.abs()) +
+                          (diff > 0 ? '' : ' (kelebihan)'),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: ok ? AppColors.successDark : AppColors.errorDark,
+                    fontWeight: FontWeight.w600,
+                  ),
+                );
+              }),
+            ],
             const SizedBox(height: 16),
 
             // Kode voucher (opsional) -- pratinjau dulu (tidak konsumsi),

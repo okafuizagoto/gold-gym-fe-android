@@ -8,6 +8,30 @@ class CartProvider with ChangeNotifier {
   String _paymentType = ''; // 'TUNAI' | 'BANK' | 'DEBIT' | ''
   double _cashAmount = 0.0;
 
+  /// Pembayaran split/campuran (2026-10-10): kosong = jalur lama satu metode
+  /// (_paymentType dipakai apa adanya). Diisi (>=2 baris) = jumlah seluruh
+  /// baris HARUS SAMA dengan grandTotal, backend menyimpan sale_pay_type
+  /// = "CAMPUR". Key = method (TUNAI/BANK/DEBIT), value = nominal.
+  final Map<String, double> _splitPayments = {};
+  Map<String, double> get splitPayments => Map.unmodifiable(_splitPayments);
+  bool get isSplitPayment => _splitPayments.length >= 2;
+  double get splitPaymentsTotal =>
+      _splitPayments.values.fold(0.0, (sum, v) => sum + v);
+
+  void setSplitPayment(String method, double amount) {
+    if (amount <= 0) {
+      _splitPayments.remove(method);
+    } else {
+      _splitPayments[method] = amount;
+    }
+    notifyListeners();
+  }
+
+  void clearSplitPayments() {
+    _splitPayments.clear();
+    notifyListeners();
+  }
+
   /// Diskon aktif per item_id di outlet yang sedang dibuka -- dimuat sekali
   /// saat load stok POS, dipakai auto-apply saat item ditambah ke keranjang.
   final Map<int, DiscountInfo> _activeDiscountsByItemId = {};
@@ -114,15 +138,26 @@ class CartProvider with ChangeNotifier {
 
   // Calculate change
   double get change {
+    if (isSplitPayment) {
+      // kembalian hanya berlaku kalau salah satu baris split-nya TUNAI
+      final cashPart = _splitPayments[AppConstants.paymentCash] ?? 0;
+      if (cashPart == 0) return 0;
+      return splitPaymentsTotal - grandTotal;
+    }
     if (_paymentType != AppConstants.paymentCash) return 0;
     if (_cashAmount == 0) return 0;
     return _cashAmount - grandTotal;
   }
 
   bool get canSave {
-    if (_items.isEmpty || _paymentType.isEmpty) return false;
+    if (_items.isEmpty) return false;
     // nota berisi booking sudah bayar bisa bertotal 0 (harga + potongan)
     final minTotal = _items.any((i) => i.isBooking) ? 0 : 1;
+    if (isSplitPayment) {
+      // jumlah seluruh baris split harus pas (backend menolak kalau tidak)
+      return splitPaymentsTotal == grandTotal && grandTotal >= minTotal;
+    }
+    if (_paymentType.isEmpty) return false;
     if (_paymentType == AppConstants.paymentCash) {
       // uang tunai harus cukup
       return _cashAmount >= grandTotal && grandTotal >= minTotal;
@@ -162,8 +197,9 @@ class CartProvider with ChangeNotifier {
     // backend bisa link payment_transaction ke nota ini.
     String? qrisOrderId,
   }) {
-    final paidAmount =
-        _paymentType == AppConstants.paymentCash ? _cashAmount : grandTotal;
+    final paidAmount = isSplitPayment
+        ? splitPaymentsTotal
+        : (_paymentType == AppConstants.paymentCash ? _cashAmount : grandTotal);
     return {
       'data': {
         'header': {
@@ -182,7 +218,8 @@ class CartProvider with ChangeNotifier {
           if (customerSource.isNotEmpty) 'sale_customer_source': customerSource,
           'sale_customer_show': customerShow,
           'sale_paymentyn': 'Y',
-          if (_paymentType.isNotEmpty) 'sale_pay_type': _paymentType,
+          if (!isSplitPayment && _paymentType.isNotEmpty)
+            'sale_pay_type': _paymentType,
           if (_activeTotalDiscount != null) ...{
             'sale_total_discount_percent':
                 _activeTotalDiscount!.discountValue.toStringAsFixed(2),
@@ -198,6 +235,13 @@ class CartProvider with ChangeNotifier {
           'qris_order_id': qrisOrderId,
         if (transDate.isNotEmpty) 'trans_date': transDate,
         if (transTime.isNotEmpty) 'trans_time': transTime,
+        if (isSplitPayment)
+          'payments': _splitPayments.entries
+              .map((e) => {
+                    'method': e.key,
+                    'amount': e.value.toStringAsFixed(0),
+                  })
+              .toList(),
       },
     };
   }
@@ -230,6 +274,7 @@ class CartProvider with ChangeNotifier {
   }
 
   void setPaymentType(String type) {
+    _splitPayments.clear();
     _paymentType = type;
     if (type == AppConstants.paymentBank || type == AppConstants.paymentDebit) {
       _cashAmount = grandTotal; // non-tunai selalu bayar pas
@@ -246,6 +291,7 @@ class CartProvider with ChangeNotifier {
     _items.clear();
     _paymentType = '';
     _cashAmount = 0.0;
+    _splitPayments.clear();
     _activeTotalDiscount = null;
     _voucherCode = null;
     _voucherPercent = null;
