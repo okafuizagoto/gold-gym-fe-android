@@ -1,6 +1,7 @@
 import 'package:http/http.dart' as http;
 import '../services/offline/connectivity_monitor.dart';
 import '../services/offline/sales_outbox.dart';
+import '../services/offline/parked_carts.dart';
 import '../services/offline/stock_cache.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -256,6 +257,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     ItemsApi().getAuthHeaders().then((headers) {
       if (mounted) setState(() => _photoHeaders = headers);
     });
+    ParkedCartsStore.instance.init();
   }
 
   Future<void> _loadUserName() async {
@@ -1824,6 +1826,22 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
             appBar: AppBarCustom(
               title: langProvider.get('Point of Sale', 'Penjualan'),
               actions: [
+                // Transaksi ditahan (2026-10-10, QA POS #7): badge jumlah keranjang yang
+                // ditahan, tap -> daftar untuk lanjutkan/buang.
+                ListenableBuilder(
+                  listenable: ParkedCartsStore.instance,
+                  builder: (context, _) {
+                    final n = ParkedCartsStore.instance.count;
+                    const icon = Icon(Icons.pause_circle_outline_rounded);
+                    return IconButton(
+                      icon: n == 0
+                          ? icon
+                          : Badge(label: Text('$n'), child: icon),
+                      tooltip: 'Transaksi Ditahan',
+                      onPressed: () => _showParkedCartsSheet(context, cart),
+                    );
+                  },
+                ),
                 IconButton(
                   icon: const Icon(Icons.qr_code_scanner_rounded),
                   tooltip: langProvider.get('Scan barcode', 'Scan Barcode'),
@@ -2779,6 +2797,15 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
           maxLines: 1, overflow: TextOverflow.ellipsis),
     );
 
+    final holdButton = OutlinedButton(
+      onPressed: cart.hasItems ? () => _holdCart(context, cart) : null,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(48, 48),
+        padding: EdgeInsets.zero,
+      ),
+      child: const Icon(Icons.pause_rounded, size: 18),
+    );
+
     final cancelButton = OutlinedButton.icon(
       onPressed: cart.hasItems
           ? () async {
@@ -2838,6 +2865,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
               Expanded(child: payButton),
               const SizedBox(width: 10),
               Expanded(child: cancelButton),
+              const SizedBox(width: 10),
+              holdButton,
             ],
           ),
           const SizedBox(height: 10),
@@ -2851,6 +2880,8 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
         Expanded(child: payButton),
         const SizedBox(width: 12),
         Expanded(child: cancelButton),
+        const SizedBox(width: 12),
+        holdButton,
         const SizedBox(width: 12),
         Expanded(child: saveButton),
       ],
@@ -3055,6 +3086,157 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
 
   /// Simpan transaksi: seluruh item cart (array) dikirim sekali ke backend,
   /// backend memasukkan ke antrian Kafka lalu consumer insert ke database.
+  /// Hold/Parkir Transaksi (2026-10-10, QA POS #7): tahan keranjang saat ini (mis. pelanggan
+  /// belum selesai pilih barang / meninggalkan kasir sebentar) supaya kasir bisa melayani
+  /// pelanggan lain, lalu lanjutkan belakangan dari layar "Transaksi Ditahan".
+  Future<void> _holdCart(BuildContext context, CartProvider cart) async {
+    if (!cart.hasItems) return;
+    final noteCtl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Tahan Transaksi'),
+        content: TextField(
+          controller: noteCtl,
+          decoration: const InputDecoration(
+              labelText: 'Catatan (opsional)', hintText: 'mis. Meja 3 / nama pelanggan'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('BATAL')),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('TAHAN')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final parked = ParkedCart(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      parkedAt: DateTime.now(),
+      note: noteCtl.text.trim().isEmpty ? null : noteCtl.text.trim(),
+      items: cart.items.map((i) => i.toParkJson()).toList(),
+      paymentType: cart.paymentType,
+      cashAmount: cart.cashAmount,
+      splitPayments: cart.splitPayments,
+      voucherCode: cart.voucherCode,
+      voucherPercent: cart.voucherPercent,
+      mejaIds: cart.mejaIds,
+      mejaNames: cart.mejaNames,
+      customerName: _receiptController.text,
+      customerMode: _customerMode,
+    );
+    await ParkedCartsStore.instance.park(parked);
+
+    // Keranjang & meja TIDAK dilepas (meja tetap tereservasi sampai transaksi benar-benar
+    // disimpan/dibatalkan) -- hanya state lokal yang dikosongkan supaya siap melayani pelanggan lain.
+    cart.clearMejaSelectionLocal();
+    cart.clear();
+    setState(() {
+      _receiptController.clear();
+      _customerMode = 'MANUAL';
+    });
+    if (context.mounted) {
+      Toast.success(context, 'Transaksi ditahan, keranjang dikosongkan');
+    }
+  }
+
+  /// Lanjutkan transaksi yang ditahan: pulihkan seluruh state keranjang.
+  void _resumeParkedCart(CartProvider cart, ParkedCart parked) {
+    cart.clear();
+    for (final item in parked.toSalesItems()) {
+      cart.addItem(item);
+    }
+    if (parked.splitPayments.isNotEmpty) {
+      parked.splitPayments.forEach((method, amount) =>
+          cart.setSplitPayment(method, amount));
+    } else if (parked.paymentType.isNotEmpty) {
+      cart.setPaymentType(parked.paymentType);
+      cart.setCashAmount(parked.cashAmount);
+    }
+    if (parked.voucherCode != null && parked.voucherPercent != null) {
+      cart.setVoucherPreview(parked.voucherCode!, parked.voucherPercent!);
+    }
+    if (parked.mejaIds.isNotEmpty) {
+      cart.setMeja(parked.mejaIds, parked.mejaNames);
+    }
+    setState(() {
+      _receiptController.text = parked.customerName;
+      _customerMode = parked.customerMode.isEmpty ? 'MANUAL' : parked.customerMode;
+    });
+  }
+
+  /// Layar daftar transaksi yang ditahan -- lanjutkan atau buang.
+  void _showParkedCartsSheet(BuildContext context, CartProvider cart) {
+    showModalDialog(
+      context: context,
+      scrollable: true,
+      child: StatefulBuilder(builder: (context, setModalState) {
+        final parkedList = ParkedCartsStore.instance.items;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Transaksi Ditahan', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            if (parkedList.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Text('Belum ada transaksi yang ditahan'),
+              )
+            else
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 360),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: parkedList.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final p = parkedList[index];
+                    final time =
+                        '${p.parkedAt.hour.toString().padLeft(2, '0')}:${p.parkedAt.minute.toString().padLeft(2, '0')}';
+                    return ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.pause_circle_outline),
+                      title: Text(p.note?.isNotEmpty == true
+                          ? p.note!
+                          : '${p.itemCount} item'),
+                      subtitle: Text(
+                          '${p.itemCount} item • ${TextFormatter.formatRupiah(p.total)} • $time'),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                        onPressed: () async {
+                          await ParkedCartsStore.instance.discard(p.id);
+                          setModalState(() {});
+                        },
+                      ),
+                      onTap: () async {
+                        if (cart.hasItems) {
+                          Navigator.pop(context);
+                          if (context.mounted) {
+                            Toast.error(context,
+                                'Keranjang saat ini belum kosong. Tahan atau selesaikan dulu.');
+                          }
+                          return;
+                        }
+                        final taken = await ParkedCartsStore.instance.take(p.id);
+                        if (taken == null) return;
+                        _resumeParkedCart(cart, taken);
+                        if (context.mounted) Navigator.pop(context);
+                      },
+                    );
+                  },
+                ),
+              ),
+          ],
+        );
+      }),
+    );
+  }
+
   /// Validasi stok real-time (2026-10-10, QA POS #6): sisa stok di layar POS adalah snapshot
   /// yang bisa basi (kasir lain sudah menjual sebagian sejak produk ditambahkan ke keranjang).
   /// Dicek ulang ke server TEPAT SEBELUM simpan -- kalau kurang, kasir diberi tahu LEBIH DULU

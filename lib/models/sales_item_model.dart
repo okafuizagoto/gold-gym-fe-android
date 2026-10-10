@@ -132,6 +132,50 @@ class SalesItemModel {
     };
   }
 
+  /// Snapshot LENGKAP (termasuk booking & diskon) -- dipakai Hold/Parkir Transaksi (2026-10-10,
+  /// QA POS #7) supaya baris keranjang bisa dipulihkan persis seperti sebelum ditahan.
+  Map<String, dynamic> toParkJson() {
+    return {
+      'stock_id': stockId,
+      'stock_code': stockCode,
+      'stock_name': stockName,
+      'stock_qty': stockQty,
+      'stock_pack': stockPack,
+      'stock_price': stockPrice,
+      'stock_totalsales': stockTotalSales,
+      'booking_id': bookingId,
+      'is_booking': isBooking,
+      'discount_id': discountId,
+      'discount_type': discountType,
+      'discount_value': discountValue,
+      'discount_amount': discountAmount,
+      'discount_created_at': discountCreatedAt?.toIso8601String(),
+      'original_stock_price': originalStockPrice,
+    };
+  }
+
+  factory SalesItemModel.fromParkJson(Map<String, dynamic> json) {
+    return SalesItemModel(
+      stockId: json['stock_id'] ?? '',
+      stockCode: json['stock_code'] ?? '',
+      stockName: json['stock_name'] ?? '',
+      stockQty: json['stock_qty'] ?? 0,
+      stockPack: json['stock_pack'] ?? '',
+      stockPrice: (json['stock_price'] as num?)?.toDouble() ?? 0,
+      stockTotalSales: (json['stock_totalsales'] as num?)?.toDouble() ?? 0,
+      bookingId: json['booking_id'] ?? '',
+      isBooking: json['is_booking'] ?? false,
+      discountId: json['discount_id'],
+      discountType: json['discount_type'],
+      discountValue: (json['discount_value'] as num?)?.toDouble(),
+      discountAmount: (json['discount_amount'] as num?)?.toDouble(),
+      discountCreatedAt: json['discount_created_at'] == null
+          ? null
+          : DateTime.tryParse(json['discount_created_at']),
+      originalStockPrice: (json['original_stock_price'] as num?)?.toDouble(),
+    );
+  }
+
   /// Format detail sesuai body insert sales backend (TDSaleDetail)
   Map<String, dynamic> toSaleDetailJson() {
     final json = <String, dynamic>{
