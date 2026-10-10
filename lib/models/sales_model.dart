@@ -22,6 +22,11 @@ class SaleHistoryModel {
   final String? saleVoucherCode;
   final double? saleVoucherPercent;
   final double? saleVoucherAmount;
+  // Void/pembatalan nota yang sudah tersimpan (2026-10-10): 'Y' = dibatalkan, nota TIDAK dihitung
+  // sebagai omzet lagi (stok sudah dikembalikan server). Nota lama = 'N'.
+  final String saleVoidYn;
+  final String? saleVoidReason;
+  final String? saleVoidedBy;
 
   SaleHistoryModel({
     required this.saleId,
@@ -42,9 +47,13 @@ class SaleHistoryModel {
     this.saleVoucherCode,
     this.saleVoucherPercent,
     this.saleVoucherAmount,
+    this.saleVoidYn = 'N',
+    this.saleVoidReason,
+    this.saleVoidedBy,
   });
 
   bool get isPaid => salePaymentyn == 'Y';
+  bool get isVoided => saleVoidYn == 'Y';
   bool get hasTotalDiscount => saleTotalDiscountAmount != null;
   bool get hasVoucher => saleVoucherAmount != null;
   bool get hasMeja => saleMejaNames != null && saleMejaNames!.isNotEmpty;
@@ -72,6 +81,9 @@ class SaleHistoryModel {
       salePaymentyn: json['sale_paymentyn'] ?? 'N',
       salePayType: json['sale_pay_type'],
       saleMejaNames: json['sale_meja_names'],
+      saleVoidYn: json['sale_void_yn'] ?? 'N',
+      saleVoidReason: json['sale_void_reason'],
+      saleVoidedBy: json['sale_voided_by'],
       saleTotalDiscountPercent: json['sale_total_discount_percent'] == null
           ? null
           : _toDouble(json['sale_total_discount_percent']),

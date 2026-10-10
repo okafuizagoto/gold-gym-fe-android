@@ -37,6 +37,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   bool _isLoading = false;
   String? _printingSaleId;
   String? _markingSaleId;
+  // Void nota (2026-10-10): hanya pemilik, STAFF tidak boleh (sejalan kebijakan diskon).
+  String? _voidingSaleId;
+  bool _isStaff = false;
   String? _loadingProofSaleId;
   bool _isSeller = true;
   // admin bisa menyembunyikan tombol "Bukti transfer" (global/per outlet/per
@@ -58,7 +61,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     final role =
         await Storage.get(AppConstants.userRoleKey) ?? AppConstants.roleSeller;
     if (mounted) {
-      setState(() => _isSeller = role != AppConstants.roleBuyer);
+      setState(() {
+        _isSeller = role != AppConstants.roleBuyer;
+        _isStaff = role == AppConstants.roleStaff;
+      });
     }
     // gagal load dianggap aktif (default aman: tidak menyembunyikan fitur
     // yang sedang berjalan hanya karena request gagal)
@@ -213,6 +219,75 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     }
   }
 
+  /// Batalkan (void) nota yang SUDAH tersimpan -- 2026-10-10, temuan QA POS #1. Nota tidak
+  /// dihapus (jejak audit tetap ada), stok dikembalikan server. Alasan WAJIB diisi.
+  Future<void> _voidSale(SaleHistoryModel sale) async {
+    final reasonCtl = TextEditingController();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Batalkan Nota'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+                'Nota ${sale.saleTrancnum} (${TextFormatter.formatRupiah(sale.saleTranstotal)}) '
+                'akan dibatalkan. Stok otomatis dikembalikan dan nota ini tidak lagi dihitung '
+                'sebagai omzet. Nota tetap tersimpan sebagai riwayat.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonCtl,
+              maxLength: 255,
+              decoration: const InputDecoration(
+                labelText: 'Alasan pembatalan *',
+                hintText: 'mis. salah input item',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('BATAL'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('BATALKAN NOTA'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    final reason = reasonCtl.text.trim();
+    if (reason.isEmpty) {
+      if (mounted) Toast.error(context, 'Alasan pembatalan wajib diisi');
+      return;
+    }
+
+    setState(() => _voidingSaleId = sale.saleId);
+    try {
+      final response = await _salesApi.voidSale(sale.saleId, reason);
+      if (response.statusCode == 200) {
+        if (mounted) {
+          Toast.success(context, 'Nota dibatalkan, stok dikembalikan');
+        }
+        await _loadSales();
+      } else {
+        String message = 'Gagal membatalkan nota';
+        try {
+          message = jsonDecode(response.body)['error'] ?? message;
+        } catch (_) {}
+        if (mounted) Toast.error(context, message);
+      }
+    } catch (e) {
+      if (mounted) Toast.error(context, 'Gagal membatalkan nota');
+    } finally {
+      if (mounted) setState(() => _voidingSaleId = null);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final langProvider = Provider.of<LanguageProvider>(context);
@@ -355,7 +430,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 tooltip: langProvider.get('Payment proof', 'Bukti transfer'),
                 onPressed: () => _viewProofs(sale),
               ),
-      if (_isSeller && !paid)
+      if (_isSeller && !paid && !sale.isVoided)
         _markingSaleId == sale.saleId
             ? spinner()
             : action(
@@ -363,6 +438,17 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 color: AppColors.successDark,
                 tooltip: langProvider.get('Mark as paid', 'Tandai lunas'),
                 onPressed: () => _markPaid(sale),
+              ),
+      // Batalkan nota (2026-10-10): hanya pemilik (bukan STAFF/kasir), dan hanya nota yang
+      // belum pernah dibatalkan.
+      if (_isSeller && !_isStaff && !sale.isVoided)
+        _voidingSaleId == sale.saleId
+            ? spinner()
+            : action(
+                icon: Icons.cancel_outlined,
+                color: AppColors.error,
+                tooltip: langProvider.get('Void sale', 'Batalkan nota'),
+                onPressed: () => _voidSale(sale),
               ),
       _printingSaleId == sale.saleId
           ? spinner()
@@ -389,14 +475,25 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   height: 40,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color:
-                        paid ? AppColors.successLight : AppColors.warningLight,
+                    color: sale.isVoided
+                        ? AppColors.errorLight
+                        : paid
+                            ? AppColors.successLight
+                            : AppColors.warningLight,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    paid ? Icons.check_rounded : Icons.hourglass_bottom_rounded,
+                    sale.isVoided
+                        ? Icons.cancel_outlined
+                        : paid
+                            ? Icons.check_rounded
+                            : Icons.hourglass_bottom_rounded,
                     size: 20,
-                    color: paid ? AppColors.successDark : AppColors.warningDark,
+                    color: sale.isVoided
+                        ? AppColors.error
+                        : paid
+                            ? AppColors.successDark
+                            : AppColors.warningDark,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -419,25 +516,41 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
-                              color: paid
-                                  ? AppColors.successLight
-                                  : AppColors.warningLight,
+                              color: sale.isVoided
+                                  ? AppColors.errorLight
+                                  : paid
+                                      ? AppColors.successLight
+                                      : AppColors.warningLight,
                               borderRadius: BorderRadius.circular(AppRadius.sm),
                             ),
                             child: Text(
-                              paid ? 'LUNAS' : 'BELUM LUNAS',
+                              sale.isVoided
+                                  ? 'DIBATALKAN'
+                                  : paid
+                                      ? 'LUNAS'
+                                      : 'BELUM LUNAS',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
-                                color: paid
-                                    ? AppColors.successDark
-                                    : AppColors.warningDark,
+                                color: sale.isVoided
+                                    ? AppColors.error
+                                    : paid
+                                        ? AppColors.successDark
+                                        : AppColors.warningDark,
                               ),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 2),
+                      if (sale.isVoided &&
+                          (sale.saleVoidReason ?? '').isNotEmpty)
+                        Text(
+                          'Alasan batal: ${sale.saleVoidReason}'
+                          '${(sale.saleVoidedBy ?? '').isNotEmpty ? ' (oleh ${sale.saleVoidedBy})' : ''}',
+                          style: textTheme.bodySmall
+                              ?.copyWith(color: AppColors.error),
+                        ),
                       Text(
                         '$dateStr ${TextFormatter.formatTimeHms(sale.saleTranstime)}',
                         style: textTheme.bodySmall,

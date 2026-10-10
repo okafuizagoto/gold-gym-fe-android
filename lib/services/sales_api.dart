@@ -228,6 +228,13 @@ class SalesApi extends ApiClient {
     return _client.put("/gold-gym/v2/sales?type=markpaid&saleid=$saleId", {});
   }
 
+  /// Batalkan (void) nota yang SUDAH tersimpan (2026-10-10) -- HANYA pemilik/admin, bukan STAFF.
+  /// Stok dikembalikan server; nota tetap ada untuk audit tapi tidak dihitung sebagai omzet.
+  Future<http.Response> voidSale(String saleId, String reason) {
+    return _client.put(
+        "/gold-gym/v2/sales?type=voidsale&saleid=$saleId", {"reason": reason});
+  }
+
   /// Ambil nota PDF dari backend. Return null jika belum tersedia/gagal.
   ///
   /// KOREKSI 2026-09-18 (QA audit #1.7): dulu tanpa try/catch -- exception

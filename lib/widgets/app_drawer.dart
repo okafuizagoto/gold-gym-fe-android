@@ -111,6 +111,13 @@ class _AppDrawerState extends State<AppDrawer> {
           icon: Icons.point_of_sale,
           route: '/penjualan',
         ),
+      // Sesi Kasir (2026-10-10): buka/tutup shift + rekonsiliasi kas, sama kondisi tampil dgn POS.
+      if (!buyerView && !isAdmin)
+        MenuItem(
+          title: 'Sesi Kasir',
+          icon: Icons.point_of_sale_outlined,
+          route: '/cashier-shift',
+        ),
       // mode pembeli: pilih outlet penjual dulu, lalu pesan barang
       if (buyerView)
         MenuItem(
