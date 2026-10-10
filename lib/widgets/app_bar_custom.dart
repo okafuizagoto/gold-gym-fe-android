@@ -17,6 +17,10 @@ class AppBarCustom extends StatefulWidget implements PreferredSizeWidget {
   final List<Widget>? actions;
   final PreferredSizeWidget? bottom;
   final Widget? leading;
+  // Chip outlet/mode pembeli normalnya disembunyikan di layar sempit (lihat komentar di
+  // build()); layar yang BENAR-BENAR butuh kasir selalu tahu outlet aktif (mis. POS, 2026-10-10
+  // QA POS #9) bisa memaksanya tetap tampil lewat flag ini.
+  final bool alwaysShowContextChip;
 
   const AppBarCustom({
     super.key,
@@ -24,6 +28,7 @@ class AppBarCustom extends StatefulWidget implements PreferredSizeWidget {
     this.actions,
     this.bottom,
     this.leading,
+    this.alwaysShowContextChip = false,
   });
 
   @override
@@ -96,13 +101,32 @@ class _AppBarCustomState extends State<AppBarCustom> {
       );
     }
 
+    // Di HP sempit, taruh outlet aktif sebagai subjudul kecil di bawah judul (bukan ikut
+    // sesak di baris actions bersama ikon lain) -- tetap 1 baris tanpa menambah tinggi app bar.
+    final showChipAsSubtitle =
+        widget.alwaysShowContextChip && compact && !buyerView && _outletCode.isNotEmpty;
+
     return AppBar(
       leading: widget.leading,
-      title: Text(
-        widget.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      title: showChipAsSubtitle
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(
+                  _outletCode,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                ),
+              ],
+            )
+          : Text(
+              widget.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
       bottom: widget.bottom,
       actions: [
         // chip outlet/mode hanya kalau ada ruang (>= 600dp); di HP tetap

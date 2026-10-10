@@ -1825,6 +1825,12 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
           return Scaffold(
             appBar: AppBarCustom(
               title: langProvider.get('Point of Sale', 'Penjualan'),
+              // Indikator outlet aktif (2026-10-10, QA POS #9): chip ini sudah ada di
+              // AppBarCustom tapi disembunyikan di HP sempit (lihat komentar di widget itu) --
+              // dipaksa tampil di layar POS karena di sinilah paling penting kasir TAHU
+              // sedang transaksi di outlet mana (risiko salah outlet kalau 1 device dipakai
+              // bergantian/banyak outlet per akun).
+              alwaysShowContextChip: true,
               actions: [
                 // Transaksi ditahan (2026-10-10, QA POS #7): badge jumlah keranjang yang
                 // ditahan, tap -> daftar untuk lanjutkan/buang.
