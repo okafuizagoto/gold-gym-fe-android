@@ -107,7 +107,7 @@ class _AdminUsageStatsScreenState extends State<AdminUsageStatsScreen> {
             ? const Center(child: CircularProgressIndicator())
             : PageBody(
                 maxWidth: 760,
-                child: ListView(children: [
+                child: Column(children: [
                   PageHeader(
                     title: title,
                     subtitle: lang.get(

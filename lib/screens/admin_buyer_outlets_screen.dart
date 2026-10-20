@@ -14,8 +14,10 @@ import '../widgets/search_field.dart';
 import '../widgets/segmented_tabs.dart';
 
 /// Layar ADMIN: mengatur outlet penjual mana yang boleh dilihat & dipesan
-/// oleh role pembeli. Pembeli hanya melihat outlet yang di-approve di sini.
-/// Berlaku untuk pembeli mandiri maupun pembeli yang didaftarkan penjual.
+/// oleh role pembeli. Sejak 2026-10-20 default OPT-OUT: outlet baru otomatis
+/// terlihat pembeli, admin di sini hanya perlu menyembunyikan outlet tertentu
+/// (switch OFF) bila diperlukan. Berlaku untuk pembeli mandiri maupun pembeli
+/// yang didaftarkan penjual.
 class AdminBuyerOutletsScreen extends StatefulWidget {
   const AdminBuyerOutletsScreen({super.key});
 
@@ -476,7 +478,7 @@ class _AdminBuyerOutletsScreenState extends State<AdminBuyerOutletsScreen> {
                       if (!context.isShort) ...[
                         const SizedBox(height: 6),
                         Text(
-                          'Aktifkan outlet agar bisa dilihat & dipesan role pembeli.',
+                          'Outlet baru otomatis terlihat pembeli. Matikan switch untuk menyembunyikan outlet tertentu.',
                           style: textTheme.bodySmall,
                         ),
                       ],

@@ -205,7 +205,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         drawer: const AppDrawer(),
         body: PageBody(
           maxWidth: 900,
-          child: ListView(
+          child: Column(
             children: [
               if (_focusFeature.isNotEmpty)
                 Container(
