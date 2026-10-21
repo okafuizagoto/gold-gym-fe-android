@@ -227,7 +227,8 @@ class _OutletScreenState extends State<NewOutletScreen> {
               minLines: 3,
               controller: _outletAddressController,
               decoration: InputDecoration(
-                labelText: lang.get('Outlet Address', 'Alamat Outlet'),
+                labelText: lang.get('Outlet Address', 'Alamat Outlet') +
+                    ' (${lang.get('required', 'wajib')})',
                 hintText: lang.get('Write the full outlet address...',
                     'Tulis alamat lengkap outlet...'),
                 alignLabelWithHint: true,
