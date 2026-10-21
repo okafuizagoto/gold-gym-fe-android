@@ -23,6 +23,7 @@ import '../widgets/search_field.dart';
 import '../widgets/segmented_tabs.dart';
 import '../widgets/future_network_image.dart';
 import '../utils/responsive.dart';
+import '../services/cashier_shift_api.dart';
 import '../services/meja_api.dart';
 import '../services/stock_api.dart';
 import '../services/sales_api.dart';
@@ -246,6 +247,11 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
   /// sekali di initState supaya tidak refetch tiap rebuild list.
   Map<String, String> _photoHeaders = {};
 
+  // Wajib Sesi Kasir sebelum transaksi (2026-10-21, porting dari web
+  // pages/penjualan/index.tsx): null = belum dicek, false = sesi belum
+  // dibuka, true = sesi terbuka.
+  bool? _shiftOpen;
+
   @override
   void initState() {
     super.initState();
@@ -258,6 +264,28 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
       if (mounted) setState(() => _photoHeaders = headers);
     });
     ParkedCartsStore.instance.init();
+    _checkShiftOpen();
+  }
+
+  Future<void> _checkShiftOpen() async {
+    final outcode = await Storage.get(AppConstants.outcode) ?? '';
+    if (outcode.isEmpty) {
+      if (mounted) setState(() => _shiftOpen = false);
+      return;
+    }
+    try {
+      final response = await CashierShiftApi().current(outcode);
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        final data = body['data'];
+        setState(() => _shiftOpen = data != null && data['shift_status'] == 'OPEN');
+      } else {
+        setState(() => _shiftOpen = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _shiftOpen = false);
+    }
   }
 
   Future<void> _loadUserName() async {
@@ -1790,6 +1818,32 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
       sellerOnly: true,
       child: Consumer2<CartProvider, LanguageProvider>(
         builder: (context, cart, langProvider, child) {
+          if (_shiftOpen == null) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (_shiftOpen == false) {
+            return Scaffold(
+              appBar: AppBarCustom(
+                  title: langProvider.get('Point of Sale', 'Penjualan')),
+              body: Center(
+                child: EmptyState(
+                  icon: Icons.lock_open_rounded,
+                  title: langProvider.get(
+                      'You must open the Cashier Shift before processing transactions.',
+                      'Anda harus membuka Sesi Kasir terlebih dahulu sebelum bisa memproses transaksi.'),
+                  action: ElevatedButton.icon(
+                    onPressed: () =>
+                        Navigator.pushNamed(context, '/cashier-shift'),
+                    icon: const Icon(Icons.lock_open_rounded, size: 18),
+                    label: Text(
+                        langProvider.get('Open Cashier Shift', 'Buka Sesi Kasir')),
+                  ),
+                ),
+              ),
+            );
+          }
           // Tablet (>= 900dp): dua panel -- katalog/manual di kiri, pesanan
           // & pembayaran selalu terlihat di kanan. HP: tab seperti biasa.
           final twoPane = context.isExpanded;
@@ -2100,14 +2154,25 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
             builder: (context, pagination, _) {
               final items = pagination?.data ?? [];
               if (items.isEmpty) {
+                // 2026-10-21 (porting dari web pages/penjualan/index.tsx):
+                // bedakan katalog outlet benar-benar kosong (belum pernah
+                // daftar produk) dari hasil search/filter yang tidak match
+                // -- dulu dua kondisi ini pakai pesan generik yang sama.
+                final searching = _catalogSearchController.text.trim().isNotEmpty;
                 return SingleChildScrollView(
                   child: EmptyState(
                     icon: Icons.inventory_2_outlined,
-                    title: langProvider.get(
-                        'No products found', 'Produk tidak ditemukan'),
-                    description: langProvider.get(
-                        'Try another keyword or add stock first',
-                        'Coba kata kunci lain atau tambah stok dulu'),
+                    title: searching
+                        ? langProvider.get(
+                            'No products found', 'Produk tidak ditemukan')
+                        : langProvider.get('No products registered yet',
+                            'Belum ada produk yang terdaftar'),
+                    description: searching
+                        ? langProvider.get(
+                            'Try another keyword', 'Coba kata kunci lain')
+                        : langProvider.get(
+                            'Please register your items and stock first via the "Add Items" menu.',
+                            'Silakan daftarkan item dan stok Anda terlebih dahulu melalui menu "Add Items".'),
                     compact: true,
                   ),
                 );

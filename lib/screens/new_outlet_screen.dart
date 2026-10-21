@@ -5,6 +5,7 @@ import '../providers/language_provider.dart';
 import '../services/outlet_api.dart';
 import '../models/outlet_model.dart';
 import '../models/location_model.dart';
+import '../utils/bidang_usaha.dart';
 import '../utils/roles.dart';
 import '../utils/toast.dart';
 import '../widgets/auth_card.dart';
@@ -22,7 +23,9 @@ class _OutletScreenState extends State<NewOutletScreen> {
   final outletsApi = OutletsApi();
   final _outletAddressController = TextEditingController();
   final _outletNameController = TextEditingController();
+  final _bidangUsahaLainnyaController = TextEditingController();
   final outletsArrNotifier = ValueNotifier<List<Outlet>>([]);
+  String _bidangUsaha = '';
 
   bool _isLoading = false;
 
@@ -54,10 +57,15 @@ class _OutletScreenState extends State<NewOutletScreen> {
   void dispose() {
     _outletAddressController.dispose();
     _outletNameController.dispose();
+    _bidangUsahaLainnyaController.dispose();
     outletsArrNotifier.dispose();
     isActiveOutlet.dispose();
     super.dispose();
   }
+
+  String get _bidangUsahaFinal => _bidangUsaha == bidangUsahaLainnya
+      ? _bidangUsahaLainnyaController.text.trim()
+      : _bidangUsaha;
 
   bool get _formFilled =>
       _outletNameController.text.trim().isNotEmpty &&
@@ -85,6 +93,7 @@ class _OutletScreenState extends State<NewOutletScreen> {
         outlet_name: _outletNameController.text,
         outlet_address: _outletAddressController.text,
         outlet_status: isActiveOutlet.value,
+        bidangUsaha: _bidangUsahaFinal,
         location: _location.copy(),
       );
 
@@ -95,7 +104,11 @@ class _OutletScreenState extends State<NewOutletScreen> {
 
       _outletNameController.clear();
       _outletAddressController.clear();
-      setState(() => _location = LocationSelection());
+      setState(() {
+        _location = LocationSelection();
+        _bidangUsaha = '';
+        _bidangUsahaLainnyaController.clear();
+      });
     }
   }
 
@@ -115,6 +128,7 @@ class _OutletScreenState extends State<NewOutletScreen> {
         outlet_name: _outletNameController.text,
         outlet_address: _outletAddressController.text,
         outlet_status: isActiveOutlet.value,
+        bidangUsaha: _bidangUsahaFinal,
         location: _location,
       );
       arrayOneOutlet = [
@@ -127,6 +141,8 @@ class _OutletScreenState extends State<NewOutletScreen> {
                   "outlet_name": item.outlet_name,
                   "outlet_address": item.outlet_address,
                   "outlet_status": item.outlet_status ? "ACTIVE" : "NON ACTIVE",
+                  if (item.bidangUsaha.isNotEmpty)
+                    "outlet_bidang_usaha": item.bidangUsaha,
                   ...?item.location?.toJson(),
                 })
             .toList()
@@ -138,6 +154,8 @@ class _OutletScreenState extends State<NewOutletScreen> {
                   "outlet_name": item.outlet_name,
                   "outlet_address": item.outlet_address,
                   "outlet_status": item.outlet_status ? "ACTIVE" : "NON ACTIVE",
+                  if (item.bidangUsaha.isNotEmpty)
+                    "outlet_bidang_usaha": item.bidangUsaha,
                   ...?item.location?.toJson(),
                 })
             .toList()
@@ -170,6 +188,8 @@ class _OutletScreenState extends State<NewOutletScreen> {
         outletsArrNotifier.value = [];
         _outletNameController.clear();
         _outletAddressController.clear();
+        _bidangUsahaLainnyaController.clear();
+        _bidangUsaha = '';
         _location = LocationSelection();
         Toast.success(context,
             lang.get('Outlet saved successfully', 'Outlet berhasil disimpan'));
@@ -214,6 +234,31 @@ class _OutletScreenState extends State<NewOutletScreen> {
               textInputAction: TextInputAction.next,
               onChanged: (_) => setState(() {}),
             ),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<String>(
+              initialValue: _bidangUsaha.isEmpty ? null : _bidangUsaha,
+              decoration: InputDecoration(
+                labelText: lang.get(
+                    'Business Type (optional)', 'Bidang Usaha (opsional)'),
+                prefixIcon: const Icon(Icons.category_outlined),
+              ),
+              items: bidangUsahaOptions
+                  .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
+                  .toList(),
+              onChanged: (v) => setState(() => _bidangUsaha = v ?? ''),
+            ),
+            if (_bidangUsaha == bidangUsahaLainnya) ...[
+              const SizedBox(height: 14),
+              TextField(
+                controller: _bidangUsahaLainnyaController,
+                textCapitalization: TextCapitalization.words,
+                decoration: InputDecoration(
+                  labelText: lang.get(
+                      'Specify Business Type', 'Sebutkan Bidang Usaha'),
+                  prefixIcon: const Icon(Icons.edit_outlined),
+                ),
+              ),
+            ],
             LocationPicker(
               key: ValueKey('loc-picker-${outletsArrNotifier.value.length}'),
               onChanged: (sel) => _location = sel,

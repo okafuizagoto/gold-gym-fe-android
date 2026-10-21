@@ -155,6 +155,7 @@ class _KelolaMejaScreenState extends State<KelolaMejaScreen> {
 
     return PrivateRoute(
       sellerOnly: true,
+      staffMenuKey: '/meja-area',
       child: Scaffold(
         appBar: const AppBarCustom(title: 'Kelola Meja'),
         drawer: const AppDrawer(),

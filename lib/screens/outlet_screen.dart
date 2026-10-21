@@ -35,8 +35,21 @@ class _OutletScreenState extends State<OutletScreen> {
   @override
   void initState() {
     super.initState();
-    isStaffRole().then((v) {
-      if (mounted && v) setState(() => _isStaff = true);
+    isStaffRole().then((v) async {
+      if (!mounted || !v) return;
+      setState(() => _isStaff = true);
+      // Akses-staff (2026-10-21, porting dari web pages/outlet/index.tsx,
+      // staffMenuKey: "/outlet"): dilewatkan kalau staff BELUM punya outlet
+      // sama sekali (baru login pertama kali, wajib bisa landing di sini
+      // dulu untuk pilih outlet yang ditugaskan).
+      final outcode = await Storage.get(AppConstants.outcode);
+      if (!mounted || (outcode ?? '').isEmpty) return;
+      final denied = await Storage.getStaffDeniedMenuKeys();
+      if (mounted && denied.contains('/outlet')) {
+        Toast.error(context,
+            'Menu ini tidak tersedia untuk akun Anda, hubungi pemilik outlet.');
+        Navigator.pushReplacementNamed(context, '/');
+      }
     });
 
     loadItemsOnStart();

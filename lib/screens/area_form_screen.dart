@@ -72,6 +72,7 @@ class _AreaFormScreenState extends State<AreaFormScreen> {
   Widget build(BuildContext context) {
     return PrivateRoute(
       sellerOnly: true,
+      staffMenuKey: '/meja-area',
       child: Scaffold(
         appBar: const AppBarCustom(title: 'Tambah Area'),
         body: PageBody(

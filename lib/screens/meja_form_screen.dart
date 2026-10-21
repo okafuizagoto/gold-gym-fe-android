@@ -228,6 +228,7 @@ class _MejaFormScreenState extends State<MejaFormScreen> {
   Widget build(BuildContext context) {
     return PrivateRoute(
       sellerOnly: true,
+      staffMenuKey: '/meja-area',
       child: Scaffold(
         appBar: const AppBarCustom(title: 'Tambah Meja'),
         body: _loadingAreas

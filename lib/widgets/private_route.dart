@@ -4,6 +4,7 @@ import '../providers/language_provider.dart';
 import '../utils/storage.dart';
 import '../utils/constants.dart';
 import '../utils/subscription_state.dart';
+import '../utils/toast.dart';
 
 /// Guard halaman:
 /// - tanpa token → redirect ke /login
@@ -17,12 +18,18 @@ class PrivateRoute extends StatefulWidget {
   final Widget child;
   final bool sellerOnly;
   final bool buyerOnly;
+  // Akses-staff (2026-10-21, porting dari web utils/privateRoutes.tsx):
+  // denied_menu_keys sebelumnya hanya menyembunyikan item di app_drawer.dart
+  // -- staff yang tahu rute langsung tetap bisa buka layar ini. Tegakkan di
+  // sini juga supaya benar2 diblok, bukan cuma disembunyikan.
+  final String? staffMenuKey;
 
   const PrivateRoute({
     super.key,
     required this.child,
     this.sellerOnly = false,
     this.buyerOnly = false,
+    this.staffMenuKey,
   });
 
   @override
@@ -123,6 +130,7 @@ class _PrivateRouteState extends State<PrivateRoute> {
       'token': await Storage.get(AppConstants.accessTokenKey),
       'role': await Storage.get(AppConstants.userRoleKey),
       'emailVerified': await Storage.get(AppConstants.emailVerifiedKey),
+      'outcode': await Storage.get(AppConstants.outcode),
     };
   }
 
@@ -164,6 +172,36 @@ class _PrivateRouteState extends State<PrivateRoute> {
             Navigator.pushReplacementNamed(context, '/');
           });
           return const SizedBox.shrink();
+        }
+
+        // Akses-staff: lihat komentar di widget.staffMenuKey. Dilewatkan
+        // kalau staff BELUM punya outlet sama sekali (outcode kosong) --
+        // itu artinya baru login pertama kali dan wajib bisa landing di
+        // /outlet dulu, baru setelah itu aturan akses-staff berlaku.
+        final hasOutcodeAlready =
+            (snapshot.data?['outcode'] ?? '').isNotEmpty;
+        if (widget.staffMenuKey != null &&
+            snapshot.data?['role'] == AppConstants.roleStaff &&
+            hasOutcodeAlready) {
+          return FutureBuilder<List<String>>(
+            future: Storage.getStaffDeniedMenuKeys(),
+            builder: (context, deniedSnap) {
+              if (!deniedSnap.hasData) {
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (deniedSnap.data!.contains(widget.staffMenuKey)) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  Toast.error(context,
+                      'Menu ini tidak tersedia untuk akun Anda, hubungi pemilik outlet.');
+                  Navigator.pushReplacementNamed(context, '/');
+                });
+                return const SizedBox.shrink();
+              }
+              return widget.child;
+            },
+          );
         }
 
         // Token "belum terverifikasi" ditolak backend di SEMUA endpoint

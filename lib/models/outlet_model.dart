@@ -7,6 +7,9 @@ class Outlet {
   String outlet_address;
   bool outlet_status;
 
+  /// Bidang Usaha (2026-10-21, opsional) -- lihat lib/utils/bidang_usaha.dart.
+  String bidangUsaha;
+
   /// Lokasi (2026-10-03, opsional) -- lihat lib/widgets/location_picker.dart.
   LocationSelection? location;
 
@@ -14,6 +17,7 @@ class Outlet {
     required this.outlet_name,
     required this.outlet_address,
     required this.outlet_status,
+    this.bidangUsaha = '',
     this.location,
   });
 
@@ -22,6 +26,7 @@ class Outlet {
       "outlet_name": outlet_name,
       "outlet_address": outlet_address,
       "outlet_status": outlet_status,
+      if (bidangUsaha.isNotEmpty) "outlet_bidang_usaha": bidangUsaha,
       ...?location?.toJson(),
     };
   }

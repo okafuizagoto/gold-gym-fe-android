@@ -1,11 +1,15 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
+import '../models/area_model.dart';
 import '../models/meja_model.dart';
+import '../services/area_api.dart';
 import '../services/meja_api.dart';
 import '../utils/responsive.dart';
 import '../utils/toast.dart';
 import 'empty_state.dart';
+
+enum _AreaFilter { all, indoor, outdoor }
 
 class MejaSelectionResult {
   final List<int> ids;
@@ -53,12 +57,17 @@ class _MejaPickerSheetBody extends StatefulWidget {
 
 class _MejaPickerSheetBodyState extends State<_MejaPickerSheetBody> {
   final _mejaApi = MejaApi();
+  final _areaApi = AreaApi();
 
   bool _loading = true;
   bool _confirming = false;
+  int? _freeingMejaId;
   List<Meja> _mejaList = [];
+  List<Area> _areaList = [];
   late Set<int> _selected;
   late List<int> _reservedByMe;
+  final _searchController = TextEditingController();
+  _AreaFilter _areaFilter = _AreaFilter.all;
 
   @override
   void initState() {
@@ -68,25 +77,97 @@ class _MejaPickerSheetBodyState extends State<_MejaPickerSheetBody> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final response = await _mejaApi.getMeja(widget.outcode);
+      final results = await Future.wait(
+          [_mejaApi.getMeja(widget.outcode), _areaApi.getAreas(widget.outcode)]);
       if (!mounted) return;
-      if (response.statusCode == 200) {
-        final body = jsonDecode(response.body);
-        final list =
-            (body['data'] as List? ?? []).map((e) => Meja.fromJson(e)).toList();
-        setState(() {
-          _mejaList = list;
-          _loading = false;
-        });
-      } else {
-        setState(() => _loading = false);
-      }
+      final mejaResp = results[0];
+      final areaResp = results[1];
+      final list = mejaResp.statusCode == 200
+          ? (jsonDecode(mejaResp.body)['data'] as List? ?? [])
+              .map((e) => Meja.fromJson(e))
+              .toList()
+          : <Meja>[];
+      final areas = areaResp.statusCode == 200
+          ? (jsonDecode(areaResp.body)['data'] as List? ?? [])
+              .map((e) => Area.fromJson(e))
+              .toList()
+          : <Area>[];
+      setState(() {
+        _mejaList = list;
+        _areaList = areas;
+        _loading = false;
+      });
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Area? _areaFor(Meja m) {
+    for (final a in _areaList) {
+      if (a.areaId == m.mejaAreaId) return a;
+    }
+    return null;
+  }
+
+  // 2026-10-21 (porting dari web components/MejaPickerDialog.tsx): cari
+  // nama meja + filter Indoor/Outdoor/Semua.
+  List<Meja> get _visibleMejaList {
+    final q = _searchController.text.trim().toLowerCase();
+    return _mejaList.where((m) {
+      if (q.isNotEmpty && !m.mejaName.toLowerCase().contains(q)) return false;
+      if (_areaFilter != _AreaFilter.all) {
+        final type = _areaFor(m)?.areaType;
+        final wanted = _areaFilter == _AreaFilter.indoor ? 'INDOOR' : 'OUTDOOR';
+        if (type != wanted) return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  // Tombol per-meja "Tandai Kosong" (siapapun kasir yang login, bukan cuma
+  // pemilik reservasi) -- melengkapi tombol "Kosongkan" global yang hanya
+  // melepas meja milik sesi ini sendiri.
+  Future<void> _tandaiKosong(Meja m) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Tandai Kosong'),
+        content: const Text('Pastikan meja ini sudah benar-benar kosong?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('BATAL'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('YA'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _freeingMejaId = m.mejaId);
+    try {
+      await _mejaApi.releaseMeja(widget.outcode, [m.mejaId]);
+    } catch (_) {
+      // best-effort, sama seperti web
+    }
+    if (!mounted) return;
+    setState(() {
+      _selected.remove(m.mejaId);
+      _reservedByMe.remove(m.mejaId);
+      _freeingMejaId = null;
+    });
+    await _load();
   }
 
   /// Meja yang boleh dipilih: KOSONG, atau sudah direservasi kasir di sesi
@@ -297,6 +378,44 @@ class _MejaPickerSheetBodyState extends State<_MejaPickerSheetBody> {
                 ],
               ),
               const SizedBox(height: 8),
+              TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  prefixIcon: Icon(Icons.search_rounded, size: 20),
+                  hintText: 'Cari nomor/nama meja',
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Semua'),
+                      selected: _areaFilter == _AreaFilter.all,
+                      onSelected: (_) =>
+                          setState(() => _areaFilter = _AreaFilter.all),
+                    ),
+                    const SizedBox(width: 6),
+                    ChoiceChip(
+                      label: const Text('Indoor'),
+                      selected: _areaFilter == _AreaFilter.indoor,
+                      onSelected: (_) =>
+                          setState(() => _areaFilter = _AreaFilter.indoor),
+                    ),
+                    const SizedBox(width: 6),
+                    ChoiceChip(
+                      label: const Text('Outdoor'),
+                      selected: _areaFilter == _AreaFilter.outdoor,
+                      onSelected: (_) =>
+                          setState(() => _areaFilter = _AreaFilter.outdoor),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
               Expanded(
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())
@@ -311,55 +430,122 @@ class _MejaPickerSheetBodyState extends State<_MejaPickerSheetBody> {
                               compact: true,
                             ),
                           )
-                        : ListView.builder(
-                            controller: scrollController,
-                            itemCount: _mejaList.length,
-                            itemBuilder: (context, index) {
-                              final m = _mejaList[index];
-                              final selectable = _isSelectable(m);
-                              final selected = _selected.contains(m.mejaId);
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 6),
-                                child: Opacity(
-                                  opacity: selectable ? 1 : 0.5,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: selected
-                                          ? AppColors.blueLight
-                                          : AppColors.surface,
-                                      borderRadius:
-                                          BorderRadius.circular(AppRadius.md),
-                                      border: Border.all(
-                                        color: selected
-                                            ? AppColors.blue
-                                            : AppColors.border,
-                                      ),
-                                    ),
-                                    child: CheckboxListTile(
-                                      value: selected,
-                                      onChanged:
-                                          selectable ? (_) => _toggle(m) : null,
-                                      dense: true,
-                                      title: Text(
-                                        m.mejaName,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: textTheme.titleSmall,
-                                      ),
-                                      subtitle: Text(
-                                        'Kapasitas ${m.mejaCapacity} orang'
-                                        '${selectable ? '' : ' - sedang dipakai'}',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      controlAffinity:
-                                          ListTileControlAffinity.leading,
-                                    ),
-                                  ),
+                        : _visibleMejaList.isEmpty
+                            ? SingleChildScrollView(
+                                controller: scrollController,
+                                child: const EmptyState(
+                                  icon: Icons.search_off_rounded,
+                                  title: 'Tidak ditemukan',
+                                  description:
+                                      'Tidak ada meja yang cocok dengan pencarian/filter.',
+                                  compact: true,
                                 ),
-                              );
-                            },
-                          ),
+                              )
+                            : ListView.builder(
+                                controller: scrollController,
+                                itemCount: _visibleMejaList.length,
+                                itemBuilder: (context, index) {
+                                  final m = _visibleMejaList[index];
+                                  final selectable = _isSelectable(m);
+                                  final selected = _selected.contains(m.mejaId);
+                                  final areaType = _areaFor(m)?.areaType;
+                                  final badge = areaType == 'INDOOR'
+                                      ? 'Indoor'
+                                      : areaType == 'OUTDOOR'
+                                          ? 'Outdoor'
+                                          : null;
+                                  final canFree = !m.isKosong &&
+                                      !_reservedByMe.contains(m.mejaId);
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 6),
+                                    child: Opacity(
+                                      opacity: selectable ? 1 : 0.5,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: selected
+                                              ? AppColors.blueLight
+                                              : AppColors.surface,
+                                          borderRadius: BorderRadius.circular(
+                                              AppRadius.md),
+                                          border: Border.all(
+                                            color: selected
+                                                ? AppColors.blue
+                                                : AppColors.border,
+                                          ),
+                                        ),
+                                        child: CheckboxListTile(
+                                          value: selected,
+                                          onChanged: selectable
+                                              ? (_) => _toggle(m)
+                                              : null,
+                                          dense: true,
+                                          title: Row(
+                                            children: [
+                                              Flexible(
+                                                child: Text(
+                                                  m.mejaName,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: textTheme.titleSmall,
+                                                ),
+                                              ),
+                                              if (badge != null) ...[
+                                                const SizedBox(width: 6),
+                                                Container(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 1),
+                                                  decoration: BoxDecoration(
+                                                    color: AppColors.chipBg,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            AppRadius.sm),
+                                                  ),
+                                                  child: Text(badge,
+                                                      style: const TextStyle(
+                                                          fontSize: 10)),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                          subtitle: Text(
+                                            'Kapasitas ${m.mejaCapacity} orang'
+                                            '${selectable ? '' : ' - sedang dipakai'}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          controlAffinity:
+                                              ListTileControlAffinity.leading,
+                                          secondary: canFree
+                                              ? IconButton(
+                                                  icon: _freeingMejaId ==
+                                                          m.mejaId
+                                                      ? const SizedBox(
+                                                          width: 18,
+                                                          height: 18,
+                                                          child:
+                                                              CircularProgressIndicator(
+                                                                  strokeWidth:
+                                                                      2))
+                                                      : const Icon(
+                                                          Icons
+                                                              .event_seat_outlined,
+                                                          size: 20),
+                                                  tooltip: 'Tandai Kosong',
+                                                  onPressed: _freeingMejaId !=
+                                                          null
+                                                      ? null
+                                                      : () => _tandaiKosong(m),
+                                                )
+                                              : null,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
               ),
               const SizedBox(height: 8),
               SizedBox(

@@ -17,4 +17,27 @@ class AreaApi extends ApiClient {
       data,
     );
   }
+
+  // 2026-10-16, submenu Kelola Meja & Area: edit nama/tipe & hapus area.
+  Future<http.Response> updateArea(
+      String outcode, int areaId, String areaName, String areaType) async {
+    final ApiClient client = ApiClient();
+    return client.put(
+      "/gold-gym/v2/area",
+      {
+        "outcode": outcode,
+        "area_id": areaId,
+        "area_name": areaName,
+        "area_type": areaType,
+      },
+    );
+  }
+
+  Future<http.Response> deleteArea(String outcode, int areaId) async {
+    final ApiClient client = ApiClient();
+    return client.delete(
+      "/gold-gym/v2/area",
+      queryParams: {"outcode": outcode, "area_id": areaId.toString()},
+    );
+  }
 }

@@ -58,6 +58,7 @@ class CoreApi extends ApiClient {
     String role = 'BUYER',
     String toko = '',
     String namaPT = '',
+    String bidangUsaha = '',
   }) async {
     final url = Uri.parse(
         '${ApiClient.baseUrl}/gold-gym/v2/userdata?type=registerbuyer');
@@ -69,6 +70,7 @@ class CoreApi extends ApiClient {
       "gold_role": role,
       "gold_toko": toko,
       "gold_nama_pt": namaPT,
+      "gold_bidang_usaha": bidangUsaha,
     };
     return await http
         .post(url, body: jsonEncode(body))

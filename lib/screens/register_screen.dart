@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/core_api.dart';
+import '../utils/bidang_usaha.dart';
 import '../utils/constants.dart';
 import '../utils/password_strength.dart';
 import '../utils/toast.dart';
@@ -26,9 +27,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _hpController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
+  final _bidangUsahaLainnyaController = TextEditingController();
   final _coreApi = CoreApi();
   bool _isLoading = false;
   String _role = AppConstants.roleBuyer;
+  String _bidangUsaha = '';
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   // BOTH (default) / BUYER_ONLY / SELLER_ONLY — diatur admin lewat menu
@@ -68,6 +71,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _hpController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
+    _bidangUsahaLainnyaController.dispose();
     super.dispose();
   }
 
@@ -90,6 +94,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => _isLoading = true);
     try {
+      final bidangUsahaFinal = _bidangUsaha == bidangUsahaLainnya
+          ? _bidangUsahaLainnyaController.text.trim()
+          : _bidangUsaha;
       final response = await _coreApi.registerBuyer(
         nama: _namaController.text,
         email: _emailController.text,
@@ -97,6 +104,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         nomorHp: _hpController.text,
         role: _role,
         namaPT: _namaPTController.text,
+        bidangUsaha: bidangUsahaFinal,
       );
 
       if (response.statusCode == 201) {
@@ -191,6 +199,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
               prefixIcon: Icon(Icons.business_outlined),
             ),
           ),
+          const SizedBox(height: 14),
+          DropdownButtonFormField<String>(
+            initialValue: _bidangUsaha.isEmpty ? null : _bidangUsaha,
+            decoration: const InputDecoration(
+              labelText: 'Bidang Usaha (opsional)',
+              prefixIcon: Icon(Icons.category_outlined),
+            ),
+            items: bidangUsahaOptions
+                .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
+                .toList(),
+            onChanged: (v) => setState(() => _bidangUsaha = v ?? ''),
+          ),
+          if (_bidangUsaha == bidangUsahaLainnya) ...[
+            const SizedBox(height: 14),
+            TextField(
+              controller: _bidangUsahaLainnyaController,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Sebutkan Bidang Usaha',
+                prefixIcon: Icon(Icons.edit_outlined),
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           TextField(
             controller: _emailController,

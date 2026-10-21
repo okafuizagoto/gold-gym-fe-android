@@ -10,6 +10,7 @@ import '../services/outlet_api.dart';
 import '../utils/constants.dart';
 import '../utils/responsive.dart';
 import '../utils/storage.dart';
+import '../utils/toast.dart';
 import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/empty_state.dart';
@@ -71,6 +72,7 @@ class _MejaAreaScreenState extends State<MejaAreaScreen> {
     final pad = context.pagePadding;
     return PrivateRoute(
       sellerOnly: true,
+      staffMenuKey: '/meja-area',
       child: Scaffold(
         appBar: const AppBarCustom(title: 'Meja & Area'),
         drawer: const AppDrawer(),
@@ -163,8 +165,10 @@ class _MejaTabView extends StatefulWidget {
 
 class _MejaTabViewState extends State<_MejaTabView> {
   final _mejaApi = MejaApi();
+  final _areaApi = AreaApi();
   bool _loading = true;
   List<Meja> _mejaList = [];
+  List<Area> _areaList = [];
 
   @override
   void initState() {
@@ -175,19 +179,26 @@ class _MejaTabViewState extends State<_MejaTabView> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final response = await _mejaApi.getMeja(widget.outcode);
+      final results = await Future.wait(
+          [_mejaApi.getMeja(widget.outcode), _areaApi.getAreas(widget.outcode)]);
       if (!mounted) return;
-      if (response.statusCode == 200) {
-        final body = jsonDecode(response.body);
-        final list =
-            (body['data'] as List? ?? []).map((e) => Meja.fromJson(e)).toList();
-        setState(() {
-          _mejaList = list;
-          _loading = false;
-        });
-      } else {
-        setState(() => _loading = false);
-      }
+      final mejaResp = results[0];
+      final areaResp = results[1];
+      final list = mejaResp.statusCode == 200
+          ? (jsonDecode(mejaResp.body)['data'] as List? ?? [])
+              .map((e) => Meja.fromJson(e))
+              .toList()
+          : <Meja>[];
+      final areas = areaResp.statusCode == 200
+          ? (jsonDecode(areaResp.body)['data'] as List? ?? [])
+              .map((e) => Area.fromJson(e))
+              .toList()
+          : <Area>[];
+      setState(() {
+        _mejaList = list;
+        _areaList = areas;
+        _loading = false;
+      });
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
@@ -198,10 +209,140 @@ class _MejaTabViewState extends State<_MejaTabView> {
     if (result == true) _load();
   }
 
+  // 2026-10-21 (porting dari web pages/meja-area/index.tsx): edit nama/
+  // kapasitas/area & hapus meja, dipanggil dari ikon di tiap kartu.
+  Future<void> _editMeja(Meja m) async {
+    final nameController = TextEditingController(text: m.mejaName);
+    final capacityController =
+        TextEditingController(text: m.mejaCapacity.toString());
+    int? areaId = m.mejaAreaId;
+    bool saving = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Edit Meja'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'Nama/Nomor Meja'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: capacityController,
+                keyboardType: TextInputType.number,
+                decoration:
+                    const InputDecoration(labelText: 'Kapasitas (orang)'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int>(
+                initialValue: areaId,
+                decoration: const InputDecoration(labelText: 'Area'),
+                items: _areaList
+                    .map((a) => DropdownMenuItem(
+                          value: a.areaId,
+                          child: Text(
+                              '${a.areaName} (${a.areaType == "INDOOR" ? "Indoor" : "Outdoor"})'),
+                        ))
+                    .toList(),
+                onChanged: (v) => setDialogState(() => areaId = v),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed:
+                  saving ? null : () => Navigator.pop(dialogContext),
+              child: const Text('BATAL'),
+            ),
+            ElevatedButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      final capacity =
+                          int.tryParse(capacityController.text) ?? 0;
+                      if (nameController.text.trim().isEmpty ||
+                          areaId == null ||
+                          capacity < 1) {
+                        Toast.error(dialogContext,
+                            'Lengkapi nama, kapasitas (minimal 1), dan area meja');
+                        return;
+                      }
+                      setDialogState(() => saving = true);
+                      try {
+                        final response = await _mejaApi.updateMeja(
+                            widget.outcode,
+                            m.mejaId,
+                            nameController.text.trim(),
+                            capacity,
+                            areaId!);
+                        if (!mounted) return;
+                        if (response.statusCode == 200) {
+                          Navigator.pop(dialogContext);
+                          Toast.success(context, 'Meja diperbarui');
+                          _load();
+                        } else {
+                          setDialogState(() => saving = false);
+                          Toast.error(dialogContext, 'Gagal memperbarui meja');
+                        }
+                      } catch (_) {
+                        setDialogState(() => saving = false);
+                        if (mounted) {
+                          Toast.error(dialogContext, 'Gagal memperbarui meja');
+                        }
+                      }
+                    },
+              child: const Text('SIMPAN'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteMeja(Meja m) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Hapus Meja'),
+        content: Text(
+            'Hapus meja "${m.mejaName}"? Tindakan ini tidak bisa dibatalkan.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('BATAL'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('HAPUS'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final response = await _mejaApi.deleteMeja(widget.outcode, m.mejaId);
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        Toast.success(context, 'Meja dihapus');
+        _load();
+      } else {
+        Toast.error(context, 'Gagal menghapus meja');
+      }
+    } catch (_) {
+      if (mounted) Toast.error(context, 'Gagal menghapus meja');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final pad = context.pagePadding;
-    final columns = context.columnsFor(minTileWidth: 300, max: 3);
+    final columns = context.columnsFor(minTileWidth: 340, max: 3);
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: _loading
@@ -228,7 +369,7 @@ class _MejaTabViewState extends State<_MejaTabView> {
                       padding: EdgeInsets.fromLTRB(pad, 4, pad, 96),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: columns,
-                        mainAxisExtent: 76,
+                        mainAxisExtent: 80,
                         crossAxisSpacing: 10,
                         mainAxisSpacing: 10,
                       ),
@@ -243,6 +384,8 @@ class _MejaTabViewState extends State<_MejaTabView> {
                             label: m.isKosong ? 'Kosong' : 'Isi',
                             positive: m.isKosong,
                           ),
+                          onEdit: () => _editMeja(m),
+                          onDelete: () => _deleteMeja(m),
                         );
                       },
                     ),
@@ -303,10 +446,123 @@ class _AreaTabViewState extends State<_AreaTabView> {
     if (result == true) _load();
   }
 
+  // 2026-10-21 (porting dari web pages/meja-area/index.tsx): edit nama/tipe
+  // & hapus area, dipanggil dari ikon di tiap kartu.
+  Future<void> _editArea(Area a) async {
+    final nameController = TextEditingController(text: a.areaName);
+    String areaType = a.areaType.isEmpty ? 'INDOOR' : a.areaType;
+    bool saving = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Edit Area'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'Nama Area'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: areaType,
+                decoration: const InputDecoration(labelText: 'Tipe'),
+                items: const [
+                  DropdownMenuItem(value: 'INDOOR', child: Text('Indoor')),
+                  DropdownMenuItem(value: 'OUTDOOR', child: Text('Outdoor')),
+                ],
+                onChanged: (v) =>
+                    setDialogState(() => areaType = v ?? 'INDOOR'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed:
+                  saving ? null : () => Navigator.pop(dialogContext),
+              child: const Text('BATAL'),
+            ),
+            ElevatedButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      if (nameController.text.trim().isEmpty) {
+                        Toast.error(dialogContext, 'Nama area wajib diisi');
+                        return;
+                      }
+                      setDialogState(() => saving = true);
+                      try {
+                        final response = await _areaApi.updateArea(
+                            widget.outcode,
+                            a.areaId,
+                            nameController.text.trim(),
+                            areaType);
+                        if (!mounted) return;
+                        if (response.statusCode == 200) {
+                          Navigator.pop(dialogContext);
+                          Toast.success(context, 'Area diperbarui');
+                          _load();
+                        } else {
+                          setDialogState(() => saving = false);
+                          Toast.error(dialogContext, 'Gagal memperbarui area');
+                        }
+                      } catch (_) {
+                        setDialogState(() => saving = false);
+                        if (mounted) {
+                          Toast.error(dialogContext, 'Gagal memperbarui area');
+                        }
+                      }
+                    },
+              child: const Text('SIMPAN'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteArea(Area a) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Hapus Area'),
+        content: Text(
+            'Hapus area "${a.areaName}"? Tindakan ini tidak bisa dibatalkan.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('BATAL'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('HAPUS'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final response = await _areaApi.deleteArea(widget.outcode, a.areaId);
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        Toast.success(context, 'Area dihapus');
+        _load();
+      } else {
+        Toast.error(context, 'Gagal menghapus area');
+      }
+    } catch (_) {
+      if (mounted) Toast.error(context, 'Gagal menghapus area');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final pad = context.pagePadding;
-    final columns = context.columnsFor(minTileWidth: 300, max: 3);
+    final columns = context.columnsFor(minTileWidth: 340, max: 3);
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: _loading
@@ -333,7 +589,7 @@ class _AreaTabViewState extends State<_AreaTabView> {
                       padding: EdgeInsets.fromLTRB(pad, 4, pad, 96),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: columns,
-                        mainAxisExtent: 76,
+                        mainAxisExtent: 80,
                         crossAxisSpacing: 10,
                         mainAxisSpacing: 10,
                       ),
@@ -352,6 +608,8 @@ class _AreaTabViewState extends State<_AreaTabView> {
                             positive: indoor,
                             neutral: true,
                           ),
+                          onEdit: () => _editArea(a),
+                          onDelete: () => _deleteArea(a),
                         );
                       },
                     ),
@@ -372,12 +630,16 @@ class _EntityTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final Widget trailing;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const _EntityTile({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.trailing,
+    this.onEdit,
+    this.onDelete,
   });
 
   @override
@@ -417,6 +679,25 @@ class _EntityTile extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             trailing,
+            if (onEdit != null)
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
+                tooltip: 'Edit',
+                onPressed: onEdit,
+              ),
+            if (onDelete != null)
+              IconButton(
+                icon: Icon(Icons.delete_outline_rounded,
+                    size: 18, color: AppColors.error),
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
+                tooltip: 'Hapus',
+                onPressed: onDelete,
+              ),
           ],
         ),
       ),
