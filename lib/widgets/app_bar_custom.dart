@@ -7,6 +7,7 @@ import '../services/core_api.dart';
 import '../utils/constants.dart';
 import '../utils/responsive.dart';
 import '../utils/storage.dart';
+import 'onboarding_tour.dart';
 
 /// Bilah atas (web: Navbar): outlet aktif / mode pembeli, toggle bahasa
 /// EN/ID, avatar inisial dengan menu (nama, email, role, logout).
@@ -49,6 +50,11 @@ class _AppBarCustomState extends State<AppBarCustom> {
   void initState() {
     super.initState();
     _loadSession();
+    // Panduan tooltip pertama kali per role (2026-10-22) -- AppBarCustom ada di
+    // semua layar ber-drawer, jadi cukup dipicu dari sini (cek sekali per role).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) OnboardingTour.maybeAutoStart(context);
+    });
   }
 
   Future<void> _loadSession() async {

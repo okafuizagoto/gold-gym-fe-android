@@ -9,6 +9,7 @@ import '../services/core_api.dart';
 import '../services/feature_request_api.dart';
 import '../utils/toast.dart';
 import 'brand_logo.dart';
+import 'onboarding_tour.dart';
 
 /// Menu samping (web: Sidebar): latar putih, logo bergradasi, item aktif
 /// disorot biru muda, grup menu bisa dibuka-tutup, Logout merah di bawah.
@@ -24,6 +25,12 @@ class _AppDrawerState extends State<AppDrawer> {
   List<MenuItem> menuItems = [];
 
   final _coreApi = CoreApi();
+
+  // Panduan Penggunaan (2026-10-22): GlobalKey per judul menu top-level supaya
+  // OnboardingTour bisa menyorot menu drawer asli (lihat widgets/onboarding_tour.dart).
+  final Map<String, GlobalKey> _tourKeys = {};
+  GlobalKey _tourKey(String title) =>
+      _tourKeys.putIfAbsent(title, () => GlobalKey(debugLabel: 'tour-$title'));
 
   @override
   void initState() {
@@ -476,6 +483,14 @@ class _AppDrawerState extends State<AppDrawer> {
         icon: Icons.info,
         route: '/about-us',
       ),
+      // Panduan Penggunaan (2026-10-22): ulangi tour tooltip dari awal. Bukan
+      // untuk ADMIN -- admin punya Quick Menu Admin sendiri di Dashboard.
+      if (!isAdmin)
+        MenuItem(
+          title: 'Panduan Penggunaan',
+          icon: Icons.tour_rounded,
+          route: '/panduan-penggunaan',
+        ),
     ];
 
     // Custom routes from storage
@@ -524,7 +539,10 @@ class _AppDrawerState extends State<AppDrawer> {
     if (isStaff) {
       final denied = await Storage.getStaffDeniedMenuKeys();
       bool allowed(String route) =>
-          route == '/about-us' || route == '/absen' || !denied.contains(route);
+          route == '/about-us' ||
+          route == '/absen' ||
+          route == '/panduan-penggunaan' ||
+          !denied.contains(route);
       allItems = allItems
           .where((item) => allowed(item.route))
           .map((item) {
@@ -548,6 +566,37 @@ class _AppDrawerState extends State<AppDrawer> {
     setState(() {
       menuItems = allItems;
     });
+    _maybeRunPendingTour();
+  }
+
+  // Drawer dibuka otomatis oleh OnboardingTour.maybeAutoStart -> jalankan tour
+  // setelah menu ter-render & animasi buka drawer selesai.
+  void _maybeRunPendingTour() {
+    final pending = OnboardingTour.pendingRole;
+    if (pending == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future.delayed(const Duration(milliseconds: 350));
+      if (!mounted) return;
+      // role bisa sudah berganti (mis. pindah mode pembeli) sejak tour dijadwalkan
+      if (await OnboardingTour.effectiveRole() != pending) {
+        OnboardingTour.pendingRole = null;
+        return;
+      }
+      await _runTour(pending);
+    });
+  }
+
+  Future<void> _runTour(String role) async {
+    final outletType =
+        await Storage.get(AppConstants.outletTypeKey) ?? 'RETAIL';
+    if (!mounted) return;
+    await OnboardingTour.run(
+      context: context,
+      role: role,
+      isTherapy: outletType == AppConstants.outletTherapy,
+      keyFor: (title) => _tourKeys[title],
+    );
+    if (mounted) Scaffold.maybeOf(context)?.closeDrawer();
   }
 
   IconData _getIconFromName(String? iconName) {
@@ -566,6 +615,12 @@ class _AppDrawerState extends State<AppDrawer> {
   // Navigasi saat menu (atau anak menu di grup) ditekan. Dipisah jadi helper
   // supaya dipakai ulang oleh ListTile biasa maupun anak ExpansionTile.
   Future<void> _onMenuTap(MenuItem item) async {
+    if (item.route == '/panduan-penggunaan') {
+      // tour berjalan DI drawer yang sedang terbuka -- jangan ditutup dulu
+      final role = await OnboardingTour.effectiveRole();
+      if (role != null && mounted) await _runTour(role);
+      return;
+    }
     Navigator.pop(context); // Close drawer
     if (item.route == '/outlet') {
       // ganti outlet: bersihkan stack supaya layar lama
@@ -650,6 +705,9 @@ class _AppDrawerState extends State<AppDrawer> {
             // Menu Items
             Expanded(
               child: ListView.builder(
+                // render semua menu (bukan cuma yang kelihatan) supaya GlobalKey
+                // panduan tooltip punya context untuk menu di luar layar
+                cacheExtent: 4000,
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 itemCount: menuItems.length,
                 itemBuilder: (context, index) {
@@ -660,6 +718,7 @@ class _AppDrawerState extends State<AppDrawer> {
                     final childActive = item.children!
                         .any((c) => _isActive(currentRoute, c.route));
                     return _DrawerGroup(
+                      tourKey: _tourKey(item.title),
                       item: item,
                       initiallyExpanded: childActive,
                       childActive: childActive,
@@ -668,6 +727,7 @@ class _AppDrawerState extends State<AppDrawer> {
                     );
                   }
                   return _DrawerTile(
+                    tourKey: _tourKey(item.title),
                     icon: item.icon,
                     title: item.title,
                     active: !item.locked && _isActive(currentRoute, item.route),
@@ -707,7 +767,11 @@ class _DrawerTile extends StatelessWidget {
   /// fitur belum ada di paket: tampil dengan gembok
   final bool locked;
 
+  /// target panduan tooltip (OnboardingTour), hanya untuk menu top-level
+  final GlobalKey? tourKey;
+
   const _DrawerTile({
+    this.tourKey,
     required this.icon,
     required this.title,
     required this.onTap,
@@ -722,6 +786,7 @@ class _DrawerTile extends StatelessWidget {
     final fg = color ?? (active ? AppColors.blue : AppColors.ink);
     final iconColor = color ?? (active ? AppColors.blue : AppColors.muted);
     return Padding(
+      key: tourKey,
       padding: EdgeInsets.fromLTRB(12 + indent, 2, 12, 2),
       child: ListTile(
         dense: true,
@@ -757,8 +822,10 @@ class _DrawerGroup extends StatefulWidget {
   final bool childActive;
   final bool Function(String route) isActive;
   final Future<void> Function(MenuItem item) onTap;
+  final GlobalKey? tourKey;
 
   const _DrawerGroup({
+    this.tourKey,
     required this.item,
     required this.initiallyExpanded,
     required this.childActive,
@@ -781,6 +848,7 @@ class _DrawerGroupState extends State<_DrawerGroup> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Padding(
+          key: widget.tourKey,
           padding: const EdgeInsets.fromLTRB(12, 2, 12, 2),
           child: ListTile(
             dense: true,
