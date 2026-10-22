@@ -118,6 +118,22 @@ class CoreApi extends ApiClient {
     return client.put('/gold-gym/v2/userdata/registrationmode', {"mode": mode});
   }
 
+  // GET /gold-gym/v2/userdata?type=getoutlettypesettings (public, tanpa token) --
+  // hide/unhide "Jasa Terapi & Spa" di Tipe Outlet (lihat utils/outlet_type.dart).
+  Future<http.Response> getOutletTypeSettings() async {
+    final url = Uri.parse(
+        '${ApiClient.baseUrl}/gold-gym/v2/userdata?type=getoutlettypesettings');
+    return await http.get(url).timeout(ApiClient.timeout);
+  }
+
+  // PUT /gold-gym/v2/userdata/outlettypesettings (wajib token + role ADMIN) --
+  // menu Akses Admin -> Tipe Outlet.
+  Future<http.Response> updateOutletTypeSettings(bool therapyVisible) async {
+    final client = ApiClient();
+    return client.put('/gold-gym/v2/userdata/outlettypesettings',
+        {"therapyVisible": therapyVisible});
+  }
+
   // POST /gold-gym/v2/userdata?type=resendverification (public, tanpa
   // token) -- kirim ulang email verifikasi (dipanggil dari
   // CheckEmailScreen, bukan lewat link -- itu selalu dibuka di browser).

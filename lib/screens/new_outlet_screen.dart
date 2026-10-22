@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../config/theme.dart';
@@ -6,10 +7,12 @@ import '../services/outlet_api.dart';
 import '../models/outlet_model.dart';
 import '../models/location_model.dart';
 import '../utils/bidang_usaha.dart';
+import '../utils/outlet_type.dart';
 import '../utils/roles.dart';
 import '../utils/toast.dart';
 import '../widgets/auth_card.dart';
 import '../widgets/location_picker.dart';
+import '../services/core_api.dart';
 
 class NewOutletScreen extends StatefulWidget {
   const NewOutletScreen({super.key});
@@ -26,6 +29,13 @@ class _OutletScreenState extends State<NewOutletScreen> {
   final _bidangUsahaLainnyaController = TextEditingController();
   final outletsArrNotifier = ValueNotifier<List<Outlet>>([]);
   String _bidangUsaha = '';
+
+  // Tipe Outlet (2026-10-22): Autocomplete freeSolo -- lihat utils/outlet_type.dart.
+  // Di-key ulang (lihat build()) supaya reset ke default setelah addItem/simpan, sama pola
+  // dengan LocationPicker di bawah -- RawAutocomplete tidak punya API langsung untuk itu.
+  final coreApi = CoreApi();
+  String _outletTypeInput = outletTypeDisplayLabel(outletTypeDefault);
+  bool _therapyVisible = true;
 
   bool _isLoading = false;
 
@@ -51,6 +61,16 @@ class _OutletScreenState extends State<NewOutletScreen> {
         Navigator.of(context).maybePop();
       }
     });
+    // Admin bisa sembunyikan "Jasa Terapi & Spa" dari daftar (menu Akses Admin) --
+    // default true (tampil) sampai pengaturan selesai dimuat.
+    coreApi.getOutletTypeSettings().then((resp) {
+      if (!mounted || resp.statusCode != 200) return;
+      final body = jsonDecode(resp.body);
+      final visible = body['data']?['therapyVisible'];
+      if (visible == false) setState(() => _therapyVisible = false);
+    }).catchError((_) {
+      // default true -- tidak memblokir form kalau pengaturan gagal dimuat
+    });
   }
 
   @override
@@ -66,6 +86,8 @@ class _OutletScreenState extends State<NewOutletScreen> {
   String get _bidangUsahaFinal => _bidangUsaha == bidangUsahaLainnya
       ? _bidangUsahaLainnyaController.text.trim()
       : _bidangUsaha;
+
+  String get _outletTypeFinal => resolveOutletTypeValue(_outletTypeInput);
 
   bool get _formFilled =>
       _outletNameController.text.trim().isNotEmpty &&
@@ -88,12 +110,18 @@ class _OutletScreenState extends State<NewOutletScreen> {
               'Lengkapi lokasi outlet (hanya field yang memang ada datanya yang wajib diisi).'));
       return;
     }
+    if (_outletTypeFinal.isEmpty) {
+      Toast.error(context,
+          lang.get('Please specify the outlet type', 'Mohon isi tipe outlet-nya'));
+      return;
+    }
     {
       final outlet = Outlet(
         outlet_name: _outletNameController.text,
         outlet_address: _outletAddressController.text,
         outlet_status: isActiveOutlet.value,
         bidangUsaha: _bidangUsahaFinal,
+        outletType: _outletTypeFinal,
         location: _location.copy(),
       );
 
@@ -108,6 +136,7 @@ class _OutletScreenState extends State<NewOutletScreen> {
         _location = LocationSelection();
         _bidangUsaha = '';
         _bidangUsahaLainnyaController.clear();
+        _outletTypeInput = outletTypeDisplayLabel(outletTypeDefault);
       });
     }
   }
@@ -129,6 +158,7 @@ class _OutletScreenState extends State<NewOutletScreen> {
         outlet_address: _outletAddressController.text,
         outlet_status: isActiveOutlet.value,
         bidangUsaha: _bidangUsahaFinal,
+        outletType: _outletTypeFinal,
         location: _location,
       );
       arrayOneOutlet = [
@@ -143,6 +173,8 @@ class _OutletScreenState extends State<NewOutletScreen> {
                   "outlet_status": item.outlet_status ? "ACTIVE" : "NON ACTIVE",
                   if (item.bidangUsaha.isNotEmpty)
                     "outlet_bidang_usaha": item.bidangUsaha,
+                  if (item.outletType.isNotEmpty)
+                    "outlet_type": item.outletType,
                   ...?item.location?.toJson(),
                 })
             .toList()
@@ -156,6 +188,8 @@ class _OutletScreenState extends State<NewOutletScreen> {
                   "outlet_status": item.outlet_status ? "ACTIVE" : "NON ACTIVE",
                   if (item.bidangUsaha.isNotEmpty)
                     "outlet_bidang_usaha": item.bidangUsaha,
+                  if (item.outletType.isNotEmpty)
+                    "outlet_type": item.outletType,
                   ...?item.location?.toJson(),
                 })
             .toList()
@@ -178,6 +212,11 @@ class _OutletScreenState extends State<NewOutletScreen> {
               'Lengkapi lokasi outlet (hanya field yang memang ada datanya yang wajib diisi).'));
       return;
     }
+    if (outletsArrNotifier.value.isEmpty && _outletTypeFinal.isEmpty) {
+      Toast.error(context,
+          lang.get('Please specify the outlet type', 'Mohon isi tipe outlet-nya'));
+      return;
+    }
 
     setState(() => _isLoading = true);
     try {
@@ -190,6 +229,7 @@ class _OutletScreenState extends State<NewOutletScreen> {
         _outletAddressController.clear();
         _bidangUsahaLainnyaController.clear();
         _bidangUsaha = '';
+        _outletTypeInput = outletTypeDisplayLabel(outletTypeDefault);
         _location = LocationSelection();
         Toast.success(context,
             lang.get('Outlet saved successfully', 'Outlet berhasil disimpan'));
@@ -233,6 +273,34 @@ class _OutletScreenState extends State<NewOutletScreen> {
               ),
               textInputAction: TextInputAction.next,
               onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 14),
+            Autocomplete<String>(
+              key: ValueKey('outlet-type-${outletsArrNotifier.value.length}'),
+              optionsBuilder: (TextEditingValue textEditingValue) {
+                final opts = visibleOutletTypeOptions(_therapyVisible)
+                    .map((o) => o.label);
+                if (textEditingValue.text.isEmpty) return opts;
+                final q = textEditingValue.text.toLowerCase();
+                return opts.where((label) => label.toLowerCase().contains(q));
+              },
+              initialValue: TextEditingValue(text: _outletTypeInput),
+              fieldViewBuilder:
+                  (context, controller, focusNode, onFieldSubmitted) {
+                return TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  decoration: InputDecoration(
+                    labelText: lang.get('Outlet Type', 'Tipe Outlet'),
+                    helperText: lang.get(
+                        'Type to search, or pick "Service & Therapy/Spa" to enable the Therapy Booking feature. Not in the list? Just type your own.',
+                        'Ketik untuk mencari, atau pilih "Jasa Terapi & Spa" untuk mengaktifkan fitur Booking Terapi. Tidak ada yang cocok? Ketik saja tipe Anda sendiri.'),
+                    prefixIcon: const Icon(Icons.storefront_outlined),
+                  ),
+                  onChanged: (v) => _outletTypeInput = v,
+                );
+              },
+              onSelected: (selection) => setState(() => _outletTypeInput = selection),
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
@@ -444,21 +512,46 @@ class _PendingOutletTile extends StatelessWidget {
                   style: textTheme.bodySmall,
                 ),
                 const SizedBox(height: 4),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: active ? AppColors.successLight : AppColors.chipBg,
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                  ),
-                  child: Text(
-                    active ? 'ACTIVE' : 'NON ACTIVE',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: active ? AppColors.successDark : AppColors.muted,
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color:
+                            active ? AppColors.successLight : AppColors.chipBg,
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                      child: Text(
+                        active ? 'ACTIVE' : 'NON ACTIVE',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color:
+                              active ? AppColors.successDark : AppColors.muted,
+                        ),
+                      ),
                     ),
-                  ),
+                    if (outlet.outletType.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.chipBg,
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                        ),
+                        child: Text(
+                          outletTypeDisplayLabel(outlet.outletType),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),

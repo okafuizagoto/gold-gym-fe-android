@@ -202,6 +202,11 @@ class _AppDrawerState extends State<AppDrawer> {
               route: '/admin-registration-mode',
             ),
             MenuItem(
+              title: 'Tipe Outlet',
+              icon: Icons.category_rounded,
+              route: '/admin-outlet-type-settings',
+            ),
+            MenuItem(
               title: 'Tampilan Langganan',
               icon: Icons.workspace_premium_outlined,
               route: '/admin-langganan-tampilan',

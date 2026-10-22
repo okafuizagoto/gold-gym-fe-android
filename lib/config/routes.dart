@@ -27,6 +27,7 @@ import '../screens/admin_buyer_outlets_screen.dart';
 import '../screens/admin_pos_customer_screen.dart';
 import '../screens/admin_proof_access_screen.dart';
 import '../screens/admin_registration_mode_screen.dart';
+import '../screens/admin_outlet_type_settings_screen.dart';
 import '../screens/admin_plan_pricing_screen.dart';
 import '../screens/cashier_shift_screen.dart';
 import '../screens/thermal_printer_screen.dart';
@@ -91,6 +92,7 @@ class AppRoutes {
   static const String adminPosCustomer = '/admin-pos-customer';
   static const String adminProofAccess = '/admin-proof-access';
   static const String adminRegistrationMode = '/admin-registration-mode';
+  static const String adminOutletTypeSettings = '/admin-outlet-type-settings';
   static const String adminLanggananTampilan = '/admin-langganan-tampilan';
   static const String adminPlanPricing = '/admin-plan-pricing';
   static const String cashierShift = '/cashier-shift';
@@ -156,6 +158,7 @@ class AppRoutes {
         adminPosCustomer: (context) => const AdminPosCustomerScreen(),
         adminProofAccess: (context) => const AdminProofAccessScreen(),
         adminRegistrationMode: (context) => const AdminRegistrationModeScreen(),
+        adminOutletTypeSettings: (context) => const AdminOutletTypeSettingsScreen(),
         adminLanggananTampilan: (context) => const AdminPricingUiScreen(),
         adminPlanPricing: (context) => const AdminPlanPricingScreen(),
         cashierShift: (context) => const CashierShiftScreen(),
