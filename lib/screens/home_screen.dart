@@ -5,6 +5,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/app_bar_custom.dart';
 import '../widgets/private_route.dart';
 import '../widgets/commerce_carousel.dart';
+import '../widgets/admin_quick_menu.dart';
 import '../providers/user_provider.dart';
 import '../providers/language_provider.dart';
 import '../utils/responsive.dart';
@@ -110,16 +111,9 @@ class _HomeScreenState extends State<HomeScreen> {
         route: '/daftar-pembeli',
         color: const Color(0xFFEC4899),
       ));
-    } else {
-      actions.add(_QuickAction(
-        icon: Icons.admin_panel_settings_rounded,
-        title: lang.get('Admin Access', 'Akses Admin'),
-        desc: lang.get('Manage feature access',
-            'Atur akses fitur (lihat menu samping)'),
-        route: '/admin-outlet-pembeli',
-        color: AppColors.warning,
-      ));
     }
+    // Admin (2026-10-22): kartu generik "Admin Access" diganti AdminQuickMenu di bawah grid --
+    // grouping per hubungan nyata antar-menu, bukan cuma satu link ke submenu pertama.
     actions.add(_QuickAction(
       icon: Icons.info_rounded,
       title: lang.get('About Us', 'Tentang Kami'),
@@ -214,16 +208,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       final a = actions[index];
                       return _QuickActionCard(
                         action: a,
-                        onTap: () {
-                          if (a.route == '/admin-outlet-pembeli') {
-                            Scaffold.of(context).openDrawer();
-                            return;
-                          }
-                          Navigator.pushNamed(context, a.route);
-                        },
+                        onTap: () => Navigator.pushNamed(context, a.route),
                       );
                     },
                   ),
+                  if (_isAdmin) ...[
+                    const SizedBox(height: 24),
+                    AdminQuickMenu(lang: langProvider),
+                  ],
                 ],
               ),
             ),
