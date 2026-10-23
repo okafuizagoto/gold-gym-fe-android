@@ -16,6 +16,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.byType(TextField), findsNWidgets(2));
-    expect(find.text('LOGIN'), findsOneWidget);
+    // tombol masuk dilokalkan (EN: 'LOG IN', ID: 'MASUK') -- tepat satu dari keduanya harus tampil
+    expect(find.text('LOG IN').evaluate().length + find.text('MASUK').evaluate().length, 1);
   });
 }

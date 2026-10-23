@@ -304,6 +304,7 @@ class _OutletScreenState extends State<NewOutletScreen> {
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
+              isExpanded: true, // lihat register_screen: tanpa ini meluap di layar 360dp
               initialValue: _bidangUsaha.isEmpty ? null : _bidangUsaha,
               decoration: InputDecoration(
                 labelText: lang.get(
@@ -311,7 +312,9 @@ class _OutletScreenState extends State<NewOutletScreen> {
                 prefixIcon: const Icon(Icons.category_outlined),
               ),
               items: bidangUsahaOptions
-                  .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
+                  .map((opt) => DropdownMenuItem(
+                      value: opt,
+                      child: Text(opt, overflow: TextOverflow.ellipsis)))
                   .toList(),
               onChanged: (v) => setState(() => _bidangUsaha = v ?? ''),
             ),

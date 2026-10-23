@@ -201,13 +201,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
+            isExpanded: true, // isi memenuhi lebar & pilihan panjang dipotong (tanpa ini meluap di layar 360dp)
             initialValue: _bidangUsaha.isEmpty ? null : _bidangUsaha,
             decoration: const InputDecoration(
               labelText: 'Bidang Usaha (opsional)',
               prefixIcon: Icon(Icons.category_outlined),
             ),
             items: bidangUsahaOptions
-                .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
+                .map((opt) => DropdownMenuItem(
+                    value: opt,
+                    child: Text(opt, overflow: TextOverflow.ellipsis)))
                 .toList(),
             onChanged: (v) => setState(() => _bidangUsaha = v ?? ''),
           ),

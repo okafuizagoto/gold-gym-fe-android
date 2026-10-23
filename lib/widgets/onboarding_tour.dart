@@ -36,6 +36,16 @@ class OnboardingTour {
   static void registerScaffold(BuildContext c) => _scaffoldContexts.add(c);
   static void unregisterScaffold(BuildContext c) => _scaffoldContexts.remove(c);
 
+  /// Context layar paling atas yang berada DI DALAM Overlay navigator. TutorialCoachMark.show() memanggil
+  /// Overlay.of(context), yang mencari ke leluhur -- context milik OverlayState sendiri (nav.overlay.context)
+  /// TIDAK menemukan overlay dan melempar error (diuji di emulator 2026-10-23: coach mark tidak pernah muncul).
+  static BuildContext? _liveContext() {
+    for (final c in _scaffoldContexts.reversed) {
+      if (c.mounted) return c;
+    }
+    return null;
+  }
+
   static ScaffoldState? _topScaffold() {
     for (final c in _scaffoldContexts.reversed) {
       if (!c.mounted) continue;
@@ -101,9 +111,11 @@ class OnboardingTour {
         await _runSteps(nav, ctx, steps, lang);
       }
       completed = true;
-    } catch (_) {
+    } catch (e, st) {
       // gagal di tengah jalan: jangan tandai "sudah dilihat" supaya bisa muncul lagi
+      debugPrint('[OnboardingTour] gagal: $e\n$st');
     } finally {
+      await _closeDrawer();
       await _returnToRoot(nav);
       if (completed) await OnboardingApi().markSeen(role);
       _running = false;
@@ -123,8 +135,13 @@ class OnboardingTour {
             await _closeDrawer();
             continue;
           }
+          final host = _liveContext();
+          if (host == null) {
+            await _closeDrawer();
+            continue;
+          }
           final next = await _coach(
-            ctx,
+            host,
             lang: lang,
             title: s.title,
             text: s.text,
@@ -155,13 +172,15 @@ class OnboardingTour {
           if (box is! RenderBox || !box.attached) continue;
           await Scrollable.ensureVisible(tctx,
               duration: const Duration(milliseconds: 200), alignment: 0.4);
-          await _delay(350);
-          if (!tctx.mounted || !box.attached) continue;
-          final offset = box.localToGlobal(Offset.zero);
-          final size = box.size;
+          // Tunggu posisi benar-benar diam (transisi halaman/gulir/animasi masuk selesai) -- membaca posisi
+          // di tengah animasi membuat sorotan meleset (terlihat di emulator 2026-10-23).
+          final rect = await _stableRect(tctx);
+          if (rect == null) continue;
+          final offset = rect.$1;
+          final size = rect.$2;
           final screenH = MediaQuery.of(ctx).size.height;
           final next = await _coach(
-            ctx,
+            tctx, // context target = di dalam Overlay layar ini
             lang: lang,
             title: '',
             text: s.text,
@@ -190,6 +209,32 @@ class OnboardingTour {
       if (DateTime.now().isAfter(deadline)) return null;
       await _delay(100);
     }
+  }
+
+  /// Posisi global + ukuran target setelah tidak berubah selama 3 pembacaan berturut-turut (100 ms/pembacaan),
+  /// maksimal ~3 detik; null kalau target hilang.
+  static Future<(Offset, Size)?> _stableRect(BuildContext c) async {
+    Offset? last;
+    Size? lastSize;
+    var stable = 0;
+    (Offset, Size)? latest;
+    for (var i = 0; i < 30; i++) {
+      if (!c.mounted) return null;
+      final box = c.findRenderObject();
+      if (box is! RenderBox || !box.attached) return null;
+      final o = box.localToGlobal(Offset.zero);
+      final sz = box.size;
+      latest = (o, sz);
+      if (last != null && (o - last).distanceSquared < 1 && sz == lastSize) {
+        if (++stable >= 3) return latest;
+      } else {
+        stable = 0;
+      }
+      last = o;
+      lastSize = sz;
+      await _delay(100);
+    }
+    return latest;
   }
 
   static Future<void> _returnToRoot(NavigatorState nav) async {
@@ -225,7 +270,7 @@ class OnboardingTour {
 
   /// Satu coach mark; true = Lanjut, false = Lewati.
   static Future<bool> _coach(
-    BuildContext ctx, {
+    BuildContext host, {
     required LanguageProvider lang,
     required String title,
     required String text,
@@ -269,7 +314,7 @@ class OnboardingTour {
         if (!done.isCompleted) done.complete(false);
         return true;
       },
-    ).show(context: ctx);
+    ).show(context: host);
     return done.future;
   }
 
