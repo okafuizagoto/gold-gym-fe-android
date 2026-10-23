@@ -10,6 +10,7 @@ import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
+import '../widgets/tour_target.dart';
 
 /// Dashboard pembeli: daftar pesanan yang sudah dibuat, lengkap dengan
 /// metode pembayaran dan status. Tombol "Detail" membuka rincian barang.
@@ -89,6 +90,7 @@ class _BuyerOrdersScreenState extends State<BuyerOrdersScreen> {
                           padding: const EdgeInsets.only(bottom: 10),
                           child: _OrderCard(
                             order: o,
+                            tourFirst: index == 0,
                             onDetail: () => Navigator.pushNamed(
                                 context, '/pesanan-detail',
                                 arguments: o.orderId),
@@ -105,8 +107,10 @@ class _BuyerOrdersScreenState extends State<BuyerOrdersScreen> {
 class _OrderCard extends StatelessWidget {
   final BuyerOrder order;
   final VoidCallback onDetail;
+  final bool tourFirst; // kartu pertama = target Panduan Penggunaan (tombol Detail)
 
-  const _OrderCard({required this.order, required this.onDetail});
+  const _OrderCard(
+      {required this.order, required this.onDetail, this.tourFirst = false});
 
   (Color, Color) _statusColors(String status) {
     switch (status) {
@@ -203,10 +207,14 @@ class _OrderCard extends StatelessWidget {
               const SizedBox(height: 4),
               Align(
                 alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  icon: const Icon(Icons.list_alt_rounded, size: 18),
-                  label: const Text('Detail'),
-                  onPressed: onDetail,
+                child: TourTarget(
+                  id: 'pesanan-detail',
+                  enabled: tourFirst,
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.list_alt_rounded, size: 18),
+                    label: const Text('Detail'),
+                    onPressed: onDetail,
+                  ),
                 ),
               ),
             ],

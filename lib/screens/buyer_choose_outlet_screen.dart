@@ -16,6 +16,7 @@ import '../widgets/info_row.dart';
 import '../widgets/page_header.dart';
 import '../widgets/private_route.dart';
 import '../widgets/section_card.dart';
+import '../widgets/tour_target.dart';
 
 /// Mode pembeli — layar pertama: pilih outlet penjual tujuan.
 /// Menampilkan SEMUA outlet non-THERAPY yang terdaftar (lintas penjual),
@@ -192,7 +193,7 @@ class _BuyerChooseOutletScreenState extends State<BuyerChooseOutletScreen> {
                                       : _selected!.outletAddress,
                                 ),
                                 const SizedBox(height: 14),
-                                SizedBox(
+                                TourTarget(id: 'pilih-outlet-start', child: SizedBox(
                                   height: 48,
                                   width: double.infinity,
                                   child: ElevatedButton.icon(
@@ -207,7 +208,7 @@ class _BuyerChooseOutletScreenState extends State<BuyerChooseOutletScreen> {
                                         Navigator.pushReplacementNamed(
                                             context, '/belanja'),
                                   ),
-                                ),
+                                )),
                               ],
                             ),
                           ),

@@ -47,6 +47,7 @@ import '../utils/constants.dart';
 import '../utils/storage.dart';
 import '../extensions/string_extension.dart';
 import 'payment_success_screen.dart';
+import '../widgets/tour_target.dart';
 
 // Warna brand aplikasi -- alias token tema (lib/config/theme.dart) supaya
 // layar ini tetap satu bahasa visual dengan layar lain & web.
@@ -2108,12 +2109,12 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
           child: Row(
             children: [
               Expanded(
-                child: SearchField(
+                child: TourTarget(id: 'pos-search', child: SearchField(
                   controller: _catalogSearchController,
                   hintText: langProvider.get('Search product', 'Cari produk'),
                   onChanged: (v) =>
                       _debouncer.run(() => getAllStock(v, 1, 200)),
-                ),
+                )),
               ),
               const SizedBox(width: 8),
               OutlinedButton.icon(
@@ -2854,7 +2855,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
 
   Widget _buildBottomButtons(
       BuildContext context, CartProvider cart, LanguageProvider langProvider) {
-    final payButton = ElevatedButton.icon(
+    final payButton = TourTarget(id: 'pos-pay', child: ElevatedButton.icon(
       onPressed: cart.hasItems
           ? () => _showPaymentModal(context, langProvider, cart)
           : null,
@@ -2866,7 +2867,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
       icon: const Icon(Icons.payments_outlined, size: 18),
       label: Text(langProvider.get('PAYMENT', 'BAYAR'),
           maxLines: 1, overflow: TextOverflow.ellipsis),
-    );
+    ));
 
     final holdButton = OutlinedButton(
       onPressed: cart.hasItems ? () => _holdCart(context, cart) : null,

@@ -49,12 +49,19 @@ class _AppBarCustomState extends State<AppBarCustom> {
   @override
   void initState() {
     super.initState();
+    OnboardingTour.registerScaffold(context);
     _loadSession();
     // Panduan tooltip pertama kali per role (2026-10-22) -- AppBarCustom ada di
     // semua layar ber-drawer, jadi cukup dipicu dari sini (cek sekali per role).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) OnboardingTour.maybeAutoStart(context);
     });
+  }
+
+  @override
+  void dispose() {
+    OnboardingTour.unregisterScaffold(context);
+    super.dispose();
   }
 
   Future<void> _loadSession() async {

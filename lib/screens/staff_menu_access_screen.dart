@@ -10,6 +10,7 @@ import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
+import '../widgets/tour_target.dart';
 
 /// Menu penjual: Akses Staff. Pilih 1 staff, lalu centang menu mana yang
 /// boleh diakses (default semua tercentang -- lihat StaffMenuKeys).
@@ -184,7 +185,9 @@ class _StaffMenuAccessScreenState extends State<StaffMenuAccessScreen> {
                   ),
         floatingActionButton: _selected == null
             ? null
-            : FloatingActionButton.extended(
+            : TourTarget(
+                id: 'staff-access-save',
+                child: FloatingActionButton.extended(
                 onPressed: _saving ? null : _save,
                 icon: _saving
                     ? const SizedBox(
@@ -194,7 +197,7 @@ class _StaffMenuAccessScreenState extends State<StaffMenuAccessScreen> {
                             strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.save_outlined),
                 label: const Text('Simpan'),
-              ),
+              )),
       ),
     );
   }

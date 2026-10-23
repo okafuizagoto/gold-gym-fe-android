@@ -11,6 +11,7 @@ import '../utils/roles.dart';
 import '../services/core_api.dart';
 import '../utils/toast.dart';
 import '../widgets/auth_card.dart';
+import '../widgets/tour_target.dart';
 
 class OutletScreen extends StatefulWidget {
   const OutletScreen({super.key});
@@ -179,7 +180,7 @@ class _OutletScreenState extends State<OutletScreen> {
               },
             ),
             const SizedBox(height: 20),
-            SizedBox(
+            TourTarget(id: 'outlet-confirm', child: SizedBox(
               height: 48,
               child: ElevatedButton.icon(
                 onPressed: _handleOutlet,
@@ -189,20 +190,20 @@ class _OutletScreenState extends State<OutletScreen> {
                 icon: const Icon(Icons.check_rounded, size: 20),
                 label: const Text('CONFIRM'),
               ),
-            ),
+            )),
             const SizedBox(height: 10),
-            SizedBox(
+            TourTarget(id: 'outlet-list', child: SizedBox(
               height: 48,
               child: ElevatedButton.icon(
                 onPressed: _handleListOutlet,
                 icon: const Icon(Icons.list_alt_rounded, size: 20),
                 label: const Text('LIST OUTLET'),
               ),
-            ),
+            )),
             // STAFF tidak boleh membuat outlet (backend 403) -- tombol disembunyikan.
             if (!_isStaff) ...[
               const SizedBox(height: 10),
-              SizedBox(
+              TourTarget(id: 'outlet-new', child: SizedBox(
                 height: 48,
                 child: ElevatedButton.icon(
                   onPressed: _handleNewOutlet,
@@ -212,7 +213,7 @@ class _OutletScreenState extends State<OutletScreen> {
                   icon: const Icon(Icons.add_business_rounded, size: 20),
                   label: const Text('NEW OUTLET'),
                 ),
-              ),
+              )),
             ],
             const SizedBox(height: 10),
             SizedBox(

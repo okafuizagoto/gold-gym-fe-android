@@ -18,6 +18,7 @@ import '../widgets/empty_state.dart';
 import '../widgets/info_row.dart';
 import '../widgets/private_route.dart';
 import '../widgets/search_field.dart';
+import '../widgets/tour_target.dart';
 
 /// Mode pembeli — memesan barang dari outlet terpilih.
 /// Pilih barang ke keranjang → BAYAR → pilih TUNAI / TRANSFER.
@@ -336,6 +337,7 @@ class _BuyerOrderShopScreenState extends State<BuyerOrderShopScreen> {
                                   qtyInCart:
                                       inCart.isNotEmpty ? inCart.first.qty : 0,
                                   onAdd: () => _addItem(cart, item),
+                                  tourFirst: index == 0,
                                 );
                               },
                             ),
@@ -409,7 +411,7 @@ class _BuyerOrderShopScreenState extends State<BuyerOrderShopScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              ElevatedButton.icon(
+              TourTarget(id: 'belanja-pay', child: ElevatedButton.icon(
                 icon: _submitting
                     ? const SizedBox(
                         width: 18,
@@ -423,7 +425,7 @@ class _BuyerOrderShopScreenState extends State<BuyerOrderShopScreen> {
                   minimumSize: const Size(0, 48),
                 ),
                 onPressed: _submitting ? null : _checkout,
-              ),
+              )),
             ],
           ),
         ],
@@ -518,11 +520,13 @@ class _CatalogTile extends StatelessWidget {
   final CatalogItem item;
   final int qtyInCart;
   final VoidCallback onAdd;
+  final bool tourFirst; // tile pertama = target Panduan Penggunaan (tombol tambah)
 
   const _CatalogTile({
     required this.item,
     required this.qtyInCart,
     required this.onAdd,
+    this.tourFirst = false,
   });
 
   @override
@@ -595,7 +599,10 @@ class _CatalogTile extends StatelessWidget {
                       style: textTheme.bodySmall,
                     ),
                   ),
-                  SizedBox(
+                  TourTarget(
+                    id: 'belanja-add',
+                    enabled: tourFirst,
+                    child: SizedBox(
                     width: 32,
                     height: 32,
                     child: IconButton(
@@ -609,7 +616,7 @@ class _CatalogTile extends StatelessWidget {
                           const Icon(Icons.add_shopping_cart_rounded, size: 16),
                       onPressed: onAdd,
                     ),
-                  ),
+                  )),
                 ],
               ),
             ],

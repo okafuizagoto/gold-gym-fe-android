@@ -32,10 +32,21 @@ class _AppDrawerState extends State<AppDrawer> {
   GlobalKey _tourKey(String title) =>
       _tourKeys.putIfAbsent(title, () => GlobalKey(debugLabel: 'tour-$title'));
 
+  GlobalKey? _keyForTour(String title) => _tourKeys[title];
+
   @override
   void initState() {
     super.initState();
+    OnboardingTour.drawerKeyFor = _keyForTour;
     _loadMenuItems();
+  }
+
+  @override
+  void dispose() {
+    if (OnboardingTour.drawerKeyFor == _keyForTour) {
+      OnboardingTour.drawerKeyFor = null;
+    }
+    super.dispose();
   }
 
   Future<void> _loadMenuItems() async {
@@ -566,37 +577,6 @@ class _AppDrawerState extends State<AppDrawer> {
     setState(() {
       menuItems = allItems;
     });
-    _maybeRunPendingTour();
-  }
-
-  // Drawer dibuka otomatis oleh OnboardingTour.maybeAutoStart -> jalankan tour
-  // setelah menu ter-render & animasi buka drawer selesai.
-  void _maybeRunPendingTour() {
-    final pending = OnboardingTour.pendingRole;
-    if (pending == null) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await Future.delayed(const Duration(milliseconds: 350));
-      if (!mounted) return;
-      // role bisa sudah berganti (mis. pindah mode pembeli) sejak tour dijadwalkan
-      if (await OnboardingTour.effectiveRole() != pending) {
-        OnboardingTour.pendingRole = null;
-        return;
-      }
-      await _runTour(pending);
-    });
-  }
-
-  Future<void> _runTour(String role) async {
-    final outletType =
-        await Storage.get(AppConstants.outletTypeKey) ?? 'RETAIL';
-    if (!mounted) return;
-    await OnboardingTour.run(
-      context: context,
-      role: role,
-      isTherapy: outletType == AppConstants.outletTherapy,
-      keyFor: (title) => _tourKeys[title],
-    );
-    if (mounted) Scaffold.maybeOf(context)?.closeDrawer();
   }
 
   IconData _getIconFromName(String? iconName) {
@@ -616,9 +596,10 @@ class _AppDrawerState extends State<AppDrawer> {
   // supaya dipakai ulang oleh ListTile biasa maupun anak ExpansionTile.
   Future<void> _onMenuTap(MenuItem item) async {
     if (item.route == '/panduan-penggunaan') {
-      // tour berjalan DI drawer yang sedang terbuka -- jangan ditutup dulu
-      final role = await OnboardingTour.effectiveRole();
-      if (role != null && mounted) await _runTour(role);
+      // tutup drawer dulu; tour membukanya lagi sendiri untuk tiap langkah menu
+      Navigator.pop(context);
+      await Future.delayed(const Duration(milliseconds: 350));
+      await OnboardingTour.start();
       return;
     }
     Navigator.pop(context); // Close drawer

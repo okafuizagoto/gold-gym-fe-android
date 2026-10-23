@@ -10,6 +10,7 @@ import '../widgets/auth_card.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/pagination_bar.dart';
 import '../widgets/search_field.dart';
+import '../widgets/tour_target.dart';
 
 class ListOutletScreen extends StatefulWidget {
   const ListOutletScreen({super.key});
@@ -263,6 +264,7 @@ class _OutletScreenState extends State<ListOutletScreen> {
                             onCancel: _cancelEdit,
                             onDelete: () => _confirmDeleteOutlet(items[i]),
                             onToggleQueue: () => _toggleQueue(items[i]),
+                            tourFirst: i == 0,
                           ),
                         ),
                       const SizedBox(height: 4),
@@ -316,6 +318,8 @@ class _OutletTile extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onToggleQueue;
   final bool readOnly;
+  // baris pertama = target Panduan Penggunaan (tombol antrian)
+  final bool tourFirst;
 
   const _OutletTile({
     required this.number,
@@ -329,6 +333,7 @@ class _OutletTile extends StatelessWidget {
     required this.onDelete,
     required this.onToggleQueue,
     this.readOnly = false,
+    this.tourFirst = false,
   });
 
   @override
@@ -509,7 +514,10 @@ class _OutletTile extends StatelessWidget {
                   const SizedBox(width: 6),
                   const Text('Antrian POS', style: TextStyle(fontSize: 13)),
                   const Spacer(),
-                  OutlinedButton(
+                  TourTarget(
+                    id: 'outlet-queue-toggle',
+                    enabled: tourFirst,
+                    child: OutlinedButton(
                     onPressed: readOnly ? null : onToggleQueue,
                     style: OutlinedButton.styleFrom(
                       backgroundColor:
@@ -520,7 +528,7 @@ class _OutletTile extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                     ),
                     child: Text(item.queueEnabled ? 'AKTIF' : 'NONAKTIF'),
-                  ),
+                  )),
                 ],
               ),
             ],

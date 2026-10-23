@@ -1,14 +1,36 @@
 import '../providers/language_provider.dart';
 
-/// Panduan tooltip pertama kali per role (2026-10-22, porting dari
-/// gold-gym-fe-next-js-ts utils/onboardingSteps.ts). [menuTitle] HARUS sama
-/// persis dengan judul menu di widgets/app_drawer.dart -- tour menyorot menu
-/// drawer ASLI lewat judul itu. Langkah yang menunya tidak tampil (mis. menu
-/// staff yang ditolak owner) otomatis dilewati.
+/// Panduan tooltip pertama kali per role (2026-10-22, diperluas 2026-10-23; porting dari
+/// gold-gym-fe-next-js-ts utils/onboardingSteps.ts). Langkah menu menyorot menu drawer ASLI lewat
+/// judulnya ([menuTitle] HARUS sama persis dengan judul di widgets/app_drawer.dart), lalu "Lanjut"
+/// membawa user ke halaman menunya ([goto]) dan langkah halaman menyorot tombol penting di sana
+/// ([targetId] = id TourTarget, lihat widgets/tour_target.dart). Langkah yang elemennya tidak ada
+/// (menu ditolak owner, tombol belum muncul karena data kosong) dilewati otomatis.
+enum OnboardingStepKind { menu, page, done }
+
 class OnboardingStep {
-  final String menuTitle;
+  final OnboardingStepKind kind;
+  final String? menuTitle;
+  final String? targetId;
+  final String? page;
+  final String? goto;
   final String text;
-  const OnboardingStep(this.menuTitle, this.text);
+  const OnboardingStep._(this.kind, this.text,
+      {this.menuTitle, this.targetId, this.page, this.goto});
+
+  factory OnboardingStep.menu(String title, String goto, String text) =>
+      OnboardingStep._(OnboardingStepKind.menu, text,
+          menuTitle: title, goto: goto);
+
+  factory OnboardingStep.page(String page, String id, String text,
+          {String? goto}) =>
+      OnboardingStep._(OnboardingStepKind.page, text,
+          targetId: id, page: page, goto: goto);
+
+  factory OnboardingStep.done(String text) =>
+      OnboardingStep._(OnboardingStepKind.done, text);
+
+  String get title => menuTitle ?? '';
 }
 
 const String onboardingRoleSeller = 'SELLER';
@@ -32,80 +54,188 @@ String onboardingWelcome(String role, LanguageProvider lang) {
 
 List<OnboardingStep> onboardingStepsFor(
     String role, bool isTherapy, LanguageProvider lang) {
+  final t = lang.get;
+  final done = OnboardingStep.done(t(
+      'You can replay this guide anytime from the "Panduan Penggunaan" menu.',
+      'Anda bisa mengulang panduan ini kapan saja lewat menu "Panduan Penggunaan".'));
+
+  final posSearch = OnboardingStep.page(
+      '/penjualan',
+      'pos-search',
+      t('Search a product by name or scan its barcode, then tap it to add it to the cart.',
+          'Cari produk lewat nama atau scan barcode, lalu ketuk produk untuk memasukkannya ke keranjang.'));
+  final posPay = OnboardingStep.page(
+      '/penjualan',
+      'pos-pay',
+      t('PAYMENT: choose how the customer pays, then save the sale. Use HOLD (next to it) to park a transaction and serve someone else first.',
+          'BAYAR: pilih cara bayar pelanggan, lalu simpan transaksi. Tombol TAHAN di sebelahnya menyimpan sementara transaksi supaya Anda bisa melayani pelanggan lain dulu.'));
+  final queueMenu =
+      (String text) => OnboardingStep.menu('Antrian POS', '/antrian-pos', text);
+  final queueAdvance = OnboardingStep.page(
+      '/antrian-pos',
+      'queue-advance',
+      t('PROCESS / FINISH: move a queue number forward (Waiting -> Processing -> Done).',
+          'PROSES / SELESAI: majukan status nomor antrian (Menunggu -> Diproses -> Selesai).'));
+
   if (role == onboardingRoleSeller) {
     return [
-      OnboardingStep(
+      OnboardingStep.menu(
           'Ganti Outlet',
-          lang.get(
-              'Create your first outlet here (or switch between outlets if you have more than one).',
-              'Buat outlet pertama Anda di sini (atau pindah antar outlet kalau sudah punya lebih dari satu).')),
+          '/outlet',
+          t('Create your first outlet here (or switch between outlets if you have more than one). Tap Next to open this page.',
+              'Buat outlet pertama Anda di sini (atau pindah antar outlet kalau sudah punya lebih dari satu). Ketuk Lanjut untuk membuka halamannya.')),
+      OnboardingStep.page(
+          '/outlet',
+          'outlet-confirm',
+          t('Pick an outlet from the list, then tap CONFIRM to work inside it.',
+              'Pilih outlet dari daftar, lalu ketuk CONFIRM untuk bekerja di outlet itu.')),
+      OnboardingStep.page(
+          '/outlet',
+          'outlet-new',
+          t('NEW OUTLET: add another store or branch.',
+              'NEW OUTLET: tambahkan toko atau cabang lain.')),
+      OnboardingStep.page(
+          '/outlet',
+          'outlet-list',
+          t('LIST OUTLET: see all your outlets and turn the queue number feature on or off. Tap Next to open it.',
+              'LIST OUTLET: lihat semua outlet Anda dan aktifkan/nonaktifkan fitur nomor antrian. Ketuk Lanjut untuk membukanya.'),
+          goto: '/list-outlet'),
+      OnboardingStep.page(
+          '/list-outlet',
+          'outlet-queue-toggle',
+          t("QUEUE button: ON gives every sale a queue number and shows it on the Antrian POS board. Leave it OFF if you don't need queue numbers.",
+              'Tombol ANTRIAN: AKTIF = tiap transaksi mendapat nomor antrian dan tampil di papan Antrian POS. Biarkan NONAKTIF kalau tidak butuh nomor antrian.')),
       // Outlet THERAPY tidak punya menu "Atur Meja" (diganti "Booking Terapi").
       if (isTherapy)
-        OnboardingStep(
+        OnboardingStep.menu(
             'Booking Terapi',
-            lang.get('Manage your therapy appointment slots here.',
-                'Atur jadwal slot terapi pelanggan Anda di sini.'))
-      else
-        OnboardingStep(
+            '/booking',
+            t('Manage your therapy appointment slots here. Tap Next to open this page.',
+                'Atur jadwal slot terapi pelanggan Anda di sini. Ketuk Lanjut untuk membukanya.'))
+      else ...[
+        OnboardingStep.menu(
             'Atur Meja',
-            lang.get(
-                'Set up your areas (indoor/outdoor) and tables -- needed before taking dine-in orders.',
-                'Atur area (indoor/outdoor) dan meja di sini -- perlu diisi sebelum menerima transaksi dine-in.')),
-      OnboardingStep(
+            '/meja-area',
+            t('Set up your areas (indoor/outdoor) and tables -- needed before taking dine-in orders. Tap Next to open this page.',
+                'Atur area (indoor/outdoor) dan meja di sini -- perlu diisi sebelum menerima transaksi dine-in. Ketuk Lanjut untuk membukanya.')),
+        OnboardingStep.page(
+            '/meja-area',
+            'meja-add',
+            t('ADD TABLE: create a new table (or a new area on the Area tab).',
+                'TAMBAH MEJA: buat meja baru (atau area baru di tab Area).')),
+      ],
+      OnboardingStep.menu(
           'Staff',
-          lang.get(
-              'Add staff accounts and control which menus each of them can access.',
-              'Tambahkan akun staff dan atur menu apa saja yang boleh mereka akses.')),
-      OnboardingStep(
+          '/daftar-staff',
+          t('Add staff accounts and control which menus each of them can access. Tap Next to open this page.',
+              'Tambahkan akun staff dan atur menu apa saja yang boleh mereka akses. Ketuk Lanjut untuk membukanya.')),
+      OnboardingStep.page(
+          '/daftar-staff',
+          'staff-add',
+          t('REGISTER STAFF: create a staff account. New staff only get the daily work menus -- you add more access next.',
+              'DAFTARKAN STAFF: buat akun staff. Staff baru hanya dapat menu kerja harian -- tambah aksesnya di langkah berikutnya.'),
+          goto: '/akses-staff'),
+      OnboardingStep.page(
+          '/akses-staff',
+          'staff-access-save',
+          t('Tick the menus a staff member may use, then tap SAVE. Unticked menus stay hidden for them.',
+              'Centang menu yang boleh dipakai staff, lalu ketuk SIMPAN. Menu yang tidak dicentang tetap tersembunyi untuknya.')),
+      OnboardingStep.menu(
+          'Sesi Kasir',
+          '/cashier-shift',
+          t('Open a cashier session before selling. Tap Next to open this page.',
+              'Buka sesi kasir sebelum mulai berjualan. Ketuk Lanjut untuk membukanya.')),
+      OnboardingStep.page(
+          '/cashier-shift',
+          'shift-main',
+          t('OPEN CASHIER SESSION: enter the starting cash. At the end of the day tap the same button to close and reconcile.',
+              'BUKA SESI KASIR: isi modal awal. Di akhir hari ketuk tombol yang sama untuk menutup dan rekonsiliasi kas.')),
+      OnboardingStep.menu(
           'Point of Sale',
-          lang.get('This is where you record sales at the counter.',
-              'Di sinilah Anda mencatat transaksi penjualan di kasir.')),
-      OnboardingStep(
-          'Antrian POS',
-          lang.get(
-              'If you turn on the queue number feature (in outlet settings), track it here.',
-              'Kalau Anda mengaktifkan fitur nomor antrian (di pengaturan outlet), pantau di sini.')),
-      OnboardingStep(
+          '/penjualan',
+          t('This is where you record sales at the counter. Tap Next to open this page.',
+              'Di sinilah Anda mencatat transaksi penjualan di kasir. Ketuk Lanjut untuk membukanya.')),
+      posSearch,
+      posPay,
+      queueMenu(t(
+          'The queue board. It only works after you turn the QUEUE button on in the outlet list. Tap Next to open it.',
+          'Papan antrian. Baru berfungsi setelah tombol ANTRIAN diaktifkan di daftar outlet. Ketuk Lanjut untuk membukanya.')),
+      queueAdvance,
+      OnboardingStep.menu(
           'Laporan Penjualan',
-          lang.get('Daily, weekly, and monthly sales reports live here.',
-              'Laporan penjualan harian, mingguan, dan bulanan ada di sini.')),
+          '/laporan',
+          t('Daily, weekly, and monthly sales reports live here. Tap Next to open it.',
+              'Laporan penjualan harian, mingguan, dan bulanan ada di sini. Ketuk Lanjut untuk membukanya.')),
+      done,
     ];
   }
   if (role == onboardingRoleStaff) {
     return [
-      OnboardingStep(
+      OnboardingStep.menu(
           'Absen',
-          lang.get(
-              'Clock in here when your shift starts, and clock out when it ends.',
-              'Absen masuk di sini saat mulai kerja, dan absen pulang saat selesai.')),
-      OnboardingStep(
+          '/absen',
+          t('Clock in here when your shift starts, and clock out when it ends. Tap Next to open this page.',
+              'Absen masuk di sini saat mulai kerja, dan absen pulang saat selesai. Ketuk Lanjut untuk membukanya.')),
+      OnboardingStep.page(
+          '/absen',
+          'absen-main',
+          t('CLOCK IN when you start working. The same button becomes CLOCK OUT at the end of your shift.',
+              'ABSEN MASUK saat mulai kerja. Tombol yang sama berubah jadi ABSEN PULANG saat shift selesai.')),
+      OnboardingStep.menu(
           'Point of Sale',
-          lang.get('Record sales for customers here.',
-              'Catat transaksi penjualan pelanggan di sini.')),
-      OnboardingStep(
-          'Antrian POS',
-          lang.get(
-              'If the outlet uses queue numbers, manage the queue board here.',
-              'Kalau outlet memakai nomor antrian, kelola papan antrian di sini.')),
+          '/penjualan',
+          t('Record sales for customers here. Tap Next to open this page.',
+              'Catat transaksi penjualan pelanggan di sini. Ketuk Lanjut untuk membukanya.')),
+      posSearch,
+      posPay,
+      queueMenu(t(
+          'If the outlet uses queue numbers, manage the queue board here. Tap Next to open it.',
+          'Kalau outlet memakai nomor antrian, kelola papan antrian di sini. Ketuk Lanjut untuk membukanya.')),
+      queueAdvance,
+      done,
     ];
   }
   return [
-    OnboardingStep(
+    OnboardingStep.menu(
         'Pilih Outlet',
-        lang.get('Browse and pick a store to shop from here.',
-            'Jelajahi dan pilih outlet untuk belanja di sini.')),
-    OnboardingStep(
+        '/pilih-outlet',
+        t('Browse and pick a store to shop from here. Tap Next to open this page.',
+            'Jelajahi dan pilih outlet untuk belanja di sini. Ketuk Lanjut untuk membukanya.')),
+    OnboardingStep.page(
+        '/pilih-outlet',
+        'pilih-outlet-start',
+        t('After you pick a store, tap this button to start ordering from it.',
+            'Setelah memilih outlet, ketuk tombol ini untuk mulai memesan dari outlet tersebut.')),
+    OnboardingStep.menu(
         'Pesan Barang',
-        lang.get('Order products from the store you picked.',
-            'Pesan produk dari outlet yang Anda pilih.')),
-    OnboardingStep(
+        '/belanja',
+        t('Order products from the store you picked. Tap Next to open this page.',
+            'Pesan produk dari outlet yang Anda pilih. Ketuk Lanjut untuk membukanya.')),
+    OnboardingStep.page(
+        '/belanja',
+        'belanja-add',
+        t('ADD: put a product in your basket.',
+            'TAMBAH: masukkan produk ke keranjang belanja Anda.')),
+    OnboardingStep.page(
+        '/belanja',
+        'belanja-pay',
+        t('PAY: choose how to pay and send your order to the seller.',
+            'BAYAR: pilih cara bayar dan kirim pesanan Anda ke penjual.')),
+    OnboardingStep.menu(
         'Pesanan Saya',
-        lang.get('Track the status of your orders here.',
-            'Pantau status pesanan Anda di sini.')),
-    OnboardingStep(
+        '/pesanan-saya',
+        t('Track the status of your orders here. Tap Next to open this page.',
+            'Pantau status pesanan Anda di sini. Ketuk Lanjut untuk membukanya.')),
+    OnboardingStep.page(
+        '/pesanan-saya',
+        'pesanan-detail',
+        t('DETAIL: see the items and status of an order.',
+            'DETAIL: lihat isi dan status sebuah pesanan.')),
+    OnboardingStep.menu(
         'Antrian Saya',
-        lang.get(
-            'If a cashier links your account to an in-store transaction, your queue number shows here.',
-            'Kalau kasir mengaitkan akun Anda ke transaksi di toko, nomor antrian Anda muncul di sini.')),
+        '/antrian-saya',
+        t('If a cashier links your account to an in-store transaction, your queue number shows here. Tap Next to open it.',
+            'Kalau kasir mengaitkan akun Anda ke transaksi di toko, nomor antrian Anda muncul di sini. Ketuk Lanjut untuk membukanya.')),
+    done,
   ];
 }

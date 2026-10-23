@@ -17,6 +17,7 @@ import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
 import '../widgets/segmented_tabs.dart';
 import '../config/routes.dart';
+import '../widgets/tour_target.dart';
 
 /// Layar utama "Meja & Area": dropdown outlet (default outlet yang
 /// sedang aktif) + 2 tab (Meja / Area), masing-masing dengan tombol tambah.
@@ -392,11 +393,13 @@ class _MejaTabViewState extends State<_MejaTabView> {
             ),
       floatingActionButton: _mejaList.isEmpty
           ? null
-          : FloatingActionButton.extended(
-              onPressed: _tambah,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Tambah Meja'),
-            ),
+          : TourTarget(
+              id: 'meja-add',
+              child: FloatingActionButton.extended(
+                onPressed: _tambah,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Tambah Meja'),
+              )),
     );
   }
 }

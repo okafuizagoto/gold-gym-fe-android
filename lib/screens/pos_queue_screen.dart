@@ -11,6 +11,7 @@ import '../providers/language_provider.dart';
 import '../widgets/app_bar_custom.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
+import '../widgets/tour_target.dart';
 
 /// Papan antrian POS -- penjual/staf lihat & majukan status. Aktif/nonaktifkan dari Daftar Outlet.
 class PosQueueScreen extends StatefulWidget {
@@ -148,14 +149,17 @@ class _PosQueueScreenState extends State<PosQueueScreen> {
                                         '${row.queueCreatedAt.toLocal().toString().substring(11, 16)} · ${statusLabel(row.queueStatus)}'),
                                     trailing: done
                                         ? null
-                                        : FilledButton(
+                                        : TourTarget(
+                                            id: 'queue-advance',
+                                            enabled: i == _rows.indexWhere((r) => r.queueStatus != QueueStatus.selesai),
+                                            child: FilledButton(
                                             onPressed: _advancingId == row.queueId
                                                 ? null
                                                 : () => _advance(row),
                                             child: Text(row.queueStatus == QueueStatus.menunggu
                                                 ? lang.get('Process', 'Proses')
                                                 : lang.get('Finish', 'Selesai')),
-                                          ),
+                                          )),
                                   ),
                                 );
                               },

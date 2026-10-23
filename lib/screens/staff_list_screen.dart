@@ -11,6 +11,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/password_strength_bar.dart';
 import '../widgets/private_route.dart';
+import '../widgets/tour_target.dart';
 
 /// Menu penjual: Daftar Staff. Registrasi akun staff (dibawahi owner, akses
 /// menu diatur lewat menu "Akses Staff") + daftar staff yang sudah terdaftar.
@@ -188,10 +189,13 @@ class _StaffListScreenState extends State<StaffListScreen> {
           ],
         ),
         drawer: const AppDrawer(),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _register,
-          icon: const Icon(Icons.person_add_alt_1_rounded),
-          label: const Text('Daftarkan Staff'),
+        floatingActionButton: TourTarget(
+          id: 'staff-add',
+          child: FloatingActionButton.extended(
+            onPressed: _register,
+            icon: const Icon(Icons.person_add_alt_1_rounded),
+            label: const Text('Daftarkan Staff'),
+          ),
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())

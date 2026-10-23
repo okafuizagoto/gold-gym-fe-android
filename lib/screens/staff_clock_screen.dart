@@ -10,6 +10,7 @@ import '../utils/toast.dart';
 import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/private_route.dart';
+import '../widgets/tour_target.dart';
 
 /// Menu wajib staff: Absen. Clock-in/out sendiri (1 sesi/hari) + riwayat
 /// ringkas beberapa hari terakhir.
@@ -171,7 +172,7 @@ class _StaffClockScreenState extends State<StaffClockScreen> {
                                   ?.copyWith(color: AppColors.muted),
                             ),
                             const SizedBox(height: 20),
-                            SizedBox(
+                            TourTarget(id: 'absen-main', child: SizedBox(
                               width: double.infinity,
                               height: 52,
                               child: ElevatedButton.icon(
@@ -200,7 +201,7 @@ class _StaffClockScreenState extends State<StaffClockScreen> {
                                         ? 'Absen Pulang'
                                         : 'Absen Masuk')),
                               ),
-                            ),
+                            )),
                           ],
                         ),
                       ),

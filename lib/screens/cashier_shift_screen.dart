@@ -11,6 +11,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
 import '../widgets/section_card.dart';
+import '../widgets/tour_target.dart';
 
 /// Layar "Sesi Kasir" (2026-10-10, temuan QA POS #2) -- buka/tutup shift dengan rekonsiliasi kas:
 /// modal awal saat buka, hasil hitung fisik uang di laci saat tutup, selisih dicatat apa adanya
@@ -247,11 +248,13 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
                                     const Text(
                                         'Buka sesi kasir untuk mulai mencatat modal awal & rekonsiliasi kas harian.'),
                                     const SizedBox(height: 12),
-                                    ElevatedButton.icon(
+                                    TourTarget(
+                                      id: 'shift-main',
+                                      child: ElevatedButton.icon(
                                       icon: const Icon(Icons.lock_open_rounded),
                                       onPressed: _openShift,
                                       label: const Text('BUKA SESI KASIR'),
-                                    ),
+                                    )),
                                   ],
                                 )
                               : Column(
@@ -262,13 +265,15 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
                                     Text(
                                         'Modal awal: ${formatRupiah(_toDouble(_current!['shift_opening_cash']).round())}'),
                                     const SizedBox(height: 12),
-                                    ElevatedButton.icon(
+                                    TourTarget(
+                                      id: 'shift-main',
+                                      child: ElevatedButton.icon(
                                       icon: const Icon(Icons.lock_outline_rounded),
                                       style: ElevatedButton.styleFrom(
                                           backgroundColor: AppColors.error),
                                       onPressed: _closeShift,
                                       label: const Text('TUTUP SESI KASIR'),
-                                    ),
+                                    )),
                                   ],
                                 ),
                         ),
