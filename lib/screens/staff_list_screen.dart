@@ -111,6 +111,13 @@ class _StaffListScreenState extends State<StaffListScreen> {
                     onChanged: (_) => setDialogState(() {}),
                   ),
                   PasswordStrengthBar(password: passC.text),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Akses awal staff: Dashboard, Booking Terapi, Point of Sale, '
+                    'Pesanan Masuk, Sales History, dan Kelola Meja. '
+                    'Tambahkan menu lain lewat Akses Staff.',
+                    style: TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
                 ],
               ),
             ),
