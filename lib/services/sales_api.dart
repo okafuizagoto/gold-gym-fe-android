@@ -46,7 +46,7 @@ class SalesApi extends ApiClient {
   Future<Uint8List?> getProofPhoto(int proofId) async {
     final url = await proofPhotoUrl(proofId);
     if (url == null) return null;
-    final response = await http.get(Uri.parse(url)).timeout(ApiClient.timeout);
+    final response = await sharedHttpClient.get(Uri.parse(url)).timeout(ApiClient.timeout);
     if (response.statusCode == 200) return response.bodyBytes;
     return null;
   }
@@ -74,7 +74,7 @@ class SalesApi extends ApiClient {
       request.headers['Authorization'] = headers['Authorization']!;
     }
     request.files.add(await http.MultipartFile.fromPath('file', file.path));
-    final streamed = await request.send().timeout(ApiClient.timeout);
+    final streamed = await sharedHttpClient.send(request).timeout(ApiClient.timeout);
     return http.Response.fromStream(streamed);
   }
 

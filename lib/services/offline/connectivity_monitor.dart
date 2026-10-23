@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import '../api_client.dart';
 
 /// Status online/offline dari ping ke `/gold-gym/v2/ping` -- BUKAN dari status jaringan OS (Wi-Fi tersambung tapi tanpa
@@ -37,7 +36,7 @@ class ConnectivityMonitor extends ChangeNotifier {
 
   Future<bool> checkNow() async {
     try {
-      final r = await http
+      final r = await sharedHttpClient
           .get(Uri.parse('${ApiClient.baseUrl}/gold-gym/v2/ping'))
           .timeout(_timeout);
       // server terjangkau = ada jawaban HTTP apa pun selain galat gerbang/server (5xx); 404 dari server lama

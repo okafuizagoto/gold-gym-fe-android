@@ -22,7 +22,7 @@ class StockApi extends ApiClient {
       },
     );
 
-    return await http.get(url, headers: headers).timeout(ApiClient.timeout);
+    return await sharedHttpClient.get(url, headers: headers).timeout(ApiClient.timeout);
   }
 
   // GET /gold-gym/v2/userdata?type=getallstock
@@ -32,7 +32,7 @@ class StockApi extends ApiClient {
       queryParameters: {'type': 'getallstock'},
     );
 
-    return await http.get(url, headers: headers).timeout(ApiClient.timeout);
+    return await sharedHttpClient.get(url, headers: headers).timeout(ApiClient.timeout);
   }
 
   Future<http.Response> getStockByName(String name) async {
@@ -44,7 +44,7 @@ class StockApi extends ApiClient {
       },
     );
 
-    return await http.get(url, headers: headers).timeout(ApiClient.timeout);
+    return await sharedHttpClient.get(url, headers: headers).timeout(ApiClient.timeout);
   }
 
   Future<http.Response> getAllStock(

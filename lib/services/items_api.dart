@@ -56,7 +56,7 @@ class ItemsApi extends ApiClient {
   Future<Uint8List?> getItemPhoto(int itemId) async {
     final url = await itemPhotoUrl(itemId);
     if (url == null) return null;
-    final response = await http.get(Uri.parse(url)).timeout(ApiClient.timeout);
+    final response = await sharedHttpClient.get(Uri.parse(url)).timeout(ApiClient.timeout);
     if (response.statusCode == 200) return response.bodyBytes;
     return null;
   }
@@ -85,7 +85,7 @@ class ItemsApi extends ApiClient {
       request.headers['Authorization'] = headers['Authorization']!;
     }
     request.files.add(await http.MultipartFile.fromPath('file', file.path));
-    final streamed = await request.send().timeout(ApiClient.timeout);
+    final streamed = await sharedHttpClient.send(request).timeout(ApiClient.timeout);
     return http.Response.fromStream(streamed);
   }
 
@@ -96,6 +96,6 @@ class ItemsApi extends ApiClient {
       queryParameters: {'type': 'getallstock'},
     );
 
-    return await http.get(url, headers: headers).timeout(ApiClient.timeout);
+    return await sharedHttpClient.get(url, headers: headers).timeout(ApiClient.timeout);
   }
 }

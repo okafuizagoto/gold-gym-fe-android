@@ -72,7 +72,7 @@ class CoreApi extends ApiClient {
       "gold_nama_pt": namaPT,
       "gold_bidang_usaha": bidangUsaha,
     };
-    return await http
+    return await sharedHttpClient
         .post(url, body: jsonEncode(body))
         .timeout(ApiClient.timeout);
   }
@@ -82,7 +82,7 @@ class CoreApi extends ApiClient {
   Future<http.Response> requestPasswordResetOtp(String email) async {
     final url = Uri.parse(
         '${ApiClient.baseUrl}/gold-gym/v2/userdata?type=updateotp&email=${Uri.encodeQueryComponent(email)}');
-    return await http.put(url).timeout(ApiClient.timeout);
+    return await sharedHttpClient.put(url).timeout(ApiClient.timeout);
   }
 
   // PUT /gold-gym/v2/userdata?type=updatepassword (public, tanpa token) --
@@ -96,7 +96,7 @@ class CoreApi extends ApiClient {
       "gold_otp": otp,
       "gold_password": newPassword,
     };
-    return await http
+    return await sharedHttpClient
         .put(url, body: jsonEncode(body))
         .timeout(ApiClient.timeout);
   }
@@ -108,7 +108,7 @@ class CoreApi extends ApiClient {
   Future<http.Response> getRegistrationMode() async {
     final url = Uri.parse(
         '${ApiClient.baseUrl}/gold-gym/v2/userdata?type=getregistrationmode');
-    return await http.get(url).timeout(ApiClient.timeout);
+    return await sharedHttpClient.get(url).timeout(ApiClient.timeout);
   }
 
   // PUT /gold-gym/v2/userdata/registrationmode (wajib token + role ADMIN) —
@@ -123,7 +123,7 @@ class CoreApi extends ApiClient {
   Future<http.Response> getOutletTypeSettings() async {
     final url = Uri.parse(
         '${ApiClient.baseUrl}/gold-gym/v2/userdata?type=getoutlettypesettings');
-    return await http.get(url).timeout(ApiClient.timeout);
+    return await sharedHttpClient.get(url).timeout(ApiClient.timeout);
   }
 
   // PUT /gold-gym/v2/userdata/outlettypesettings (wajib token + role ADMIN) --
@@ -140,7 +140,7 @@ class CoreApi extends ApiClient {
   Future<http.Response> resendVerification(String email) async {
     final url = Uri.parse(
         '${ApiClient.baseUrl}/gold-gym/v2/userdata?type=resendverification');
-    return await http
+    return await sharedHttpClient
         .post(url, body: jsonEncode({"gold_email": email}))
         .timeout(ApiClient.timeout);
   }
@@ -163,7 +163,7 @@ class CoreApi extends ApiClient {
   // Future<String?> logoutR() async {
   //   final cookie = await Storage.get('refresh_cookie');
 
-  //   final response = await http.post(
+  //   final response = await sharedHttpClient.post(
   //     Uri.parse('${ApiClient.baseUrl}/gold-gym/v2/auth/logout'),
   //     headers: {"Cookie": cookie ?? "", "Content-Type": "application/json"},
   //   );
@@ -187,7 +187,7 @@ class CoreApi extends ApiClient {
     final url = Uri.parse('${ApiClient.baseUrl}/core/v1/users/$nip/pt')
         .replace(queryParameters: params);
 
-    return await http.get(url, headers: headers).timeout(ApiClient.timeout);
+    return await sharedHttpClient.get(url, headers: headers).timeout(ApiClient.timeout);
   }
 
   // GET /core/v1/users/:nip/outlet
@@ -197,7 +197,7 @@ class CoreApi extends ApiClient {
     final url = Uri.parse('${ApiClient.baseUrl}/core/v1/users/$nip/outlet')
         .replace(queryParameters: params);
 
-    return await http.get(url, headers: headers).timeout(ApiClient.timeout);
+    return await sharedHttpClient.get(url, headers: headers).timeout(ApiClient.timeout);
   }
 
   // --- QRIS Saya (2026-09-16): foto QRIS statis milik penjual sendiri,
@@ -215,7 +215,7 @@ class CoreApi extends ApiClient {
       request.headers['Authorization'] = headers['Authorization']!;
     }
     request.files.add(await http.MultipartFile.fromPath('file', file.path));
-    final streamed = await request.send().timeout(ApiClient.timeout);
+    final streamed = await sharedHttpClient.send(request).timeout(ApiClient.timeout);
     return http.Response.fromStream(streamed);
   }
 
@@ -256,7 +256,7 @@ class CoreApi extends ApiClient {
       request.headers['Authorization'] = headers['Authorization']!;
     }
     request.files.add(await http.MultipartFile.fromPath('file', file.path));
-    final streamed = await request.send().timeout(ApiClient.timeout);
+    final streamed = await sharedHttpClient.send(request).timeout(ApiClient.timeout);
     return http.Response.fromStream(streamed);
   }
 

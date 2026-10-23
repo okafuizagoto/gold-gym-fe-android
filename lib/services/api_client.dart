@@ -1,5 +1,7 @@
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import '../utils/storage.dart';
 import '../utils/navigation.dart';
@@ -49,6 +51,16 @@ void throwOnErrorStatus(http.Response response, String fallbackMessage) {
     throw Exception(extractErrorMessage(response, fallbackMessage));
   }
 }
+
+/// Satu klien HTTP bersama untuk seluruh aplikasi (2026-10-23). `http.get/post` tingkat atas membuat klien baru
+/// dan menutupnya tiap panggilan, jadi SETIAP request membayar ulang TCP + TLS (ratusan ms di jaringan seluler;
+/// diukur: jabat tangan TLS ke edge 80-170 ms). Dengan satu klien, koneksi keep-alive dipakai ulang -- ping
+/// konektivitas tiap 10 detik (ConnectivityMonitor) sekaligus menjaga koneksi tetap hangat. idleTimeout 60 dtk
+/// lebih pendek dari batas idle server/Cloudflare supaya tidak memakai koneksi yang sudah ditutup di sisi server.
+/// Padanan web: browser sudah memakai ulang koneksi (HTTP/2) ke origin yang sama -- tidak ada perubahan di Next.js.
+final http.Client sharedHttpClient = IOClient(HttpClient()
+  ..connectionTimeout = const Duration(seconds: 10)
+  ..idleTimeout = const Duration(seconds: 60));
 
 class ApiClient {
   static final Random _rng = Random.secure();
@@ -135,7 +147,7 @@ class ApiClient {
     }
 
     try {
-      final response = await http.post(
+      final response = await sharedHttpClient.post(
         Uri.parse('${ApiClient.baseUrl}/gold-gym/v2/auth/refreshtoken'),
         headers: {"Cookie": cookie, "Content-Type": "application/json"},
       ).timeout(timeout);
@@ -196,13 +208,13 @@ class ApiClient {
     final headers = await _authHeaders();
     final url = Uri.parse("$baseUrl$endpoint");
 
-    var response = await http
+    var response = await sharedHttpClient
         .post(url, headers: _withRequestId(headers), body: jsonEncode(body))
         .timeout(effectiveTimeout);
 
     if (response.statusCode == 401) {
       final newToken = await _refreshOrLogout();
-      response = await http
+      response = await sharedHttpClient
           .post(url,
               headers: _withRequestId(_headersWith(newToken)),
               body: jsonEncode(body))
@@ -219,12 +231,12 @@ class ApiClient {
       queryParameters: queryParams,
     );
 
-    var response = await http.get(uri, headers: headers).timeout(timeout);
+    var response = await sharedHttpClient.get(uri, headers: headers).timeout(timeout);
 
     if (response.statusCode == 401) {
       final newToken = await _refreshOrLogout();
       response =
-          await http.get(uri, headers: _headersWith(newToken)).timeout(timeout);
+          await sharedHttpClient.get(uri, headers: _headersWith(newToken)).timeout(timeout);
     }
 
     return response;
@@ -234,13 +246,13 @@ class ApiClient {
     final headers = await _authHeaders();
     final uri = Uri.parse("$baseUrl$endpoint");
 
-    var response = await http
+    var response = await sharedHttpClient
         .put(uri, headers: _withRequestId(headers), body: jsonEncode(body))
         .timeout(timeout);
 
     if (response.statusCode == 401) {
       final newToken = await _refreshOrLogout();
-      response = await http
+      response = await sharedHttpClient
           .put(uri,
               headers: _withRequestId(_headersWith(newToken)),
               body: jsonEncode(body))
@@ -255,13 +267,13 @@ class ApiClient {
     final headers = await _authHeaders();
     final uri = Uri.parse("$baseUrl$endpoint");
 
-    var response = await http
+    var response = await sharedHttpClient
         .patch(uri, headers: _withRequestId(headers), body: jsonEncode(body))
         .timeout(timeout);
 
     if (response.statusCode == 401) {
       final newToken = await _refreshOrLogout();
-      response = await http
+      response = await sharedHttpClient
           .patch(uri,
               headers: _withRequestId(_headersWith(newToken)),
               body: jsonEncode(body))
@@ -278,13 +290,13 @@ class ApiClient {
       queryParameters: queryParams,
     );
 
-    var response = await http
+    var response = await sharedHttpClient
         .delete(uri, headers: _withRequestId(headers))
         .timeout(timeout);
 
     if (response.statusCode == 401) {
       final newToken = await _refreshOrLogout();
-      response = await http
+      response = await sharedHttpClient
           .delete(uri, headers: _withRequestId(_headersWith(newToken)))
           .timeout(timeout);
     }
