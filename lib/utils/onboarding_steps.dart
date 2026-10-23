@@ -59,6 +59,11 @@ List<OnboardingStep> onboardingStepsFor(
       'You can replay this guide anytime from the "Panduan Penggunaan" menu.',
       'Anda bisa mengulang panduan ini kapan saja lewat menu "Panduan Penggunaan".'));
 
+  final posOpenShift = OnboardingStep.page(
+      '/penjualan',
+      'pos-open-shift',
+      t('A cashier session must be open before you can sell. Tap this button to open one (the owner or any staff can).',
+          'Sesi kasir harus dibuka dulu sebelum bisa berjualan. Ketuk tombol ini untuk membukanya (owner atau staff mana pun bisa).'));
   final posSearch = OnboardingStep.page(
       '/penjualan',
       'pos-search',
@@ -155,6 +160,7 @@ List<OnboardingStep> onboardingStepsFor(
           '/penjualan',
           t('This is where you record sales at the counter. Tap Next to open this page.',
               'Di sinilah Anda mencatat transaksi penjualan di kasir. Ketuk Lanjut untuk membukanya.')),
+      posOpenShift,
       posSearch,
       posPay,
       queueMenu(t(
@@ -186,6 +192,7 @@ List<OnboardingStep> onboardingStepsFor(
           '/penjualan',
           t('Record sales for customers here. Tap Next to open this page.',
               'Catat transaksi penjualan pelanggan di sini. Ketuk Lanjut untuk membukanya.')),
+      posOpenShift,
       posSearch,
       posPay,
       queueMenu(t(

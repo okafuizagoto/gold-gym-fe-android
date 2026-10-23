@@ -1834,12 +1834,15 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                   title: langProvider.get(
                       'You must open the Cashier Shift before processing transactions.',
                       'Anda harus membuka Sesi Kasir terlebih dahulu sebelum bisa memproses transaksi.'),
-                  action: ElevatedButton.icon(
-                    onPressed: () =>
-                        Navigator.pushNamed(context, '/cashier-shift'),
-                    icon: const Icon(Icons.lock_open_rounded, size: 18),
-                    label: Text(
-                        langProvider.get('Open Cashier Shift', 'Buka Sesi Kasir')),
+                  action: TourTarget(
+                    id: 'pos-open-shift',
+                    child: ElevatedButton.icon(
+                      onPressed: () =>
+                          Navigator.pushNamed(context, '/cashier-shift'),
+                      icon: const Icon(Icons.lock_open_rounded, size: 18),
+                      label: Text(langProvider.get(
+                          'Open Cashier Shift', 'Buka Sesi Kasir')),
+                    ),
                   ),
                 ),
               ),
