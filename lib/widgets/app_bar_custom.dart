@@ -8,6 +8,7 @@ import '../utils/constants.dart';
 import '../utils/responsive.dart';
 import '../utils/storage.dart';
 import 'onboarding_tour.dart';
+import '../services/play_integrity.dart';
 
 /// Bilah atas (web: Navbar): outlet aktif / mode pembeli, toggle bahasa
 /// EN/ID, avatar inisial dengan menu (nama, email, role, logout).
@@ -50,6 +51,7 @@ class _AppBarCustomState extends State<AppBarCustom> {
   void initState() {
     super.initState();
     OnboardingTour.registerScaffold(context);
+    PlayIntegrity.instance.reportOncePerSession(); // telemetri Play Integrity, sekali per sesi
     _loadSession();
     // Panduan tooltip pertama kali per role (2026-10-22) -- AppBarCustom ada di
     // semua layar ber-drawer, jadi cukup dipicu dari sini (cek sekali per role).

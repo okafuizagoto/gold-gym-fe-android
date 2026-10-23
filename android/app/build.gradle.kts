@@ -82,6 +82,11 @@ android {
     }
 }
 
+dependencies {
+    // Play Integrity API (anti APK modifikasi) -- dipakai MainActivity lewat MethodChannel "okejual/integrity".
+    implementation("com.google.android.play:integrity:1.4.0")
+}
+
 flutter {
     source = "../.."
 }

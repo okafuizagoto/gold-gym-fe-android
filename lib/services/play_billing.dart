@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 import 'api_client.dart';
+import 'play_integrity.dart';
 
 /// Hasil satu percobaan pembelian / pemulihan langganan lewat Google Play.
 enum PlayOutcome {
@@ -48,6 +49,10 @@ class PlayBilling {
     'PLAY_PAYMENT_PENDING':
         'Pembayaran masih diproses. Langganan aktif otomatis setelah selesai.',
     'PLAY_UNKNOWN_PRODUCT': 'Produk langganan tidak dikenali.',
+    'INTEGRITY_REQUIRED':
+        'Aplikasi tidak bisa diverifikasi. Pasang Okejual dari Google Play lalu coba lagi.',
+    'INTEGRITY_FAILED':
+        'Aplikasi ini bukan versi resmi dari Google Play. Pasang Okejual dari Google Play lalu coba lagi.',
   };
 
   void _ensureListening() {
@@ -91,9 +96,13 @@ class PlayBilling {
   /// Kirim purchase token ke backend. Backend idempotent -> aman diulang.
   Future<PlayResult> _verify(PurchaseDetails p) async {
     try {
+      final integrity = await PlayIntegrity.instance.token();
       final res = await _api.post(
         '/gold-gym/v2/userdata/subscription/play/verify',
-        {'purchase_token': p.verificationData.serverVerificationData},
+        {
+          'purchase_token': p.verificationData.serverVerificationData,
+          if (integrity != null) 'integrity_token': integrity,
+        },
       );
       if (res.statusCode == 200) {
         return const PlayResult(PlayOutcome.success, 'Langganan aktif.');
