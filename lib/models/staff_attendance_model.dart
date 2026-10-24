@@ -58,3 +58,29 @@ class TodayStatus {
   bool get isClockedIn => clockInAt != null && clockOutAt == null;
   bool get isDone => clockInAt != null && clockOutAt != null;
 }
+
+/// Hasil GET /gold-gym/v2/staff?type=office -- lokasi kantor untuk absensi.
+/// configured=false berarti belum diatur (absen tidak dibatasi lokasi).
+class OfficeLocation {
+  final bool configured;
+  final String name;
+  final double lat;
+  final double lng;
+  final int radiusM;
+
+  OfficeLocation({
+    required this.configured,
+    required this.name,
+    required this.lat,
+    required this.lng,
+    required this.radiusM,
+  });
+
+  factory OfficeLocation.fromJson(Map<String, dynamic> json) => OfficeLocation(
+        configured: _toBool(json['configured']),
+        name: json['name'] ?? '',
+        lat: _toDoubleOrNull(json['lat']) ?? 0,
+        lng: _toDoubleOrNull(json['lng']) ?? 0,
+        radiusM: (_toDoubleOrNull(json['radius_m']) ?? 100).toInt(),
+      );
+}

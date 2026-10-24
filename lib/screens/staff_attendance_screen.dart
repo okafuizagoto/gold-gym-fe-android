@@ -5,6 +5,7 @@ import '../models/staff_attendance_model.dart';
 import '../models/staff_model.dart';
 import '../services/staff_api.dart';
 import '../utils/responsive.dart';
+import '../utils/geo_location.dart';
 import '../utils/toast.dart';
 import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
@@ -32,12 +33,15 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
   DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
   int? _workHours;
   bool _savingWorkHours = false;
+  OfficeLocation? _office;
+  bool _savingOffice = false;
 
   @override
   void initState() {
     super.initState();
     _loadStaff();
     _loadWorkHours();
+    _loadOffice();
   }
 
   Future<void> _loadStaff() async {
@@ -64,6 +68,174 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
         }
       }
     } catch (_) {}
+  }
+
+  Future<void> _loadOffice() async {
+    try {
+      final resp = await _api.getOffice();
+      if (resp.statusCode == 200) {
+        final body = jsonDecode(resp.body);
+        if (mounted) {
+          setState(() => _office =
+              OfficeLocation.fromJson(body['data'] as Map<String, dynamic>));
+        }
+      }
+    } catch (_) {}
+  }
+
+  /// Penjual menandai titik kantor + radius. Staff hanya bisa absen di sekitar titik ini.
+  Future<void> _setOffice() async {
+    final o = _office;
+    final nameC = TextEditingController(text: o?.name ?? '');
+    final latC = TextEditingController(
+        text: o?.configured == true ? o!.lat.toString() : '');
+    final lngC = TextEditingController(
+        text: o?.configured == true ? o!.lng.toString() : '');
+    final radiusC = TextEditingController(text: (o?.radiusM ?? 100).toString());
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dc) {
+        var locating = false;
+        return StatefulBuilder(
+          builder: (dc, setD) => AlertDialog(
+            title: const Text('Lokasi Kantor'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Staff hanya bisa absen masuk dan pulang di sekitar titik ini. Berdirilah di kantor, lalu tekan tombol lokasi. Berlaku untuk SEMUA staff. Koordinat staff tidak disimpan; hanya dipakai untuk menghitung jarak saat absen.',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: AppColors.muted),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: nameC,
+                    maxLength: 100,
+                    decoration: const InputDecoration(
+                        labelText: 'Nama kantor (opsional)'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: locating
+                        ? null
+                        : () async {
+                            setD(() => locating = true);
+                            try {
+                              final geo = await getCurrentGeo();
+                              latC.text =
+                                  (geo['lat'] as double).toStringAsFixed(7);
+                              lngC.text =
+                                  (geo['lng'] as double).toStringAsFixed(7);
+                              if (mounted) {
+                                Toast.success(context,
+                                    'Titik kantor diisi dari lokasi Anda saat ini');
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                Toast.error(
+                                    context,
+                                    e is GeoException
+                                        ? e.message
+                                        : 'Lokasi tidak terbaca');
+                              }
+                            }
+                            setD(() => locating = false);
+                          },
+                    icon: locating
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.my_location_rounded),
+                    label: const Text('Gunakan lokasi saya sekarang'),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: latC,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true, signed: true),
+                          decoration: const InputDecoration(labelText: 'Lintang'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: lngC,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true, signed: true),
+                          decoration: const InputDecoration(labelText: 'Bujur'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: radiusC,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Radius (meter)',
+                      helperText: '20 - 1000 m. Disarankan 100 m.',
+                      suffixText: 'm',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(dc, false),
+                  child: const Text('Batal')),
+              ElevatedButton(
+                  onPressed: () => Navigator.pop(dc, true),
+                  child: const Text('Simpan')),
+            ],
+          ),
+        );
+      },
+    );
+    if (ok != true) return;
+    final lat = double.tryParse(latC.text.trim().replaceAll(',', '.'));
+    final lng = double.tryParse(lngC.text.trim().replaceAll(',', '.'));
+    final radius = int.tryParse(radiusC.text.trim());
+    if (lat == null || lng == null || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      if (mounted) {
+        Toast.error(context,
+            'Titik kantor belum diisi. Tekan "Gunakan lokasi saya sekarang" saat Anda berada di kantor.');
+      }
+      return;
+    }
+    if (radius == null || radius < 20 || radius > 1000) {
+      if (mounted) Toast.error(context, 'Radius harus antara 20 dan 1000 meter');
+      return;
+    }
+    setState(() => _savingOffice = true);
+    try {
+      final resp = await _api.setOffice(
+          name: nameC.text.trim(), lat: lat, lng: lng, radiusM: radius);
+      if (resp.statusCode == 200) {
+        if (mounted) {
+          Toast.success(context,
+              'Lokasi kantor disimpan. Staff hanya bisa absen di sekitar titik ini.');
+        }
+        await _loadOffice();
+      } else {
+        String msg = 'Gagal menyimpan';
+        try {
+          msg = jsonDecode(resp.body)['error'] ?? msg;
+        } catch (_) {}
+        if (mounted) Toast.error(context, msg);
+      }
+    } catch (e) {
+      if (mounted) Toast.error(context, 'Gagal: $e');
+    } finally {
+      if (mounted) setState(() => _savingOffice = false);
+    }
   }
 
   Future<void> _setWorkHours() async {
@@ -173,6 +345,11 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
           title: 'Absen Staff',
           actions: [
             IconButton(
+              tooltip: 'Lokasi Kantor',
+              icon: const Icon(Icons.place_outlined),
+              onPressed: _savingOffice ? null : _setOffice,
+            ),
+            IconButton(
               tooltip: 'Jam Kerja Standar',
               icon: const Icon(Icons.timer_outlined),
               onPressed: _savingWorkHours ? null : _setWorkHours,
@@ -223,6 +400,31 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
                                   _selectStaff(s);
                                 },
                               ),
+                              if (_office != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: _office!.configured
+                                          ? AppColors.successLight
+                                          : AppColors.warningLight,
+                                      borderRadius:
+                                          BorderRadius.circular(AppRadius.md),
+                                    ),
+                                    child: Text(
+                                      _office!.configured
+                                          ? 'Absen dibatasi di ${_office!.name.isEmpty ? 'kantor' : _office!.name} (radius ${_office!.radiusM} m).'
+                                          : 'Lokasi kantor belum diatur: staff bisa absen dari mana saja. Atur lewat ikon lokasi di kanan atas.',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: _office!.configured
+                                              ? AppColors.successDark
+                                              : AppColors.warningDark),
+                                    ),
+                                  ),
+                                ),
                               if (_workHours != null)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8),

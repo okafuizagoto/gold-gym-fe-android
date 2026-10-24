@@ -4,6 +4,7 @@ import '../config/theme.dart';
 import '../models/staff_attendance_model.dart';
 import '../services/staff_api.dart';
 import '../utils/constants.dart';
+import '../utils/geo_location.dart';
 import '../utils/responsive.dart';
 import '../utils/storage.dart';
 import '../utils/toast.dart';
@@ -27,6 +28,7 @@ class _StaffClockScreenState extends State<StaffClockScreen> {
   bool _loading = true;
   bool _busy = false;
   List<AttendanceDay> _recent = [];
+  OfficeLocation? _office;
 
   @override
   void initState() {
@@ -41,6 +43,12 @@ class _StaffClockScreenState extends State<StaffClockScreen> {
       if (resp.statusCode == 200) {
         final body = jsonDecode(resp.body);
         _today = TodayStatus.fromJson(body['data'] as Map<String, dynamic>);
+      }
+      final officeResp = await _api.getOffice();
+      if (officeResp.statusCode == 200) {
+        final body = jsonDecode(officeResp.body);
+        _office =
+            OfficeLocation.fromJson(body['data'] as Map<String, dynamic>);
       }
       final now = DateTime.now();
       final monthStr =
@@ -64,10 +72,17 @@ class _StaffClockScreenState extends State<StaffClockScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
+  /// Koordinat hanya diminta bila penjual mengatur lokasi kantor (tanpa itu absen tidak butuh izin lokasi).
+  Future<Map<String, dynamic>?> _geoIfNeeded() async {
+    if (_office?.configured != true) return null;
+    return getCurrentGeo();
+  }
+
   Future<void> _clockIn() async {
     setState(() => _busy = true);
     try {
-      final resp = await _api.clockIn();
+      final geo = await _geoIfNeeded();
+      final resp = await _api.clockIn(geo: geo);
       if (resp.statusCode == 200) {
         if (mounted) Toast.success(context, 'Absen masuk berhasil');
         await _load();
@@ -75,7 +90,9 @@ class _StaffClockScreenState extends State<StaffClockScreen> {
         _showErr(resp.body);
       }
     } catch (e) {
-      if (mounted) Toast.error(context, 'Gagal: $e');
+      if (mounted) {
+        Toast.error(context, e is GeoException ? e.message : 'Gagal: $e');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -84,7 +101,8 @@ class _StaffClockScreenState extends State<StaffClockScreen> {
   Future<void> _clockOut() async {
     setState(() => _busy = true);
     try {
-      final resp = await _api.clockOut();
+      final geo = await _geoIfNeeded();
+      final resp = await _api.clockOut(geo: geo);
       if (resp.statusCode == 200) {
         if (mounted) Toast.success(context, 'Absen pulang berhasil');
         await _load();
@@ -92,7 +110,9 @@ class _StaffClockScreenState extends State<StaffClockScreen> {
         _showErr(resp.body);
       }
     } catch (e) {
-      if (mounted) Toast.error(context, 'Gagal: $e');
+      if (mounted) {
+        Toast.error(context, e is GeoException ? e.message : 'Gagal: $e');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -171,6 +191,23 @@ class _StaffClockScreenState extends State<StaffClockScreen> {
                               style: textTheme.bodySmall
                                   ?.copyWith(color: AppColors.muted),
                             ),
+                            if (_office?.configured == true) ...[
+                              const SizedBox(height: 12),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: AppColors.infoLight,
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.md),
+                                ),
+                                child: Text(
+                                  'Absen hanya bisa dilakukan di ${_office!.name.isEmpty ? 'kantor' : _office!.name} (radius ${_office!.radiusM} m). Izinkan akses lokasi saat diminta.',
+                                  style: const TextStyle(
+                                      fontSize: 12, color: AppColors.infoDark),
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 20),
                             TourTarget(id: 'absen-main', child: SizedBox(
                               width: double.infinity,

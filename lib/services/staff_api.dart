@@ -56,6 +56,21 @@ class StaffApi extends ApiClient {
     return _client.put("/gold-gym/v2/staff?type=workhours", {"hours": hours});
   }
 
+  /// Lokasi kantor untuk absensi (penjual mengatur, staff membaca).
+  Future<http.Response> getOffice() {
+    return _client.get("/gold-gym/v2/staff", queryParams: {"type": "office"});
+  }
+
+  Future<http.Response> setOffice({
+    required String name,
+    required double lat,
+    required double lng,
+    required int radiusM,
+  }) {
+    return _client.put("/gold-gym/v2/staff?type=office",
+        {"name": name, "lat": lat, "lng": lng, "radius_m": radiusM});
+  }
+
   // ---- Staff (self-service) ----
 
   Future<http.Response> myDeniedMenus() {
@@ -63,12 +78,13 @@ class StaffApi extends ApiClient {
         .get("/gold-gym/v2/staff", queryParams: {"type": "mydeniedmenus"});
   }
 
-  Future<http.Response> clockIn() {
-    return _client.post("/gold-gym/v2/staff?type=clockin", {});
+  /// [geo] = koordinat perangkat ({lat,lng,accuracy_m,mocked}); wajib bila penjual mengatur lokasi kantor.
+  Future<http.Response> clockIn({Map<String, dynamic>? geo}) {
+    return _client.post("/gold-gym/v2/staff?type=clockin", geo ?? {});
   }
 
-  Future<http.Response> clockOut() {
-    return _client.post("/gold-gym/v2/staff?type=clockout", {});
+  Future<http.Response> clockOut({Map<String, dynamic>? geo}) {
+    return _client.post("/gold-gym/v2/staff?type=clockout", geo ?? {});
   }
 
   Future<http.Response> today() {
