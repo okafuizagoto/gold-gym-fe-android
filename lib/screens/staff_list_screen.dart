@@ -97,6 +97,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
                   TextField(
                     controller: passC,
                     obscureText: obscure,
+                    autofillHints: const [AutofillHints.newPassword],
                     decoration: InputDecoration(
                       labelText: 'Password *',
                       helperText: 'Minimal 6 karakter, huruf besar, huruf kecil, dan angka',

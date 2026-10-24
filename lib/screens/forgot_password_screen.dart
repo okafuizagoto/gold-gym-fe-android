@@ -219,6 +219,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 : null,
           ),
           obscureText: _obscurePassword,
+          autofillHints: const [AutofillHints.newPassword],
           onChanged: (_) => setState(() {}),
           onSubmitted: (_) => _resetPassword(lang),
         ),

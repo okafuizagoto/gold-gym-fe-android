@@ -229,6 +229,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           TextField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
+            autofillHints: const [AutofillHints.username],
             textInputAction: TextInputAction.next,
             decoration: const InputDecoration(
               labelText: 'Email',
@@ -240,6 +241,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           TextField(
             controller: _hpController,
             keyboardType: TextInputType.phone,
+            autofillHints: const [AutofillHints.telephoneNumber],
             textInputAction: TextInputAction.next,
             decoration: const InputDecoration(
               labelText: 'Nomor HP',
@@ -251,6 +253,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           TextField(
             controller: _passwordController,
             obscureText: _obscurePassword,
+            autofillHints: const [AutofillHints.newPassword],
             textInputAction: TextInputAction.next,
             decoration: InputDecoration(
               labelText: 'Password',
@@ -277,6 +280,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           TextField(
             controller: _confirmController,
             obscureText: _obscureConfirm,
+            autofillHints: const [AutofillHints.newPassword],
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _handleRegister(),
             decoration: InputDecoration(
