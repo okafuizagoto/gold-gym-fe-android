@@ -106,6 +106,8 @@ class _LoginScreenState extends State<LoginScreen> {
             AppConstants.menuModePembeliKey, loginResponse.menuModePembeli);
         await Storage.set(AppConstants.emailVerifiedKey,
             loginResponse.emailVerified.toString());
+        await Storage.set(AppConstants.forceChangePasswordKey,
+            loginResponse.forceChangePassword.toString());
         await Storage.set(
             AppConstants.languageKey, AppConstants.defaultLanguage);
         if (rawCookie != null) {
@@ -146,6 +148,8 @@ class _LoginScreenState extends State<LoginScreen> {
         String dest = '/outlet';
         if (!loginResponse.emailVerified) {
           dest = '/check-email';
+        } else if (loginResponse.forceChangePassword == 1) {
+          dest = '/ganti-password'; // password awal dari penjual: wajib diganti dulu
         } else if (loginResponse.role == AppConstants.roleBuyer) {
           final buyerOutlet = await Storage.get(AppConstants.buyerOutcodeKey);
           dest = (buyerOutlet == null || buyerOutlet.isEmpty)

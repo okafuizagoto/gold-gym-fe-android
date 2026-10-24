@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../models/staff_model.dart';
 import '../services/staff_api.dart';
+import 'package:flutter/services.dart';
+import '../utils/password_generator.dart';
 import '../utils/password_strength.dart';
 import '../utils/responsive.dart';
 import '../utils/toast.dart';
@@ -112,9 +114,40 @@ class _StaffListScreenState extends State<StaffListScreen> {
                     ),
                     onChanged: (_) => setDialogState(() {}),
                   ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.auto_fix_high_rounded, size: 18),
+                          label: const Text('Buat password acak'),
+                          onPressed: () => setDialogState(() {
+                            passC.text = generatePassword(12);
+                            obscure = false;
+                          }),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.copy_rounded, size: 18),
+                        label: const Text('Salin'),
+                        onPressed: passC.text.isEmpty
+                            ? null
+                            : () async {
+                                await Clipboard.setData(
+                                    ClipboardData(text: passC.text));
+                                if (dc.mounted) {
+                                  Toast.success(dc,
+                                      'Password disalin. Berikan ke staff; staff wajib menggantinya setelah verifikasi email.');
+                                }
+                              },
+                      ),
+                    ],
+                  ),
                   PasswordStrengthBar(password: passC.text),
                   const SizedBox(height: 8),
                   const Text(
+                    'Tautan verifikasi akan dikirim ke email staff; pastikan email aktif dan bisa dibuka staff. '
                     'Akses awal staff: Dashboard, Booking Terapi, Point of Sale, '
                     'Pesanan Masuk, Sales History, dan Kelola Meja. '
                     'Tambahkan menu lain lewat Akses Staff.',
@@ -154,7 +187,10 @@ class _StaffListScreenState extends State<StaffListScreen> {
         nomorHp: hpC.text.trim(),
       );
       if (resp.statusCode == 200 || resp.statusCode == 201) {
-        if (mounted) Toast.success(context, 'Staff berhasil didaftarkan');
+        if (mounted) {
+          Toast.success(context,
+              'Staff berhasil didaftarkan. Tautan verifikasi dikirim ke email staff; staff harus memverifikasi email sebelum bisa masuk.');
+        }
         await _load();
       } else {
         _showErr(resp.body);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../screens/login_screen.dart';
 import '../screens/outlet_screen.dart';
+import '../screens/change_password_screen.dart';
 import '../screens/new_outlet_screen.dart';
 import '../screens/list_outlet_screen.dart';
 import '../screens/home_screen.dart';
@@ -120,6 +121,7 @@ class AppRoutes {
   static const String absenStaff = '/absen-staff';
   static const String absen = '/absen';
   static const String checkEmail = '/check-email';
+  static const String gantiPassword = '/ganti-password';
   static const String expense = '/expense';
   static const String antreanTransaksi = '/antrean-transaksi';
   static const String transferStok = '/transfer-stok';
@@ -188,6 +190,7 @@ class AppRoutes {
         absenStaff: (context) => const StaffAttendanceScreen(),
         absen: (context) => const StaffClockScreen(),
         checkEmail: (context) => const CheckEmailScreen(),
+        gantiPassword: (context) => const ChangePasswordScreen(),
         expense: (context) => const ExpenseScreen(),
         antreanTransaksi: (context) => const SalesOutboxScreen(),
         transferStok: (context) => const StockTransferListScreen(),

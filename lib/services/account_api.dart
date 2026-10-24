@@ -1,7 +1,7 @@
 import 'package:http/http.dart' as http;
 import 'api_client.dart';
 
-/// Hapus akun. Padanan services/account.ts (Next.js).
+/// Hapus akun + ganti password. Padanan services/account.ts (Next.js).
 class AccountApi extends ApiClient {
   final ApiClient _c = ApiClient();
 
@@ -11,5 +11,12 @@ class AccountApi extends ApiClient {
         'password': password,
         'confirm': 'HAPUS',
         if (totpCode != null && totpCode.isNotEmpty) 'totp_code': totpCode,
+      });
+
+  /// POST /gold-gym/v2/userdata/account/changepassword -- ganti password sendiri (password lama wajib benar).
+  Future<http.Response> changePassword(String oldPassword, String newPassword) =>
+      _c.post('/gold-gym/v2/userdata/account/changepassword', {
+        'old_password': oldPassword,
+        'new_password': newPassword,
       });
 }

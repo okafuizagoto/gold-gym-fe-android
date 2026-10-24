@@ -41,6 +41,9 @@ class AppConstants {
   // "false" (lihat ValidateToken middleware backend).
   static const String emailVerifiedKey = 'email_verified';
 
+  // '1' = akun wajib mengganti password awal (staff yang didaftarkan penjual) sebelum memakai aplikasi.
+  static const String forceChangePasswordKey = 'force_change_password';
+
   // Roles
   static const String roleSeller = 'SELLER';
   static const String roleBuyer = 'BUYER';

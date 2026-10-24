@@ -130,6 +130,7 @@ class _PrivateRouteState extends State<PrivateRoute> {
       'token': await Storage.get(AppConstants.accessTokenKey),
       'role': await Storage.get(AppConstants.userRoleKey),
       'emailVerified': await Storage.get(AppConstants.emailVerifiedKey),
+      'forceChange': await Storage.get(AppConstants.forceChangePasswordKey),
       'outcode': await Storage.get(AppConstants.outcode),
     };
   }
@@ -154,6 +155,15 @@ class _PrivateRouteState extends State<PrivateRoute> {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Navigator.pushNamedAndRemoveUntil(
                 context, '/login', (route) => false);
+          });
+          return const SizedBox.shrink();
+        }
+
+        // Password awal dari penjual (staff baru): wajib diganti sebelum layar apa pun dipakai.
+        if (snapshot.data?['forceChange'] == '1') {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Navigator.pushNamedAndRemoveUntil(
+                context, '/ganti-password', (route) => false);
           });
           return const SizedBox.shrink();
         }
