@@ -37,7 +37,7 @@ class AboutUsScreen extends StatelessWidget {
           const _InfoCard(
             icon: Icons.email_rounded,
             title: 'Email',
-            content: 'admin@okejual.co.id',
+            content: 'support@okejual.com',
           ),
         ];
 
