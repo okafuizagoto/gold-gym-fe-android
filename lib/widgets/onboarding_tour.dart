@@ -25,6 +25,8 @@ class OnboardingTour {
   OnboardingTour._();
 
   static bool _running = false;
+  // Diulang manual lewat "Panduan Penggunaan" -> tombol Lewati tampil (panduan pertama wajib diselesaikan).
+  static bool _replay = false;
   static final Set<String> _checkedRoles = {};
 
   /// Diisi AppDrawer yang sedang terbuka: GlobalKey menu drawer per judul (null = belum ter-render).
@@ -80,21 +82,22 @@ class OnboardingTour {
     if (seen || !context.mounted) return;
     // beri jeda supaya layar & menu drawer selesai dimuat dulu
     await Future.delayed(const Duration(milliseconds: 600));
-    await start();
+    await start(manual: false);
   }
 
   /// Mulai tour untuk role akun yang sedang aktif (abaikan status "sudah dilihat").
-  static Future<void> start() async {
+  static Future<void> start({bool manual = true}) async {
     final role = await effectiveRole();
     if (role == null) return;
-    await _run(role);
+    await _run(role, manual);
   }
 
   static Future<void> _delay(int ms) =>
       Future.delayed(Duration(milliseconds: ms));
 
-  static Future<void> _run(String role) async {
+  static Future<void> _run(String role, bool manual) async {
     if (_running) return;
+    _replay = manual;
     final nav = navigatorKey.currentState;
     final overlay = nav?.overlay;
     if (nav == null || overlay == null) return;
@@ -125,7 +128,9 @@ class OnboardingTour {
   static Future<void> _runSteps(NavigatorState nav, BuildContext ctx,
       List<OnboardingStep> steps, LanguageProvider lang) async {
     String? current; // rute yang sedang dibuka tour (null = layar utama)
-    for (final s in steps) {
+    for (var idx = 0; idx < steps.length; idx++) {
+      final s = steps[idx];
+      final progress = '${idx + 1}/${steps.length}';
       switch (s.kind) {
         case OnboardingStepKind.menu:
           await _returnToRoot(nav);
@@ -146,6 +151,7 @@ class OnboardingTour {
             title: s.title,
             text: s.text,
             keyTarget: key,
+            progress: progress,
             alignTop: false,
             beforeFocus: () async {
               final c = key.currentContext;
@@ -185,6 +191,7 @@ class OnboardingTour {
             title: '',
             text: s.text,
             position: TargetPosition(size, offset),
+            progress: progress,
             alignTop: offset.dy + size.height / 2 > screenH * 0.55,
           );
           if (!next) return;
@@ -195,7 +202,7 @@ class OnboardingTour {
           }
           break;
         case OnboardingStepKind.done:
-          await _doneDialog(ctx, s.text, lang);
+          await _doneDialog(ctx, s.text, lang, progress);
           break;
       }
     }
@@ -274,6 +281,7 @@ class OnboardingTour {
     required LanguageProvider lang,
     required String title,
     required String text,
+    required String progress,
     GlobalKey? keyTarget,
     TargetPosition? position,
     required bool alignTop,
@@ -295,6 +303,8 @@ class OnboardingTour {
                 title: title,
                 text: text,
                 lang: lang,
+                progress: progress,
+                showSkip: _replay,
                 onSkip: controller.skip,
                 onNext: controller.next,
               ),
@@ -343,7 +353,8 @@ class OnboardingTour {
   }
 
   static Future<void> _doneDialog(
-      BuildContext context, String text, LanguageProvider lang) async {
+      BuildContext context, String text, LanguageProvider lang,
+      String progress) async {
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -351,11 +362,29 @@ class OnboardingTour {
         icon: const Icon(Icons.check_circle_rounded,
             color: AppColors.successDark, size: 36),
         title: Text(lang.get('All set!', 'Selesai!')),
-        content: Text(text),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [Text(text)],
+        ),
         actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(lang.get('Finish', 'Selesai')),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(lang.get('Finish', 'Selesai')),
+              ),
+              const SizedBox(height: 6),
+              Text(progress,
+                  style:
+                      const TextStyle(fontSize: 12, color: AppColors.muted)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(progress,
+                style: const TextStyle(fontSize: 12, color: AppColors.muted)),
           ),
         ],
       ),
@@ -367,6 +396,8 @@ class _StepCard extends StatelessWidget {
   final String title;
   final String text;
   final LanguageProvider lang;
+  final String progress;
+  final bool showSkip;
   final VoidCallback onSkip;
   final VoidCallback onNext;
 
@@ -374,6 +405,8 @@ class _StepCard extends StatelessWidget {
     required this.title,
     required this.text,
     required this.lang,
+    required this.progress,
+    required this.showSkip,
     required this.onSkip,
     required this.onNext,
   });
@@ -404,11 +437,13 @@ class _StepCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              TextButton(
-                onPressed: onSkip,
-                child: Text(lang.get('Skip', 'Lewati')),
-              ),
-              const SizedBox(width: 6),
+              if (showSkip) ...[
+                TextButton(
+                  onPressed: onSkip,
+                  child: Text(lang.get('Skip', 'Lewati')),
+                ),
+                const SizedBox(width: 6),
+              ],
               ElevatedButton(
                 onPressed: onNext,
                 child: Text(lang.get('Next', 'Lanjut')),

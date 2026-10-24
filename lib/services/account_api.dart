@@ -19,4 +19,12 @@ class AccountApi extends ApiClient {
         'old_password': oldPassword,
         'new_password': newPassword,
       });
+
+  /// GET /gold-gym/v2/userdata/account/profile -- nama, email, nomor HP akun sendiri.
+  Future<http.Response> getProfile() =>
+      _c.get('/gold-gym/v2/userdata/account/profile');
+
+  /// PUT /gold-gym/v2/userdata/account/profile -- ubah nama akun sendiri.
+  Future<http.Response> updateProfile(String nama) =>
+      _c.put('/gold-gym/v2/userdata/account/profile', {'nama': nama});
 }

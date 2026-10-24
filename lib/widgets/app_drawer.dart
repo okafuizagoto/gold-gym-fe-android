@@ -485,6 +485,11 @@ class _AppDrawerState extends State<AppDrawer> {
           route: '/qris-outlet',
         ),
       MenuItem(
+        title: 'Edit Profil',
+        icon: Icons.account_circle_outlined,
+        route: '/edit-profil',
+      ),
+      MenuItem(
         title: 'Keamanan Akun',
         icon: Icons.lock_person_outlined,
         route: '/keamanan-akun',
