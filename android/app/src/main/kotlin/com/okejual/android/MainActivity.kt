@@ -1,4 +1,4 @@
-package com.example.gold_gym_fe_android
+package com.okejual.android
 
 import com.google.android.play.core.integrity.IntegrityManagerFactory
 import com.google.android.play.core.integrity.IntegrityTokenRequest

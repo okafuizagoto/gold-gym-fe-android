@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.gold_gym_fe_android"
+    namespace = "com.okejual.android"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
