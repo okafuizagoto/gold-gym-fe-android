@@ -9,6 +9,7 @@ import 'package:file_saver/file_saver.dart';
 import '../config/theme.dart';
 import '../services/sales_api.dart';
 import '../utils/responsive.dart';
+import '../utils/subscription_state.dart';
 import '../utils/toast.dart';
 import '../widgets/page_header.dart';
 import '../widgets/section_card.dart';
@@ -27,6 +28,8 @@ class _ShareReceiptScreenState extends State<ShareReceiptScreen> {
   Uint8List? _pdfBytes;
   bool _loading = true;
   bool _busy = false;
+  // Struk digital = bagikan nota sebagai dokumen/PDF. Dinonaktifkan admin -> terkunci (cetak tetap boleh).
+  bool _locked = false;
 
   @override
   void initState() {
@@ -41,8 +44,16 @@ class _ShareReceiptScreenState extends State<ShareReceiptScreen> {
   }
 
   Future<void> _loadPdf() async {
+    if (!SubscriptionState.hasFeature('receipt')) {
+      setState(() {
+        _locked = true;
+        _loading = false;
+      });
+      return;
+    }
     try {
-      final bytes = await _salesApi.getReceiptPdfWithRetry(widget.saleId);
+      final bytes =
+          await _salesApi.getReceiptPdfWithRetry(widget.saleId, share: true);
       if (!mounted) return;
       setState(() {
         _pdfBytes = bytes;
@@ -122,103 +133,125 @@ class _ShareReceiptScreenState extends State<ShareReceiptScreen> {
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
-            : PageBody(
-                maxWidth: 640,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    PageHeader(
-                      title: 'Bagikan Struk',
-                      subtitle: 'Kirim nota ke pelanggan dengan mudah',
-                      onBack: () => Navigator.pop(context),
-                    ),
-                    SectionCard(
-                      dense: true,
-                      padding: const EdgeInsets.all(12),
-                      child: _pdfBytes != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(AppRadius.md),
-                              child: SizedBox(
-                                height: previewHeight,
-                                child: PdfPreview(
-                                  build: (format) async => _pdfBytes!,
-                                  canChangeOrientation: false,
-                                  canChangePageFormat: false,
-                                  canDebug: false,
-                                  allowPrinting: false,
-                                  allowSharing: false,
-                                  useActions: false,
-                                  scrollViewDecoration: const BoxDecoration(
-                                      color: AppColors.background),
-                                ),
-                              ),
-                            )
-                          : Padding(
-                              padding: const EdgeInsets.all(32),
-                              child: Center(
-                                child: Text('Nota belum siap',
-                                    style: textTheme.bodyMedium
-                                        ?.copyWith(color: AppColors.muted)),
-                              ),
-                            ),
-                    ),
-                    const SizedBox(height: 20),
-                    SectionCard(
-                      icon: Icons.chat_bubble_rounded,
-                      title: 'Kirim lewat WhatsApp',
-                      description:
-                          'Nomor pelanggan, lalu lampirkan PDF dari chat',
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          TextField(
-                            controller: _phoneController,
-                            keyboardType: TextInputType.phone,
-                            decoration: const InputDecoration(
-                              hintText: 'Nomor WhatsApp pelanggan',
-                              prefixIcon: Icon(Icons.phone_rounded),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            height: 48,
-                            child: ElevatedButton.icon(
-                              onPressed: _shareToWhatsApp,
-                              icon: const Icon(Icons.send_rounded, size: 18),
-                              label: const Text('Bagikan ke WhatsApp'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _whatsappGreen,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
+            : _locked
+                ? PageBody(
+                    maxWidth: 640,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: _softActionButton(
-                            icon: Icons.ios_share_rounded,
-                            label: 'Bagikan Lainnya',
-                            color: AppColors.blue,
-                            onTap: _busy ? null : _shareGeneric,
-                          ),
+                        PageHeader(
+                          title: 'Bagikan Struk',
+                          subtitle: 'Struk digital tidak aktif',
+                          onBack: () => Navigator.pop(context),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _softActionButton(
-                            icon: Icons.download_rounded,
-                            label: 'Unduh Struk',
-                            color: AppColors.successDark,
-                            onTap: _busy ? null : _unduhStruk,
+                        const SectionCard(
+                          child: Text(
+                            'Membagikan struk sebagai dokumen/PDF tidak termasuk paket Anda saat ini. '
+                            'Anda tetap bisa mencetak struk dari Riwayat Penjualan atau setelah pembayaran.',
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
+                  )
+                : PageBody(
+                    maxWidth: 640,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        PageHeader(
+                          title: 'Bagikan Struk',
+                          subtitle: 'Kirim nota ke pelanggan dengan mudah',
+                          onBack: () => Navigator.pop(context),
+                        ),
+                        SectionCard(
+                          dense: true,
+                          padding: const EdgeInsets.all(12),
+                          child: _pdfBytes != null
+                              ? ClipRRect(
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.md),
+                                  child: SizedBox(
+                                    height: previewHeight,
+                                    child: PdfPreview(
+                                      build: (format) async => _pdfBytes!,
+                                      canChangeOrientation: false,
+                                      canChangePageFormat: false,
+                                      canDebug: false,
+                                      allowPrinting: false,
+                                      allowSharing: false,
+                                      useActions: false,
+                                      scrollViewDecoration: const BoxDecoration(
+                                          color: AppColors.background),
+                                    ),
+                                  ),
+                                )
+                              : Padding(
+                                  padding: const EdgeInsets.all(32),
+                                  child: Center(
+                                    child: Text('Nota belum siap',
+                                        style: textTheme.bodyMedium
+                                            ?.copyWith(color: AppColors.muted)),
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(height: 20),
+                        SectionCard(
+                          icon: Icons.chat_bubble_rounded,
+                          title: 'Kirim lewat WhatsApp',
+                          description:
+                              'Nomor pelanggan, lalu lampirkan PDF dari chat',
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              TextField(
+                                controller: _phoneController,
+                                keyboardType: TextInputType.phone,
+                                decoration: const InputDecoration(
+                                  hintText: 'Nomor WhatsApp pelanggan',
+                                  prefixIcon: Icon(Icons.phone_rounded),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                height: 48,
+                                child: ElevatedButton.icon(
+                                  onPressed: _shareToWhatsApp,
+                                  icon:
+                                      const Icon(Icons.send_rounded, size: 18),
+                                  label: const Text('Bagikan ke WhatsApp'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _whatsappGreen,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _softActionButton(
+                                icon: Icons.ios_share_rounded,
+                                label: 'Bagikan Lainnya',
+                                color: AppColors.blue,
+                                onTap: _busy ? null : _shareGeneric,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _softActionButton(
+                                icon: Icons.download_rounded,
+                                label: 'Unduh Struk',
+                                color: AppColors.successDark,
+                                onTap: _busy ? null : _unduhStruk,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
       ),
     );
   }

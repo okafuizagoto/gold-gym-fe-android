@@ -10,6 +10,7 @@ import '../services/thermal_printer.dart';
 import '../utils/constants.dart';
 import '../utils/receipt_escpos.dart';
 import '../utils/responsive.dart';
+import '../utils/subscription_state.dart';
 import '../utils/text_formatter.dart';
 import '../utils/toast.dart';
 import '../config/routes.dart';
@@ -283,18 +284,22 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> {
                           children: [
                             Row(
                               children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: _handleBagikanStruk,
-                                    style: whiteOutline,
-                                    icon: const Icon(Icons.ios_share_rounded,
-                                        size: 18),
-                                    label: const Text('Bagikan Struk',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis),
+                                // Struk digital (bagikan dokumen) mengikuti paket; cetak selalu ada.
+                                if (SubscriptionState.hasFeature(
+                                    'receipt')) ...[
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: _handleBagikanStruk,
+                                      style: whiteOutline,
+                                      icon: const Icon(Icons.ios_share_rounded,
+                                          size: 18),
+                                      label: const Text('Bagikan Struk',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 12),
+                                  const SizedBox(width: 12),
+                                ],
                                 Expanded(
                                   child: OutlinedButton.icon(
                                     onPressed:

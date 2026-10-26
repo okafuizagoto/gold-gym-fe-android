@@ -46,7 +46,8 @@ class SalesApi extends ApiClient {
   Future<Uint8List?> getProofPhoto(int proofId) async {
     final url = await proofPhotoUrl(proofId);
     if (url == null) return null;
-    final response = await sharedHttpClient.get(Uri.parse(url)).timeout(ApiClient.timeout);
+    final response =
+        await sharedHttpClient.get(Uri.parse(url)).timeout(ApiClient.timeout);
     if (response.statusCode == 200) return response.bodyBytes;
     return null;
   }
@@ -74,7 +75,8 @@ class SalesApi extends ApiClient {
       request.headers['Authorization'] = headers['Authorization']!;
     }
     request.files.add(await http.MultipartFile.fromPath('file', file.path));
-    final streamed = await sharedHttpClient.send(request).timeout(ApiClient.timeout);
+    final streamed =
+        await sharedHttpClient.send(request).timeout(ApiClient.timeout);
     return http.Response.fromStream(streamed);
   }
 
@@ -243,11 +245,15 @@ class SalesApi extends ApiClient {
   /// padahal sudah tersimpan sukses di backend. Sekarang exception
   /// ditangkap & diperlakukan sama seperti "belum siap" (null) supaya
   /// retry loop tetap jalan sebagaimana mestinya.
-  Future<Uint8List?> getReceiptPdf(String saleId) async {
+  ///
+  /// [share] = nota akan DIBAGIKAN sebagai dokumen -> digerbang fitur "Struk
+  /// digital" di server (share=1). Cetak biasa (share=false) selalu boleh.
+  Future<Uint8List?> getReceiptPdf(String saleId, {bool share = false}) async {
     try {
       final response = await _client.get("/gold-gym/v2/sales", queryParams: {
         "type": "receipt",
         "saleid": saleId,
+        if (share) "share": "1",
       });
       if (response.statusCode == 200) {
         return response.bodyBytes;
@@ -261,9 +267,9 @@ class SalesApi extends ApiClient {
   /// Insert sales async lewat Kafka: nota mungkin belum ada sesaat setelah
   /// simpan, jadi coba beberapa kali sebelum menyerah.
   Future<Uint8List?> getReceiptPdfWithRetry(String saleId,
-      {int maxRetry = 6}) async {
+      {int maxRetry = 6, bool share = false}) async {
     for (var i = 0; i < maxRetry; i++) {
-      final bytes = await getReceiptPdf(saleId);
+      final bytes = await getReceiptPdf(saleId, share: share);
       if (bytes != null) return bytes;
       await Future.delayed(const Duration(seconds: 1));
     }
