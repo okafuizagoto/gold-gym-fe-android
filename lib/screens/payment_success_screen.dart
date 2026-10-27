@@ -81,9 +81,6 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> {
       await FlutterBluePlus.turnOn();
       return true;
     } catch (_) {
-      if (mounted) {
-        Toast.error(context, 'Aktifkan Bluetooth untuk mencetak struk');
-      }
       return false;
     }
   }
@@ -121,8 +118,10 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen> {
   Future<void> _handleCetakStrukPdf() async {
     setState(() => _printing = true);
     try {
-      final btOn = await _ensureBluetoothOn();
-      if (!btOn) return;
+      // Bluetooth hanya upaya terbaik (agar printer BT muncul di dialog print):
+      // jangan memblokir cetak -- printer WiFi / simpan PDF tidak memerlukannya,
+      // dan perangkat tanpa Bluetooth atau izin ditolak tetap harus bisa mencetak.
+      await _ensureBluetoothOn();
       final pdfBytes = await _salesApi.getReceiptPdfWithRetry(widget.saleId);
       if (pdfBytes == null) {
         if (mounted) Toast.error(context, 'Nota belum siap, coba lagi');

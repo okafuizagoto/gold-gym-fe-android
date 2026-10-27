@@ -1837,8 +1837,14 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                   action: TourTarget(
                     id: 'pos-open-shift',
                     child: ElevatedButton.icon(
-                      onPressed: () =>
-                          Navigator.pushNamed(context, '/cashier-shift'),
+                      onPressed: () async {
+                        await Navigator.pushNamed(context, '/cashier-shift');
+                        // Cek ulang saat kembali: sesi mungkin baru dibuka
+                        // (di web halaman dimuat ulang sendiri).
+                        if (!mounted) return;
+                        setState(() => _shiftOpen = null);
+                        _checkShiftOpen();
+                      },
                       icon: const Icon(Icons.lock_open_rounded, size: 18),
                       label: Text(langProvider.get(
                           'Open Cashier Shift', 'Buka Sesi Kasir')),
