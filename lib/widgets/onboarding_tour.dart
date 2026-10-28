@@ -29,6 +29,26 @@ class OnboardingTour {
   static bool _replay = false;
   static final Set<String> _checkedRoles = {};
 
+  // Penutup layar transparan selama tour (juga di jeda antar langkah, saat drawer/halaman berpindah):
+  // semua sentuhan di bawahnya dibuang, hanya coach mark & dialog tour (di-insert SETELAH ini, jadi di atasnya)
+  // yang bisa disentuh. Wajib di-raise lagi setelah halaman baru di-push, karena route baru masuk ke overlay
+  // di atasnya.
+  static OverlayEntry? _blocker;
+  static void _raiseBlocker(OverlayState overlay) {
+    _blocker?.remove();
+    _blocker = OverlayEntry(
+      builder: (_) => const Positioned.fill(
+        child: ModalBarrier(dismissible: false, color: Colors.transparent),
+      ),
+    );
+    overlay.insert(_blocker!);
+  }
+
+  static void _removeBlocker() {
+    _blocker?.remove();
+    _blocker = null;
+  }
+
   /// Diisi AppDrawer yang sedang terbuka: GlobalKey menu drawer per judul (null = belum ter-render).
   static GlobalKey? Function(String title)? drawerKeyFor;
 
@@ -111,6 +131,9 @@ class OnboardingTour {
       final steps = onboardingStepsFor(
           role, outletType == AppConstants.outletTherapy, lang);
       if (await _welcomeDialog(ctx, role, lang)) {
+        // Dialog (route) disisipkan Navigator DI BAWAH penutup ini, jadi penutup hanya dipasang di antara
+        // dialog: selama dialog tampil, dialognya sendiri sudah modal. Coach mark (OverlayEntry) tetap di atasnya.
+        _raiseBlocker(overlay);
         await _runSteps(nav, ctx, steps, lang);
       }
       completed = true;
@@ -120,6 +143,7 @@ class OnboardingTour {
     } finally {
       await _closeDrawer();
       await _returnToRoot(nav);
+      _removeBlocker();
       if (completed) await OnboardingApi().markSeen(role);
       _running = false;
     }
@@ -167,7 +191,10 @@ class OnboardingTour {
           if (s.goto != null) {
             nav.pushNamed(s.goto!);
             current = s.goto;
-            await _delay(700);
+            await _delay(60);
+            _raiseBlocker(nav.overlay!);
+            await _delay(640);
+            _raiseBlocker(nav.overlay!);
           }
           break;
         case OnboardingStepKind.page:
@@ -198,10 +225,14 @@ class OnboardingTour {
           if (s.goto != null) {
             nav.pushNamed(s.goto!);
             current = s.goto;
-            await _delay(700);
+            await _delay(60);
+            _raiseBlocker(nav.overlay!);
+            await _delay(640);
+            _raiseBlocker(nav.overlay!);
           }
           break;
         case OnboardingStepKind.done:
+          _removeBlocker(); // lihat catatan di _run: dialog tidak boleh berada di bawah penutup
           await _doneDialog(ctx, s.text, lang, progress);
           break;
       }
@@ -296,6 +327,9 @@ class OnboardingTour {
           targetPosition: position,
           shape: ShapeLightFocus.RRect,
           radius: 10,
+          // hanya tombol Lanjut yang boleh ditekan: menyentuh elemen yang disorot tidak melakukan apa pun
+          enableTargetTab: false,
+          enableOverlayTab: false,
           contents: [
             TargetContent(
               align: alignTop ? ContentAlign.top : ContentAlign.bottom,
@@ -330,63 +364,70 @@ class OnboardingTour {
 
   static Future<bool> _welcomeDialog(
       BuildContext context, String role, LanguageProvider lang) async {
+    // Panduan pertama wajib diselesaikan: tanpa Lewati dan tombol Back sistem dimatikan (replay boleh).
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.tour_rounded, color: AppColors.blue, size: 36),
-        title: Text(lang.get('Welcome!', 'Selamat Datang!')),
-        content: Text(onboardingWelcome(role, lang)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(lang.get('Skip', 'Lewati')),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(lang.get('Start', 'Mulai')),
-          ),
-        ],
+      builder: (ctx) => PopScope(
+        canPop: _replay,
+        child: AlertDialog(
+          icon: const Icon(Icons.tour_rounded, color: AppColors.blue, size: 36),
+          title: Text(lang.get('Welcome!', 'Selamat Datang!')),
+          content: Text(onboardingWelcome(role, lang)),
+          actions: [
+            if (_replay)
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(lang.get('Skip', 'Lewati')),
+              ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(lang.get('Next', 'Lanjut')),
+            ),
+          ],
+        ),
       ),
     );
     return result == true;
   }
 
-  static Future<void> _doneDialog(
-      BuildContext context, String text, LanguageProvider lang,
-      String progress) async {
+  static Future<void> _doneDialog(BuildContext context, String text,
+      LanguageProvider lang, String progress) async {
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.check_circle_rounded,
-            color: AppColors.successDark, size: 36),
-        title: Text(lang.get('All set!', 'Selesai!')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [Text(text)],
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          icon: const Icon(Icons.check_circle_rounded,
+              color: AppColors.successDark, size: 36),
+          title: Text(lang.get('All set!', 'Selesai!')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [Text(text)],
+          ),
+          actions: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(lang.get('Finish', 'Selesai')),
+                ),
+                const SizedBox(height: 6),
+                Text(progress,
+                    style:
+                        const TextStyle(fontSize: 12, color: AppColors.muted)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(progress,
+                  style: const TextStyle(fontSize: 12, color: AppColors.muted)),
+            ),
+          ],
         ),
-        actions: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(lang.get('Finish', 'Selesai')),
-              ),
-              const SizedBox(height: 6),
-              Text(progress,
-                  style:
-                      const TextStyle(fontSize: 12, color: AppColors.muted)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(progress,
-                style: const TextStyle(fontSize: 12, color: AppColors.muted)),
-          ),
-        ],
       ),
     );
   }
