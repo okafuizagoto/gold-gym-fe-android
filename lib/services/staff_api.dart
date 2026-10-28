@@ -71,6 +71,12 @@ class StaffApi extends ApiClient {
         {"name": name, "lat": lat, "lng": lng, "radius_m": radiusM});
   }
 
+  /// Nonaktifkan batas lokasi absen (kosongkan lokasi kantor). Penjual, atau staff dengan izin "/lokasi-kantor".
+  Future<http.Response> clearOffice() {
+    return _client
+        .delete("/gold-gym/v2/staff", queryParams: {"type": "office"});
+  }
+
   // ---- Staff (self-service) ----
 
   Future<http.Response> myDeniedMenus() {

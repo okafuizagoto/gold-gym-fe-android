@@ -290,6 +290,14 @@ class _AppDrawerState extends State<AppDrawer> {
                 route: '/kelola-meja'),
           ],
         ),
+      // Lokasi Kantor untuk STAFF yang diizinkan owner (menu_key "/lokasi-kantor" lewat Akses Staff;
+      // difilter denied_menu_keys di bawah seperti menu lain). Owner mengaksesnya dari grup Staff.
+      if (!buyerView && isStaff)
+        MenuItem(
+          title: 'Lokasi Kantor',
+          icon: Icons.place_outlined,
+          route: '/lokasi-kantor',
+        ),
       // Staff: khusus owner penjual (retail & therapy) -- kelola akun staff,
       // akses menu tiap staff, dan pantau absensi. Staff sendiri TIDAK
       // pernah melihat grup ini.
@@ -313,6 +321,11 @@ class _AppDrawerState extends State<AppDrawer> {
                 title: 'Absen Staff',
                 icon: Icons.event_note_outlined,
                 route: '/absen-staff',
+                feature: 'staff_management'),
+            MenuItem(
+                title: 'Lokasi Kantor',
+                icon: Icons.place_outlined,
+                route: '/lokasi-kantor',
                 feature: 'staff_management'),
             if (!isTherapy)
               MenuItem(

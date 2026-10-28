@@ -54,6 +54,7 @@ import '../screens/kelola_meja_screen.dart';
 import '../screens/staff_list_screen.dart';
 import '../screens/staff_menu_access_screen.dart';
 import '../screens/staff_attendance_screen.dart';
+import '../screens/office_location_screen.dart';
 import '../screens/staff_clock_screen.dart';
 import '../screens/check_email_screen.dart';
 import '../screens/expense_screen.dart';
@@ -121,6 +122,7 @@ class AppRoutes {
   static const String daftarStaff = '/daftar-staff';
   static const String aksesStaff = '/akses-staff';
   static const String absenStaff = '/absen-staff';
+  static const String lokasiKantor = '/lokasi-kantor';
   static const String absen = '/absen';
   static const String checkEmail = '/check-email';
   static const String gantiPassword = '/ganti-password';
@@ -191,6 +193,7 @@ class AppRoutes {
         daftarStaff: (context) => const StaffListScreen(),
         aksesStaff: (context) => const StaffMenuAccessScreen(),
         absenStaff: (context) => const StaffAttendanceScreen(),
+        lokasiKantor: (context) => const OfficeLocationScreen(),
         absen: (context) => const StaffClockScreen(),
         checkEmail: (context) => const CheckEmailScreen(),
         gantiPassword: (context) => const ChangePasswordScreen(),
