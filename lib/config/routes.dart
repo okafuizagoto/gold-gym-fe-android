@@ -67,6 +67,7 @@ import '../screens/pos_queue_screen.dart';
 import '../screens/my_queue_screen.dart';
 import '../screens/refund_history_screen.dart';
 import '../screens/cash_history_screen.dart';
+import '../screens/cash_move_screen.dart';
 
 class AppRoutes {
   static const String home = '/';
@@ -127,6 +128,8 @@ class AppRoutes {
   static const String lokasiKantor = '/lokasi-kantor';
   static const String riwayatRefund = '/riwayat-refund';
   static const String kasHistory = '/kas-history';
+  static const String tarikKas = '/tarik-kas';
+  static const String tambahKas = '/tambah-kas';
   static const String absen = '/absen';
   static const String checkEmail = '/check-email';
   static const String gantiPassword = '/ganti-password';
@@ -200,6 +203,8 @@ class AppRoutes {
         lokasiKantor: (context) => const OfficeLocationScreen(),
         riwayatRefund: (context) => const RefundHistoryScreen(),
         kasHistory: (context) => const CashHistoryScreen(),
+        tarikKas: (context) => const CashMoveScreen(incoming: false),
+        tambahKas: (context) => const CashMoveScreen(incoming: true),
         absen: (context) => const StaffClockScreen(),
         checkEmail: (context) => const CheckEmailScreen(),
         gantiPassword: (context) => const ChangePasswordScreen(),

@@ -130,11 +130,33 @@ class _AppDrawerState extends State<AppDrawer> {
           route: '/penjualan',
         ),
       // Sesi Kasir (2026-10-10): buka/tutup shift + rekonsiliasi kas, sama kondisi tampil dgn POS.
+      // Semua menu terkait kas dijadikan satu grup "Kas" (2026-10-28): Sesi Kasir, Kas History, Tarik Kas, Tambah Kas.
+      // Staff: anak grup difilter denied_menu_keys seperti menu lain; Sesi Kasir selalu tampil.
       if (!buyerView && !isAdmin)
         MenuItem(
-          title: 'Sesi Kasir',
-          icon: Icons.point_of_sale_outlined,
-          route: '/cashier-shift',
+          title: 'Kas',
+          icon: Icons.account_balance_wallet_rounded,
+          route: '',
+          children: [
+            MenuItem(
+                title: 'Sesi Kasir',
+                icon: Icons.point_of_sale_outlined,
+                route: '/cashier-shift'),
+            if (isSeller || isStaff) ...[
+              MenuItem(
+                  title: 'Kas History',
+                  icon: Icons.account_balance_wallet_rounded,
+                  route: '/kas-history'),
+              MenuItem(
+                  title: 'Tarik Kas',
+                  icon: Icons.savings_rounded,
+                  route: '/tarik-kas'),
+              MenuItem(
+                  title: 'Tambah Kas',
+                  icon: Icons.add_card_rounded,
+                  route: '/tambah-kas'),
+            ],
+          ],
         ),
       // Printer Thermal (2026-10-10): pilih/ingat printer Bluetooth untuk cetak struk
       // ESC/POS langsung, sama kondisi tampil dgn POS.
@@ -183,13 +205,6 @@ class _AppDrawerState extends State<AppDrawer> {
           title: 'Riwayat Refund',
           icon: Icons.replay_rounded,
           route: '/riwayat-refund',
-        ),
-      // Kas History (2026-10-28): buku kas harian; penjual dan staff yang diizinkan (menu_key "/kas-history").
-      if (!buyerView && !isAdmin && (isSeller || isStaff))
-        MenuItem(
-          title: 'Kas History',
-          icon: Icons.account_balance_wallet_rounded,
-          route: '/kas-history',
         ),
       // PENJUAL (retail & therapy): satu menu laporan penjualan; per hari /
       // minggu / bulan dipilih lewat TAB di dalam layarnya.

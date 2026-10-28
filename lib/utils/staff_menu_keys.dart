@@ -24,7 +24,8 @@ class StaffMenuKeys {
     StaffMenuKeyOption('/lokasi-kantor', 'Lokasi Kantor (atur batas absen)'),
     StaffMenuKeyOption('/riwayat-refund', 'Riwayat Refund (lihat & lakukan refund)'),
     StaffMenuKeyOption('/kas-history', 'Kas History (lihat buku kas harian)'),
-    StaffMenuKeyOption('/tarik-kas', 'Tarik Kas (catat tarik/setor kas)'),
+    StaffMenuKeyOption('/tarik-kas', 'Tarik Kas (catat uang keluar laci)'),
+    StaffMenuKeyOption('/tambah-kas', 'Tambah Kas (catat uang masuk laci)'),
   ];
 }
 

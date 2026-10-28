@@ -33,11 +33,40 @@ class CashierShiftApi extends ApiClient {
         queryParams: {'code': outcode, 'date': date});
   }
 
-  /// POST /open: buka sesi kasir baru dengan modal awal.
-  Future<http.Response> open(String outcode, double openingCash) {
+  /// GET /handoff: kas akhir sesi sebelumnya + Tarik Kas sesudahnya (cek serah-terima saat buka sesi).
+  Future<http.Response> handoff(String outcode) {
+    return _client.get('/gold-gym/v2/cashier-shift/handoff',
+        queryParams: {'code': outcode});
+  }
+
+  /// POST /open: buka sesi kasir baru dengan modal awal (+ alasan bila berbeda dari kas akhir sesi sebelumnya).
+  Future<http.Response> open(String outcode, double openingCash,
+      {String handoffReason = ''}) {
     return _client.post('/gold-gym/v2/cashier-shift/open', {
       'outcode': outcode,
       'opening_cash': openingCash,
+      'handoff_reason': handoffReason,
+    });
+  }
+
+  /// POST /cash-move: catat Tarik Kas (penjual / staff yang diizinkan).
+  Future<http.Response> addCashMove(
+      String outcode, String kind, double amount, String reason) {
+    return _client.post('/gold-gym/v2/cashier-shift/cash-move', {
+      'outcode': outcode,
+      'kind': kind,
+      'amount': amount,
+      'reason': reason,
+    });
+  }
+
+  /// GET /cash-moves: Tarik Kas (incoming=false) atau Tambah Kas (incoming=true) satu hari (default hari ini).
+  Future<http.Response> cashMoves(String outcode,
+      {required bool incoming, String? date}) {
+    return _client.get('/gold-gym/v2/cashier-shift/cash-moves', queryParams: {
+      'code': outcode,
+      'dir': incoming ? 'in' : 'out',
+      if (date != null) 'date': date,
     });
   }
 

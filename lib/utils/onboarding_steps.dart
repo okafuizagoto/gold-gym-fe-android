@@ -137,8 +137,8 @@ List<OnboardingStep> onboardingStepsFor(
       OnboardingStep.page(
           '/daftar-staff',
           'staff-add',
-          t('REGISTER STAFF: create a staff account. New staff only get the daily work menus -- you add more access next.',
-              'DAFTARKAN STAFF: buat akun staff. Staff baru hanya dapat menu kerja harian -- tambah aksesnya di langkah berikutnya.'),
+          t('REGISTER STAFF: create a staff account and tick the menus they may use (sensitive menus are unticked by default; your choice is remembered).',
+              'DAFTARKAN STAFF: buat akun staff dan centang menu yang boleh dipakai (menu sensitif tidak dicentang secara default; pilihan Anda diingat).'),
           goto: '/akses-staff'),
       OnboardingStep.page(
           '/akses-staff',
@@ -146,10 +146,10 @@ List<OnboardingStep> onboardingStepsFor(
           t('Tick the menus a staff member may use, then tap SAVE. Unticked menus stay hidden for them.',
               'Centang menu yang boleh dipakai staff, lalu ketuk SIMPAN. Menu yang tidak dicentang tetap tersembunyi untuknya.')),
       OnboardingStep.menu(
-          'Sesi Kasir',
+          'Kas',
           '/cashier-shift',
-          t('Open a cashier session before selling. Tap Next to open this page.',
-              'Buka sesi kasir sebelum mulai berjualan. Ketuk Lanjut untuk membukanya.')),
+          t('The Cash group holds Cashier Session, Cash History, Withdraw Cash and Add Cash. Open a cashier session before selling. Tap Next to open it.',
+              'Grup Kas berisi Sesi Kasir, Kas History, Tarik Kas, dan Tambah Kas. Buka sesi kasir sebelum mulai berjualan. Ketuk Lanjut untuk membukanya.')),
       OnboardingStep.page(
           '/cashier-shift',
           'shift-main',

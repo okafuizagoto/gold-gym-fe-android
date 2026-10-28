@@ -168,7 +168,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
                       style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
                   const Text(
-                    'Menu sensitif (refund, kas, tarik kas, outlet, lokasi kantor, meja & area) tidak dicentang secara default. '
+                    'Menu sensitif (refund, kas history, tarik kas, tambah kas, outlet, lokasi kantor, meja & area) tidak dicentang secara default. '
                     'Pilihan Anda diingat untuk pendaftaran staff berikutnya dan bisa diubah kapan saja lewat Akses Staff.',
                     style: TextStyle(fontSize: 12, color: Colors.black54),
                   ),

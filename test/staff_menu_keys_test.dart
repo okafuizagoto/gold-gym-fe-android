@@ -9,6 +9,7 @@ void main() {
     expect(keys, contains('/riwayat-refund'));
     expect(keys, contains('/kas-history'));
     expect(keys, contains('/tarik-kas'));
+    expect(keys, contains('/tambah-kas'));
     expect(keys.toSet().length, keys.length);
   });
 }

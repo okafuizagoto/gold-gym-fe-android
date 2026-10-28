@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
+import '../models/cash_day_model.dart';
 import '../services/cashier_shift_api.dart';
 import '../utils/constants.dart';
 import '../utils/storage.dart';
@@ -61,36 +62,96 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
   }
 
   Future<void> _openShift() async {
-    final ctl = TextEditingController(text: '0');
+    // Cek serah-terima: kas akhir sesi sebelumnya + Tarik Kas yang tercatat sesudahnya.
+    Map<String, dynamic>? ho;
+    try {
+      final r = await _api.handoff(_outcode);
+      if (r.statusCode == 200) {
+        final d = jsonDecode(r.body)['data'];
+        if (d != null && d['has_prev'] == true) ho = Map<String, dynamic>.from(d);
+      }
+    } catch (_) {}
+    final expected = ho == null ? null : _toDouble(ho['expected']);
+    final gapMoves = ho == null ? <dynamic>[] : (ho['gap_moves'] ?? []) as List;
+    final prevBy = ho?['prev_shift']?['shift_closed_by'];
+
+    final ctl = TextEditingController(
+        text: expected == null ? '0' : expected.round().toString());
+    final reasonCtl = TextEditingController();
     final value = await showDialog<double>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Buka Sesi Kasir'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Masukkan jumlah uang tunai yang sudah ada di laci sebelum mulai jualan.'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Modal awal (Rp)'),
-              autofocus: true,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setD) {
+          final entered = double.tryParse(ctl.text.trim()) ?? 0;
+          final diff = expected == null ? 0.0 : entered - expected;
+          final mismatch = expected != null && diff.round() != 0;
+          return AlertDialog(
+            title: const Text('Buka Sesi Kasir'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Masukkan jumlah uang tunai yang sudah ada di laci sebelum mulai jualan.'),
+                  if (expected != null) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(8)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                              'Kas akhir shift sebelumnya: ${formatRupiah(_toDouble(ho!['prev_counted']).round())}'
+                              '${prevBy != null ? ' (ditutup oleh $prevBy)' : ''}',
+                              style: const TextStyle(fontWeight: FontWeight.w600)),
+                          for (final m in gapMoves)
+                            Text(
+                                '${cashMoveIsIncoming('${m['kind']}') ? 'Tambah Kas' : 'Tarik Kas'} · ${cashMoveKindLabel('${m['kind']}')} ${formatRupiah(_toDouble(m['amount']).round())} oleh ${m['by']} (alasan ${cashMoveIsIncoming('${m['kind']}') ? 'tambah' : 'tarik'} kas: ${m['reason']})',
+                                style: const TextStyle(fontSize: 12, color: AppColors.muted)),
+                          Text('Seharusnya di laci: ${formatRupiah(expected.round())}',
+                              style: const TextStyle(fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: ctl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Modal awal (Rp)'),
+                    autofocus: true,
+                    onChanged: (_) => setD(() {}),
+                  ),
+                  if (mismatch) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                        'Selisih serah-terima: ${diff > 0 ? '+' : ''}${formatRupiah(diff.round())}. Tulis alasannya (nama Anda tercatat sebagai penulis).',
+                        style: const TextStyle(color: Colors.red, fontSize: 12.5)),
+                    TextField(
+                      controller: reasonCtl,
+                      maxLength: 255,
+                      decoration: const InputDecoration(labelText: 'Alasan selisih serah-terima (wajib)'),
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('BATAL'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(
-                dialogContext, double.tryParse(ctl.text.trim()) ?? 0),
-            child: const Text('BUKA SESI'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('BATAL'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(
+                    dialogContext, double.tryParse(ctl.text.trim()) ?? 0),
+                child: const Text('BUKA SESI'),
+              ),
+            ],
+          );
+        },
       ),
     );
     if (value == null) return;
@@ -98,8 +159,18 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
       if (mounted) Toast.error(context, 'Modal awal tidak boleh negatif');
       return;
     }
+    if (expected != null &&
+        (value - expected).round() != 0 &&
+        reasonCtl.text.trim().length < 3) {
+      if (mounted) {
+        Toast.error(context,
+            'Uang awal berbeda dari kas akhir shift sebelumnya, tulis alasannya');
+      }
+      return;
+    }
     try {
-      final resp = await _api.open(_outcode, value);
+      final resp = await _api.open(_outcode, value,
+          handoffReason: reasonCtl.text.trim());
       if (resp.statusCode == 200) {
         if (mounted) Toast.success(context, 'Sesi kasir dibuka');
         await _load();
@@ -131,6 +202,8 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
         preview == null ? 0.0 : _toDouble(preview['shift']['shift_expected_cash']);
     final cashSales = preview == null ? 0.0 : _toDouble(preview['cash_sales']);
     final salesCount = preview == null ? 0 : (preview['sales_count'] as num? ?? 0).toInt();
+    final cashIn = preview == null ? 0.0 : _toDouble(preview['cash_in']);
+    final cashOut = preview == null ? 0.0 : _toDouble(preview['cash_out']);
 
     final countedCtl = TextEditingController();
     final noteCtl = TextEditingController();
@@ -145,6 +218,9 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
             children: [
               Text('Nota selama sesi ini: $salesCount'),
               Text('Penjualan tunai: ${formatRupiah(cashSales.round())}'),
+              if (cashIn > 0 || cashOut > 0)
+                Text(
+                    'Tambah Kas selama sesi: +${formatRupiah(cashIn.round())} · Tarik Kas: -${formatRupiah(cashOut.round())}'),
               Text('Ekspektasi kas di laci: ${formatRupiah(expected.round())}',
                   style: const TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 12),
@@ -295,7 +371,8 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
                                           '${h['shift_opened_by']} • ${closed ? 'Selesai' : 'Berjalan'}'),
                                       subtitle: Text(
                                           'Modal: ${formatRupiah(_toDouble(h['shift_opening_cash']).round())}'
-                                          '${closed ? ' • Selisih: ${diff! >= 0 ? '+' : ''}${formatRupiah(diff.round())}' : ''}'),
+                                          '${closed ? ' • Selisih: ${diff! >= 0 ? '+' : ''}${formatRupiah(diff.round())}' : ''}'
+                                          '${h['handoff_diff'] != null && _toDouble(h['handoff_diff']) != 0 ? '\nSelisih serah-terima ${_toDouble(h['handoff_diff']) > 0 ? '+' : ''}${formatRupiah(_toDouble(h['handoff_diff']).round())}${(h['handoff_gap_net'] != null && _toDouble(h['handoff_gap_net']) == 0) ? (_toDouble(h['handoff_diff']) < 0 ? ' (belum ada catatan Tarik Kas)' : ' (belum ada catatan Tambah Kas)') : ''}, alasan selisih: "${h['handoff_reason']}" — ${h['handoff_by']}' : ''}'),
                                       trailing: closed && diff != 0
                                           ? Icon(Icons.warning_amber_rounded,
                                               color: AppColors.warningDark,

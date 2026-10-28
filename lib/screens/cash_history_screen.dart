@@ -92,15 +92,45 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
         ),
       );
 
-  String _kind(LanguageProvider lang, String k) => k == 'OPENING'
-      ? lang.get('Opening cash', 'Modal awal')
-      : k == 'REFUND'
-          ? lang.get('Cash refund', 'Refund tunai')
-          : lang.get('Cash sale', 'Penjualan tunai');
+  // Penanda warna Kas History: oranye = Tarik Kas (disengaja, tercatat), biru = Tambah Kas, merah = selisih serah-terima
+  // yang PERLU DICEK, kuning = selisih sebagian, hijau = penjualan / serah-terima sesuai, ungu = refund.
+  (String, Color) _meta(LanguageProvider lang, String k, String flag) {
+    switch (k) {
+      case 'OPENING':
+        return (lang.get('Opening cash', 'Modal awal'), Colors.blueGrey);
+      case 'REFUND':
+        return (lang.get('Cash refund', 'Refund tunai'), Colors.purple.shade600);
+      case 'CASH_OUT':
+        return (lang.get('Withdraw cash', 'Tarik Kas'), Colors.orange.shade800);
+      case 'CASH_IN':
+        return (lang.get('Add cash', 'Tambah Kas'), Colors.blue.shade700);
+      case 'HANDOFF_OK':
+        return (lang.get('Handover OK ✓', 'Serah-terima SESUAI ✓'), Colors.green.shade700);
+      case 'HANDOFF_DIFF':
+        return flag == 'PARTIAL'
+            ? (lang.get('Handover difference (partial)', 'Selisih serah-terima (sebagian)'), Colors.amber.shade800)
+            : (lang.get('Handover difference', 'Selisih serah-terima'), Colors.red.shade700);
+      default:
+        return (lang.get('Cash sale', 'Penjualan tunai'), Colors.green.shade700);
+    }
+  }
+
+  Widget _chip(String label, Color c, {bool outlined = false}) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        decoration: BoxDecoration(
+          color: outlined ? Colors.transparent : c.withValues(alpha: 0.14),
+          border: Border.all(color: c.withValues(alpha: outlined ? 0.8 : 0.0)),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(label,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: c)),
+      );
 
   Widget _movement(LanguageProvider lang, CashMovement m) {
     final out = m.amount < 0;
     final color = out ? Colors.red.shade700 : Colors.green.shade700;
+    final isHandoff = m.kind == 'HANDOFF_OK' || m.kind == 'HANDOFF_DIFF';
+    final (label, c) = _meta(lang, m.kind, m.flag);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -109,24 +139,35 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${_kind(lang, m.kind)} · ${m.ref}',
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 2,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _chip(label, c, outlined: m.kind == 'HANDOFF_OK'),
+                    if (m.kind == 'HANDOFF_DIFF' && m.flag == 'REVIEW')
+                      _chip(lang.get('CHECK', 'PERLU DICEK'), Colors.red.shade700,
+                          outlined: true),
+                    Text(m.ref, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  ],
+                ),
                 Text('${m.time} · ${m.description}',
                     style: const TextStyle(color: AppColors.muted, fontSize: 12)),
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                  '${out ? '-' : '+'}${TextFormatter.formatRupiah(m.amount.abs())}',
-                  style: TextStyle(fontWeight: FontWeight.w800, color: color)),
-              Text(
-                  '${lang.get('Balance', 'Saldo')} ${TextFormatter.formatRupiah(m.balance)}',
-                  style: const TextStyle(color: AppColors.muted, fontSize: 12)),
-            ],
-          ),
+          if (!isHandoff)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                    '${out ? '-' : '+'}${TextFormatter.formatRupiah(m.amount.abs())}',
+                    style: TextStyle(fontWeight: FontWeight.w800, color: color)),
+                Text(
+                    '${lang.get('Balance', 'Saldo')} ${TextFormatter.formatRupiah(m.balance)}',
+                    style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+              ],
+            ),
         ],
       ),
     );
@@ -179,6 +220,68 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
                     _stat(lang.get('Expected cash', 'Kas seharusnya'), day.expected),
                   ],
                 ),
+                if (day.cashIn > 0 || day.cashOut > 0) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                      '${lang.get('Withdraw/Add Cash records', 'Catatan Tarik/Tambah Kas')}: +${TextFormatter.formatRupiah(day.cashIn)} / -${TextFormatter.formatRupiah(day.cashOut)} · ${lang.get('End-of-day balance', 'Saldo akhir hari')} ${TextFormatter.formatRupiah(day.endBalance)}',
+                      style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                ],
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text('${lang.get('Legend', 'Keterangan')}:',
+                        style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+                    _chip(lang.get('Withdraw cash (recorded, deliberate)', 'Tarik Kas (tercatat, disengaja)'), Colors.orange.shade800),
+                    _chip(lang.get('Add cash (recorded)', 'Tambah Kas (tercatat)'), Colors.blue.shade700),
+                    _chip(lang.get('Handover difference: CHECK', 'Selisih serah-terima: PERLU DICEK'), Colors.red.shade700),
+                    _chip(lang.get('Handover OK', 'Serah-terima sesuai'), Colors.green.shade700, outlined: true),
+                  ],
+                ),
+                for (final h in day.handoffs.where((h) => h.diff != 0)) ...[
+                  const SizedBox(height: 8),
+                  Card(
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                            width: 2,
+                            color: (h.gapNet ?? 0) != 0
+                                ? Colors.amber.shade800
+                                : Colors.red.shade700)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              _chip(
+                                  (h.gapNet ?? 0) != 0
+                                      ? lang.get('PARTIAL', 'SEBAGIAN')
+                                      : lang.get('CHECK', 'PERLU DICEK'),
+                                  (h.gapNet ?? 0) != 0
+                                      ? Colors.amber.shade800
+                                      : Colors.red.shade700),
+                              Text(
+                                  '${lang.get('Handover difference', 'Selisih serah-terima')}: ${h.diff > 0 ? '+' : ''}${TextFormatter.formatRupiah(h.diff)}',
+                                  style: const TextStyle(fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                          Text(
+                              '${lang.get('Previous close', 'Kas akhir sebelumnya')} ${TextFormatter.formatRupiah(h.prevCounted)} → ${lang.get('expected', 'seharusnya')} ${TextFormatter.formatRupiah(h.expected)} → ${lang.get('opened with', 'dibuka dengan')} ${TextFormatter.formatRupiah(h.opening)}'
+                              '${(h.gapNet ?? 0) == 0 ? ' · ${h.diff < 0 ? lang.get('no Withdraw Cash record', 'tidak ada catatan Tarik Kas') : lang.get('no Add Cash record', 'tidak ada catatan Tambah Kas')}' : ''}'),
+                          Text(
+                              '${lang.get("Cashier's explanation (not verified)", 'Penjelasan kasir (belum terverifikasi)')}: “${h.reason}” — ${h.by}',
+                              style: const TextStyle(color: AppColors.muted)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Text(
                     '${lang.get('Non-cash sales (transfer, QRIS, etc.) are not in the drawer', 'Penjualan non-tunai (transfer, QRIS, dll) tidak masuk laci')}: ${TextFormatter.formatRupiah(day.nonCash)} · ${day.salesCount} ${lang.get('receipts', 'nota')}',
