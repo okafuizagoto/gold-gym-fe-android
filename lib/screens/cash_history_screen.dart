@@ -154,6 +154,40 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
         ),
       );
 
+  // Kartu ringkasan selisih serah-terima: minus = merah, plus = hijau, nol/tidak ada = netral.
+  String _signed(double v) =>
+      '${v > 0 ? '+' : v < 0 ? '-' : ''}${TextFormatter.formatRupiah(v.abs())}';
+
+  Widget _diffStat(LanguageProvider lang, String label, List<HandoffNote> list) {
+    final sum = list.fold<double>(0, (a, h) => a + h.diff);
+    final color = sum < 0
+        ? Colors.red.shade700
+        : sum > 0
+            ? Colors.green.shade700
+            : null;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+            const SizedBox(height: 2),
+            Text(_signed(sum),
+                style: TextStyle(
+                    fontWeight: FontWeight.w800, fontSize: 16, color: color)),
+            Text(
+                list.isEmpty
+                    ? lang.get('No difference', 'Tidak ada selisih')
+                    : '${list.length} ${lang.get('difference(s)', 'selisih')}',
+                style: const TextStyle(color: AppColors.muted, fontSize: 11.5)),
+          ],
+        ),
+      ),
+    );
+  }
+
   // Penanda warna Kas History: oranye = Tarik Kas (disengaja, tercatat), biru = Tambah Kas, merah = selisih serah-terima
   // yang PERLU DICEK, kuning = selisih sebagian, hijau = penjualan / serah-terima sesuai, ungu = refund.
   (String, Color) _meta(LanguageProvider lang, String k, String flag) {
@@ -280,7 +314,7 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
                   crossAxisCount: 2,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  childAspectRatio: 2.3,
+                  childAspectRatio: 1.95,
                   mainAxisSpacing: 8,
                   crossAxisSpacing: 8,
                   children: [
@@ -290,6 +324,14 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
                     _stat(lang.get('Cash refunds', 'Refund tunai'), day.cashRefunds,
                         color: day.cashRefunds > 0 ? Colors.red.shade700 : null),
                     _stat(lang.get('Expected cash', 'Kas seharusnya'), day.expected),
+                    _diffStat(
+                        lang,
+                        lang.get('Unverified difference', 'Selisih belum terverifikasi'),
+                        day.handoffs.where((h) => h.diff != 0 && !h.verified).toList()),
+                    _diffStat(
+                        lang,
+                        lang.get('Verified difference', 'Selisih sudah terverifikasi'),
+                        day.handoffs.where((h) => h.diff != 0 && h.verified).toList()),
                   ],
                 ),
                 ),
@@ -349,7 +391,7 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
                                           ? Colors.amber.shade800
                                           : Colors.red.shade700),
                               Text(
-                                  '${lang.get('Handover difference', 'Selisih serah-terima')}: ${h.diff > 0 ? '+' : ''}${TextFormatter.formatRupiah(h.diff)}',
+                                  '${lang.get('Handover difference', 'Selisih serah-terima')}: ${_signed(h.diff)}',
                                   style: const TextStyle(fontWeight: FontWeight.w700)),
                             ],
                           ),

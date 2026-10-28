@@ -22,6 +22,18 @@ class SubscriptionApi extends ApiClient {
     return _client.patch('/gold-gym/v2/userdata/admin/pricing-ui', body);
   }
 
+  /// GET /admin/plan-features (ADMIN, 2026-10-17): matriks fitur efektif tiap paket + label + kunci.
+  Future<http.Response> adminGetPlanFeatures() {
+    return _client.get('/gold-gym/v2/userdata/admin/plan-features');
+  }
+
+  /// PUT /admin/plan-features (ADMIN): aktif/nonaktifkan 1 fitur untuk 1 paket.
+  Future<http.Response> adminSetPlanFeature(
+      String planId, String featureKey, bool enabled) {
+    return _client.put('/gold-gym/v2/userdata/admin/plan-features',
+        {'plan_id': planId, 'feature_key': featureKey, 'enabled': enabled});
+  }
+
   /// GET /admin/plan-pricing (ADMIN, 2026-10-10): baris override harga + diskon tiap paket.
   Future<http.Response> adminGetPlanPricing() {
     return _client.get('/gold-gym/v2/userdata/admin/plan-pricing');

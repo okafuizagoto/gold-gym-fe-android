@@ -206,6 +206,26 @@ class _AppDrawerState extends State<AppDrawer> {
           icon: Icons.replay_rounded,
           route: '/riwayat-refund',
         ),
+      // Antrean Transaksi: nota offline yang menunggu dikirim (offline-first).
+      if (!buyerView && !isAdmin && (isSeller || isStaff))
+        MenuItem(
+          title: 'Antrean Transaksi',
+          icon: Icons.sync,
+          route: '/antrean-transaksi',
+        ),
+      // Antrian POS: papan nomor antrian, aktif/nonaktifkan dari Daftar Outlet (2026-09-30).
+      if (!buyerView && !isAdmin && (isSeller || isStaff))
+        MenuItem(
+          title: 'Antrian POS',
+          icon: Icons.format_list_numbered_rounded,
+          route: '/antrian-pos',
+        ),
+      if (buyerView)
+        MenuItem(
+          title: 'Antrian Saya',
+          icon: Icons.format_list_numbered_rounded,
+          route: '/antrian-saya',
+        ),
       // PENJUAL (retail & therapy): satu menu laporan penjualan; per hari /
       // minggu / bulan dipilih lewat TAB di dalam layarnya.
       if (!buyerView && (isSeller || isStaff))
@@ -213,6 +233,18 @@ class _AppDrawerState extends State<AppDrawer> {
           title: 'Laporan Penjualan',
           icon: Icons.assessment,
           route: '/laporan',
+        ),
+      // Pencatatan Pengeluaran: ledger biaya operasional per outlet
+      // (sewa/listrik/gaji/dst), berdampingan dengan Laporan Penjualan.
+      // Sama seperti Stock/Items, staff yang bekerja untuk penjual ikut
+      // bisa mencatat -- hapus tetap dibatasi pemilik outlet asli
+      // (lihat requireRealSeller di backend).
+      if (!buyerView && (isSeller || isStaff))
+        MenuItem(
+          title: 'Pencatatan Pengeluaran',
+          icon: Icons.payments_outlined,
+          route: '/expense',
+          feature: 'expenses',
         ),
       // ADMIN: grup "Akses Admin" yang bisa di-show/hide (ExpansionTile).
       // Isinya menu pengaturan akses fitur yang khusus admin:
@@ -262,6 +294,11 @@ class _AppDrawerState extends State<AppDrawer> {
               title: 'Harga & Diskon Paket',
               icon: Icons.sell_outlined,
               route: '/admin-plan-pricing',
+            ),
+            MenuItem(
+              title: 'Fitur per Paket',
+              icon: Icons.tune_rounded,
+              route: '/admin-plan-features',
             ),
             MenuItem(
               title: 'Akses Daftar Pembeli',
@@ -370,32 +407,12 @@ class _AppDrawerState extends State<AppDrawer> {
           icon: Icons.inventory,
           route: '/stock-barang',
         ),
-      // Antrean Transaksi: nota offline yang menunggu dikirim (offline-first).
-      if (!buyerView && !isAdmin && (isSeller || isStaff))
-        MenuItem(
-          title: 'Antrean Transaksi',
-          icon: Icons.sync,
-          route: '/antrean-transaksi',
-        ),
       // Transfer Stok: kirim stok antar outlet + surat jalan (retail saja).
       if (!buyerView && !isAdmin && !isTherapy && (isSeller || isStaff))
         MenuItem(
           title: 'Transfer Stok',
           icon: Icons.local_shipping_outlined,
           route: '/transfer-stok',
-        ),
-      // Antrian POS: papan nomor antrian, aktif/nonaktifkan dari Daftar Outlet (2026-09-30).
-      if (!buyerView && !isAdmin && (isSeller || isStaff))
-        MenuItem(
-          title: 'Antrian POS',
-          icon: Icons.format_list_numbered_rounded,
-          route: '/antrian-pos',
-        ),
-      if (buyerView)
-        MenuItem(
-          title: 'Antrian Saya',
-          icon: Icons.format_list_numbered_rounded,
-          route: '/antrian-saya',
         ),
       if (!buyerView && !isAdmin)
         MenuItem(
@@ -418,6 +435,14 @@ class _AppDrawerState extends State<AppDrawer> {
           title: 'Daftar Customer',
           icon: Icons.contacts,
           route: '/daftar-customer',
+        ),
+      // Tipe Pelanggan: kategori opsional pelanggan (mis. Reguler/Member/Grosir) per outlet.
+      if (!buyerView && !isAdmin)
+        MenuItem(
+          title: 'Tipe Pelanggan',
+          icon: Icons.label_outline_rounded,
+          route: '/customer-type',
+          feature: 'customers',
         ),
       // Daftar Pembeli hanya tampil sebelum akun terdaftar sebagai pembeli;
       // setelah konfirmasi, menu ini hilang dan Mode Pembeli muncul.
@@ -471,18 +496,6 @@ class _AppDrawerState extends State<AppDrawer> {
           title: 'Mode Penjual',
           icon: Icons.swap_horiz,
           route: '/switch-seller',
-        ),
-      // Pencatatan Pengeluaran: ledger biaya operasional per outlet
-      // (sewa/listrik/gaji/dst), berdampingan dengan Laporan Penjualan.
-      // Sama seperti Stock/Items, staff yang bekerja untuk penjual ikut
-      // bisa mencatat -- hapus tetap dibatasi pemilik outlet asli
-      // (lihat requireRealSeller di backend).
-      if (!buyerView && !isAdmin)
-        MenuItem(
-          title: 'Pencatatan Pengeluaran',
-          icon: Icons.payments_outlined,
-          route: '/expense',
-          feature: 'expenses',
         ),
       // Langganan: paket, batas outlet/pengguna, dan fitur akun (penjual & staff).
       if (!buyerView && !isAdmin && !isRealBuyer)
