@@ -186,6 +186,16 @@ List<OnboardingStep> onboardingStepsFor(
           t('Enter the amount and the reason, then RECORD. It appears in Cash History as Add Cash.',
               'Isi jumlah dan alasan, lalu CATAT. Tampil di Kas History sebagai Tambah Kas.')),
       OnboardingStep.menu(
+          'Riwayat Refund',
+          '/riwayat-refund',
+          t('Refunds and EXCHANGES of items. Tap Next to open it.',
+              'Refund dan TUKAR BARANG. Ketuk Lanjut untuk membukanya.')),
+      OnboardingStep.page(
+          '/riwayat-refund',
+          'refund-howto',
+          t("Read 'How to refund' here. In Sales History tap the round-arrow button on a sale: 'Return money' gives the money back, 'Exchange items' swaps for registered products and settles the price difference (cash goes in/out of the drawer).",
+              "Baca 'Cara refund' di sini. Di Sales History ketuk tombol panah melingkar pada nota: 'Kembalikan uang' mengembalikan uang, 'Tukar barang' menukar dengan produk terdaftar dan menyelesaikan selisih harga (tunai masuk/keluar laci).")),
+      OnboardingStep.menu(
           'Point of Sale',
           '/penjualan',
           t('This is where you record sales at the counter. Tap Next to open this page.',

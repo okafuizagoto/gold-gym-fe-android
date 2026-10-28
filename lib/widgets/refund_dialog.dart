@@ -397,7 +397,11 @@ class _RefundDialogState extends State<_RefundDialog> {
               ButtonSegment(value: true, label: Text(lang.get('Exchange items', 'Tukar barang'))),
             ],
             selected: {_exchange},
-            onSelectionChanged: (v) => setState(() => _exchange = v.first),
+            onSelectionChanged: (v) {
+              setState(() => _exchange = v.first);
+              // Muat daftar produk pengganti sekali saat mode tukar barang dipilih (sama dengan web).
+              if (_exchange && _results.isEmpty) _runSearch(_search.text.trim());
+            },
           ),
           const SizedBox(height: 10),
           for (final l in d.lines) _lineRow(lang, l),

@@ -14,6 +14,7 @@ import '../utils/responsive.dart';
 import '../utils/storage.dart';
 import '../utils/text_formatter.dart';
 import '../utils/toast.dart';
+import '../widgets/tour_target.dart';
 import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/empty_state.dart';
@@ -224,8 +225,13 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
       lang.get(
           'Print the refund receipt and give it to the customer together with the money. The amount already accounts for discounts and vouchers on the sale.',
           'Cetak struk refund dan berikan ke pelanggan bersama uangnya. Nilainya sudah memperhitungkan diskon dan voucher di nota.'),
+      lang.get(
+          "To EXCHANGE items instead, choose 'Exchange items' at the top of the refund window, pick the replacement from your registered products, and pay or return the price difference.",
+          "Untuk TUKAR BARANG, pilih 'Tukar barang' di bagian atas jendela refund, pilih barang pengganti dari produk terdaftar, lalu bayar atau kembalikan selisih harganya."),
     ];
-    return Card(
+    return TourTarget(
+      id: 'refund-howto',
+      child: Card(
       child: ExpansionTile(
         leading: const Icon(Icons.help_outline_rounded, color: AppColors.blue),
         title: Text(lang.get('How to refund', 'Cara refund'),
@@ -245,7 +251,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
               style: const TextStyle(color: AppColors.muted, fontSize: 12)),
         ],
       ),
-    );
+    ));
   }
 
   Widget _card(LanguageProvider lang, RefundHeader r) {
