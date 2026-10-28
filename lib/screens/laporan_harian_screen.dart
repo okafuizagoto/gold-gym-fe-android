@@ -289,24 +289,53 @@ class _LaporanHarianViewState extends State<LaporanHarianView>
         child: Padding(
           padding: EdgeInsets.symmetric(
               horizontal: context.pagePadding, vertical: 12),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: Text(
-                  'Total Keseluruhan (${_report!.count} nota)',
-                  style: textTheme.titleSmall,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Total Keseluruhan (${_report!.count} nota)',
+                      style: textTheme.titleSmall,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    TextFormatter.formatRupiah(_report!.grandTotal),
+                    style: textTheme.titleMedium?.copyWith(
+                      color: AppColors.blue,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Text(
-                TextFormatter.formatRupiah(_report!.grandTotal),
-                style: textTheme.titleMedium?.copyWith(
-                  color: AppColors.blue,
-                  fontWeight: FontWeight.w700,
+              // Refund pada tanggal ini (2026-10-28): samakan dengan laporan minggu/bulan yang sudah bersih.
+              if (_report!.refundTotal > 0) ...[
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Refund hari ini',
+                        style: textTheme.bodyMedium
+                            ?.copyWith(color: Colors.red.shade700)),
+                    Text('-${TextFormatter.formatRupiah(_report!.refundTotal)}',
+                        style: textTheme.bodyMedium
+                            ?.copyWith(color: Colors.red.shade700)),
+                  ],
                 ),
-              ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Total Bersih', style: textTheme.titleSmall),
+                    Text(TextFormatter.formatRupiah(_report!.netTotal),
+                        style: textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w800)),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

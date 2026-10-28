@@ -60,13 +60,17 @@ class DayReport {
   final List<ReportItem> items;
   final int count; // jumlah nota
   final double grandTotal;
+  final double refundTotal; // refund yang dilakukan pada tanggal ini
+  final double netTotal; // grandTotal - refundTotal
 
   DayReport({
     required this.date,
     required this.items,
     required this.count,
     required this.grandTotal,
-  });
+    this.refundTotal = 0,
+    double? netTotal,
+  }) : netTotal = netTotal ?? grandTotal - refundTotal;
 
   factory DayReport.fromJson(Map<String, dynamic> j) => DayReport(
         date: j['date'] ?? '',
@@ -75,6 +79,8 @@ class DayReport {
             .toList(),
         count: _toInt(j['count']),
         grandTotal: _toDouble(j['grand_total']),
+        refundTotal: _toDouble(j['refund_total']),
+        netTotal: j['net_total'] == null ? null : _toDouble(j['net_total']),
       );
 }
 
