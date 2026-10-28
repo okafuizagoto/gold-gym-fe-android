@@ -6,6 +6,7 @@ void main() {
   test('Akses Staff memuat izin Lokasi Kantor dan tanpa key ganda', () {
     final keys = StaffMenuKeys.options.map((o) => o.key).toList();
     expect(keys, contains('/lokasi-kantor'));
+    expect(keys, contains('/riwayat-refund'));
     expect(keys.toSet().length, keys.length);
   });
 }

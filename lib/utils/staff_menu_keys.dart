@@ -22,6 +22,7 @@ class StaffMenuKeys {
     StaffMenuKeyOption('/outlet', 'Ganti Outlet'),
     StaffMenuKeyOption('/storage', 'Storage'),
     StaffMenuKeyOption('/lokasi-kantor', 'Lokasi Kantor (atur batas absen)'),
+    StaffMenuKeyOption('/riwayat-refund', 'Riwayat Refund (lihat & lakukan refund)'),
   ];
 }
 

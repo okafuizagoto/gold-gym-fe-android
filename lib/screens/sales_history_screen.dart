@@ -20,6 +20,7 @@ import '../utils/toast.dart';
 import '../utils/debouncer.dart';
 import '../utils/storage.dart';
 import '../utils/constants.dart';
+import '../widgets/refund_dialog.dart';
 import 'proof_viewer_screen.dart';
 import 'sales_detail_screen.dart';
 
@@ -41,6 +42,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   String? _markingSaleId;
   // Void nota (2026-10-10): hanya pemilik, STAFF tidak boleh (sejalan kebijakan diskon).
   String? _voidingSaleId;
+  bool _canRefund = false;
   bool _isStaff = false;
   String? _loadingProofSaleId;
   bool _isSeller = true;
@@ -67,6 +69,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         _isSeller = role != AppConstants.roleBuyer;
         _isStaff = role == AppConstants.roleStaff;
       });
+    }
+    final denied = await Storage.getStaffDeniedMenuKeys();
+    if (mounted) {
+      setState(() => _canRefund = role == AppConstants.roleSeller ||
+          (role == AppConstants.roleStaff && !denied.contains('/riwayat-refund')));
     }
     // gagal load dianggap aktif (default aman: tidak menyembunyikan fitur
     // yang sedang berjalan hanya karena request gagal)
@@ -482,6 +489,14 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 tooltip: langProvider.get('Void sale', 'Batalkan nota'),
                 onPressed: () => _voidSale(sale),
               ),
+      // Refund (2026-10-28): penjual selalu boleh; staff hanya bila owner mencentang "Riwayat Refund".
+      if (_canRefund && paid && !sale.isVoided)
+        action(
+          icon: Icons.replay_rounded,
+          color: AppColors.warningDark,
+          tooltip: langProvider.get('Refund', 'Refund'),
+          onPressed: () => showRefundDialog(context, sale.saleId),
+        ),
       _printingSaleId == sale.saleId
           ? spinner()
           : PopupMenuButton<String>(

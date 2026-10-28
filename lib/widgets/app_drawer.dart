@@ -177,6 +177,13 @@ class _AppDrawerState extends State<AppDrawer> {
           icon: Icons.receipt_long,
           route: '/history-sales',
         ),
+      // Riwayat Refund (2026-10-28): penjual dan staff yang diizinkan penjual (menu_key "/riwayat-refund").
+      if (!buyerView && !isAdmin && (isSeller || isStaff))
+        MenuItem(
+          title: 'Riwayat Refund',
+          icon: Icons.replay_rounded,
+          route: '/riwayat-refund',
+        ),
       // PENJUAL (retail & therapy): satu menu laporan penjualan; per hari /
       // minggu / bulan dipilih lewat TAB di dalam layarnya.
       if (!buyerView && (isSeller || isStaff))
