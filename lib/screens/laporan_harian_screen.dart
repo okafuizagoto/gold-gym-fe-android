@@ -313,7 +313,7 @@ class _LaporanHarianViewState extends State<LaporanHarianView>
                 ],
               ),
               // Refund pada tanggal ini (2026-10-28): samakan dengan laporan minggu/bulan yang sudah bersih.
-              if (_report!.refundTotal > 0) ...[
+              if (_report!.refundTotal > 0 || _report!.exchangeTotal > 0) ...[
                 const SizedBox(height: 4),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -326,6 +326,18 @@ class _LaporanHarianViewState extends State<LaporanHarianView>
                             ?.copyWith(color: Colors.red.shade700)),
                   ],
                 ),
+                if (_report!.exchangeTotal > 0)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Barang pengganti (tukar barang)',
+                          style: textTheme.bodyMedium
+                              ?.copyWith(color: Colors.green.shade700)),
+                      Text('+${TextFormatter.formatRupiah(_report!.exchangeTotal)}',
+                          style: textTheme.bodyMedium
+                              ?.copyWith(color: Colors.green.shade700)),
+                    ],
+                  ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [

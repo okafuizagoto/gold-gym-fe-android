@@ -196,6 +196,8 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
         return (lang.get('Opening cash', 'Modal awal'), Colors.blueGrey);
       case 'REFUND':
         return (lang.get('Cash refund', 'Refund tunai'), Colors.purple.shade600);
+      case 'EXCHANGE_IN':
+        return (lang.get('Exchange (cash in)', 'Tukar barang (bayar selisih)'), Colors.purple.shade600);
       case 'CARRY':
         return (lang.get('Carried over', 'Lanjutan sesi'), Colors.blueGrey);
       case 'CASH_OUT':

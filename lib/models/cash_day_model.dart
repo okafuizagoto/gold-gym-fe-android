@@ -4,7 +4,7 @@ double _n(dynamic v) => double.tryParse('$v') ?? 0;
 
 class CashMovement {
   final String at; // "YYYY-MM-DD HH:MM:SS"
-  final String kind; // OPENING | SALE | REFUND | CASH_OUT | CASH_IN
+  final String kind; // OPENING | SALE | REFUND | EXCHANGE_IN | CASH_OUT | CASH_IN
   final String ref;
   final String description;
   final double amount; // masuk positif, keluar negatif

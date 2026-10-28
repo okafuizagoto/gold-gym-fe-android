@@ -122,17 +122,44 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
                     ],
                   ),
                 ),
+              if (d.header.isExchange) ...[
+                const SizedBox(height: 6),
+                Text(lang.get('Replacement items', 'Barang pengganti'),
+                    style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+                for (final l in d.newLines)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(child: Text('${l.qty} × ${l.stockName}')),
+                        Text(TextFormatter.formatRupiah(l.amount)),
+                      ],
+                    ),
+                  ),
+              ],
               const Divider(),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Total refund', style: TextStyle(fontWeight: FontWeight.w700)),
-                  Text(TextFormatter.formatRupiah(d.header.total),
+                  Text(
+                      d.header.isExchange
+                          ? (d.header.net > 0
+                              ? lang.get('Customer paid', 'Pelanggan membayar')
+                              : d.header.net < 0
+                                  ? lang.get('Returned to customer', 'Dikembalikan ke pelanggan')
+                                  : lang.get('Even exchange', 'Tukar sama nilai'))
+                          : 'Total refund',
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                  Text(
+                      TextFormatter.formatRupiah(
+                          d.header.isExchange ? d.header.net.abs() : d.header.total),
                       style: const TextStyle(fontWeight: FontWeight.w800)),
                 ],
               ),
               const SizedBox(height: 6),
-              Text('${refundMethodLabel(d.header.method)} · ${d.header.reason} · ${d.header.by}',
+              Text(
+                  '${d.header.isExchange && d.header.net == 0 ? '' : '${refundMethodLabel(d.header.netMethod.isNotEmpty ? d.header.netMethod : d.header.method)} · '}${d.header.reason} · ${d.header.by}',
                   style: const TextStyle(color: AppColors.muted, fontSize: 12)),
             ],
           ),
@@ -243,9 +270,35 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
             Text('${lang.get('Sale', 'Nota')} ${r.saleNumber} · ${r.date} ${r.time} · ${r.by}',
                 style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
             Text(r.reason, style: const TextStyle(fontSize: 12.5)),
+            if (r.isExchange)
+              Text(
+                  r.net > 0
+                      ? '${lang.get('customer pays', 'pelanggan bayar')} +${TextFormatter.formatRupiah(r.net)}'
+                      : r.net < 0
+                          ? '${lang.get('returned', 'dikembalikan')} -${TextFormatter.formatRupiah(-r.net)}'
+                          : lang.get('no difference', 'tanpa selisih'),
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: r.net > 0
+                          ? Colors.green.shade700
+                          : r.net < 0
+                              ? Colors.red.shade700
+                              : AppColors.muted)),
             Row(
               children: [
-                Chip(label: Text(refundMethodLabel(r.method)), visualDensity: VisualDensity.compact),
+                if (r.isExchange)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Chip(
+                        label: Text(refundModeLabel(r.mode)),
+                        backgroundColor: AppColors.blueLight,
+                        visualDensity: VisualDensity.compact),
+                  ),
+                Chip(
+                    label: Text(r.isExchange && r.net == 0
+                        ? lang.get('Even exchange', 'Tukar sama nilai')
+                        : refundMethodLabel(r.method)),
+                    visualDensity: VisualDensity.compact),
                 const Spacer(),
                 IconButton(
                   tooltip: lang.get('Detail', 'Detail'),

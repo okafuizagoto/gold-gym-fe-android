@@ -22,7 +22,7 @@ class RefundEscPos {
       }
     }
     bytes += g.hr();
-    bytes += g.text('STRUK REFUND',
+    bytes += g.text(h.isExchange ? 'STRUK TUKAR BARANG' : 'STRUK REFUND',
         styles: const PosStyles(align: PosAlign.center, bold: true));
     bytes += g.hr();
     bytes += g.text('No: ${h.refundNumber}');
@@ -31,31 +31,64 @@ class RefundEscPos {
     bytes += g.text('Petugas: ${h.by}');
     bytes += g.hr();
 
+    List<int> lineRows(String name, int qty, double unit, double amount) => [
+          ...g.text(name),
+          ...g.row([
+            PosColumn(text: '$qty x ${TextFormatter.formatRupiah(unit)}', width: 7),
+            PosColumn(
+                text: TextFormatter.formatRupiah(amount),
+                width: 5,
+                styles: const PosStyles(align: PosAlign.right)),
+          ]),
+        ];
+    List<int> kv(String k, String v, {bool bold = false}) => g.row([
+          PosColumn(text: k, width: 7, styles: PosStyles(bold: bold)),
+          PosColumn(
+              text: v,
+              width: 5,
+              styles: PosStyles(align: PosAlign.right, bold: bold)),
+        ]);
+
+    if (h.isExchange) {
+      bytes += g.text('BARANG DIKEMBALIKAN', styles: const PosStyles(bold: true));
+    }
     for (final l in d.lines) {
-      bytes += g.text(l.stockName);
+      bytes += lineRows(l.stockName, l.qty, l.unitPrice, l.amount);
+    }
+    if (h.isExchange) {
+      bytes += g.hr();
+      bytes += g.text('BARANG PENGGANTI', styles: const PosStyles(bold: true));
+      for (final l in d.newLines) {
+        bytes += lineRows(l.stockName, l.qty, l.unitPrice, l.amount);
+      }
+      bytes += g.hr();
+      bytes += kv('Nilai dikembalikan', TextFormatter.formatRupiah(h.total));
+      bytes += kv('Nilai pengganti', TextFormatter.formatRupiah(h.exchangeTotal));
+      if (h.net > 0) {
+        bytes += kv('PELANGGAN BAYAR', TextFormatter.formatRupiah(h.net), bold: true);
+        bytes += g.text('Dibayar via: ${h.method}');
+      } else if (h.net < 0) {
+        bytes += kv('DIKEMBALIKAN', TextFormatter.formatRupiah(-h.net), bold: true);
+        bytes += g.text('Dikembalikan via: ${h.method}');
+      } else {
+        bytes += g.text('TUKAR SAMA NILAI - tidak ada selisih',
+            styles: const PosStyles(align: PosAlign.center, bold: true));
+      }
+    } else {
+      bytes += g.hr();
       bytes += g.row([
         PosColumn(
-            text: '${l.qty} x ${TextFormatter.formatRupiah(l.unitPrice)}',
-            width: 7),
+            text: 'TOTAL REFUND',
+            width: 7,
+            styles: const PosStyles(bold: true, height: PosTextSize.size2)),
         PosColumn(
-            text: TextFormatter.formatRupiah(l.amount),
+            text: TextFormatter.formatRupiah(h.total),
             width: 5,
-            styles: const PosStyles(align: PosAlign.right)),
+            styles: const PosStyles(
+                align: PosAlign.right, bold: true, height: PosTextSize.size2)),
       ]);
+      bytes += g.text('Dikembalikan via: ${h.method}');
     }
-    bytes += g.hr();
-    bytes += g.row([
-      PosColumn(
-          text: 'TOTAL REFUND',
-          width: 7,
-          styles: const PosStyles(bold: true, height: PosTextSize.size2)),
-      PosColumn(
-          text: TextFormatter.formatRupiah(h.total),
-          width: 5,
-          styles: const PosStyles(
-              align: PosAlign.right, bold: true, height: PosTextSize.size2)),
-    ]);
-    bytes += g.text('Dikembalikan via: ${h.method}');
     bytes += g.hr();
     bytes += g.text('Alasan: ${h.reason}');
     bytes += g.text('Terima kasih',

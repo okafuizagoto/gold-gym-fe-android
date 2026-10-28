@@ -31,14 +31,18 @@ class RefundApi {
   Future<http.Response> create({
     required String saleId,
     required List<Map<String, dynamic>> items, // {td_id, qty, restock}
-    required String method,
+    required String method, // MONEY_BACK: cara uang dikembalikan; EXCHANGE: cara selisih (kosong bila selisih 0)
     required String reason,
+    String mode = 'MONEY_BACK',
+    List<Map<String, dynamic>>? exchangeItems, // {stock_id, qty}; harga TIDAK dikirim (backend pakai harga jual terkini)
   }) =>
       _client.post('$_base?type=create', {
         'sale_id': saleId,
         'items': items,
         'method': method,
         'reason': reason,
+        'mode': mode,
+        if (exchangeItems != null) 'exchange_items': exchangeItems,
       });
 
   /// Struk refund PDF (58mm), sama seperti struk penjualan.

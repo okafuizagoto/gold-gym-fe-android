@@ -61,7 +61,8 @@ class DayReport {
   final int count; // jumlah nota
   final double grandTotal;
   final double refundTotal; // refund yang dilakukan pada tanggal ini
-  final double netTotal; // grandTotal - refundTotal
+  final double exchangeTotal; // nilai barang pengganti pada tukar barang di tanggal ini
+  final double netTotal; // grandTotal - refundTotal + exchangeTotal
 
   DayReport({
     required this.date,
@@ -69,8 +70,9 @@ class DayReport {
     required this.count,
     required this.grandTotal,
     this.refundTotal = 0,
+    this.exchangeTotal = 0,
     double? netTotal,
-  }) : netTotal = netTotal ?? grandTotal - refundTotal;
+  }) : netTotal = netTotal ?? grandTotal - refundTotal + exchangeTotal;
 
   factory DayReport.fromJson(Map<String, dynamic> j) => DayReport(
         date: j['date'] ?? '',
@@ -80,6 +82,7 @@ class DayReport {
         count: _toInt(j['count']),
         grandTotal: _toDouble(j['grand_total']),
         refundTotal: _toDouble(j['refund_total']),
+        exchangeTotal: _toDouble(j['exchange_total']),
         netTotal: j['net_total'] == null ? null : _toDouble(j['net_total']),
       );
 }

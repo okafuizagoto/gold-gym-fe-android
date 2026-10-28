@@ -1,18 +1,24 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import '../config/theme.dart';
 import '../models/refund_model.dart';
+import '../models/stock_model.dart';
 import '../providers/language_provider.dart';
 import '../services/refund_api.dart';
+import '../services/stock_api.dart';
+import '../utils/constants.dart';
+import '../utils/storage.dart';
 import '../services/thermal_printer.dart';
 import '../utils/refund_escpos.dart';
 import '../utils/text_formatter.dart';
 import '../utils/toast.dart';
 
-/// Refund Tahap 1 (kembalikan barang + uang), padanan components/RefundDialog.tsx di web: pilih barang dan jumlah
-/// yang dikembalikan, metode pengembalian uang, dan alasan. Nilai per barang sudah memperhitungkan diskon/voucher
+/// Refund (Tahap 1: kembalikan barang + uang; Tahap 2: TUKAR BARANG), padanan components/RefundDialog.tsx di web:
+/// pilih barang dan jumlah yang dikembalikan, lalu uang dikembalikan ATAU barang pengganti dari produk terdaftar di
+/// outlet (selisih harga dibayar pelanggan atau dikembalikan), metode, dan alasan. Nilai per barang sudah memperhitungkan diskon/voucher
 /// nota (dihitung backend). Setelah berhasil, langsung bisa mencetak STRUK REFUND (PDF atau thermal).
 Future<void> showRefundDialog(BuildContext context, String saleId,
     {VoidCallback? onDone}) {
@@ -43,6 +49,14 @@ class _RefundDialogState extends State<_RefundDialog> {
   String _method = 'TUNAI';
   final Map<int, int> _qty = {};
   final Map<int, bool> _restock = {};
+  // Tukar barang
+  bool _exchange = false;
+  final Map<String, StockResponse> _replStock = {};
+  final Map<String, int> _replQty = {};
+  final _search = TextEditingController();
+  List<StockResponse> _results = [];
+  bool _searching = false;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -52,6 +66,8 @@ class _RefundDialogState extends State<_RefundDialog> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
+    _search.dispose();
     _reason.dispose();
     super.dispose();
   }
@@ -85,6 +101,65 @@ class _RefundDialogState extends State<_RefundDialog> {
       : _data!.lines.fold<double>(
           0, (s, l) => s + (_qty[l.tdId] ?? 0) * l.unitRefund);
 
+  double get _replTotal => _replQty.entries
+      .fold<double>(0, (s, e) => s + e.value * (_replStock[e.key]?.stock_price ?? 0));
+
+  /// + pelanggan bayar tambahan, - dikembalikan ke pelanggan.
+  double get _net => _replTotal - _total;
+
+  void _onSearch(String q) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () => _runSearch(q.trim()));
+  }
+
+  Future<void> _runSearch(String q) async {
+    if (!mounted) return;
+    setState(() => _searching = true);
+    try {
+      final oc = await Storage.get(AppConstants.outcode) ?? '';
+      final resp = await StockApi().getAllStock(q, oc, 1, 12);
+      if (resp.statusCode == 200 && mounted) {
+        final list = (jsonDecode(resp.body)['data'] ?? []) as List;
+        setState(() => _results = list
+            .map((e) => StockResponse.fromJson(Map<String, dynamic>.from(e)))
+            .toList());
+      }
+    } catch (_) {
+      /* hasil terakhir dipertahankan */
+    } finally {
+      if (mounted) setState(() => _searching = false);
+    }
+  }
+
+  void _addRepl(StockResponse s) {
+    final cur = _replQty[s.stock_id] ?? 0;
+    final max = s.isTherapy ? 999 : s.stock_qty;
+    if (cur >= max) {
+      Toast.error(context, 'Stok tidak cukup');
+      return;
+    }
+    setState(() {
+      _replStock[s.stock_id] = s;
+      _replQty[s.stock_id] = cur + 1;
+    });
+  }
+
+  void _stepRepl(String id, int delta) {
+    final cur = _replQty[id] ?? 0;
+    final q = cur + delta;
+    final s = _replStock[id];
+    if (s == null) return;
+    if (q <= 0) {
+      setState(() {
+        _replQty.remove(id);
+        _replStock.remove(id);
+      });
+      return;
+    }
+    if (q > (s.isTherapy ? 999 : s.stock_qty)) return;
+    setState(() => _replQty[id] = q);
+  }
+
   bool get _anySelected =>
       _data != null && _data!.lines.any((l) => (_qty[l.tdId] ?? 0) > 0);
 
@@ -92,7 +167,11 @@ class _RefundDialogState extends State<_RefundDialog> {
     final lang = context.read<LanguageProvider>();
     if (_data == null || !_anySelected) return;
     if (_reason.text.trim().isEmpty) {
-      Toast.error(context, lang.get('Reason is required', 'Alasan refund wajib diisi'));
+      Toast.error(context, lang.get('Reason is required', 'Alasan wajib diisi'));
+      return;
+    }
+    if (_exchange && _replQty.isEmpty) {
+      Toast.error(context, lang.get('Pick at least one replacement item', 'Pilih minimal satu barang pengganti'));
       return;
     }
     setState(() => _saving = true);
@@ -107,14 +186,18 @@ class _RefundDialogState extends State<_RefundDialog> {
                   'restock': _restock[l.tdId] ?? true,
                 })
             .toList(),
-        method: _method,
+        method: _exchange && _net.round() == 0 ? '' : _method,
         reason: _reason.text.trim(),
+        mode: _exchange ? 'EXCHANGE' : 'MONEY_BACK',
+        exchangeItems: _exchange
+            ? _replQty.entries.map((e) => {'stock_id': e.key, 'qty': e.value}).toList()
+            : null,
       );
       if (!mounted) return;
       if (resp.statusCode == 201 || resp.statusCode == 200) {
         setState(() =>
             _done = RefundDetail.fromJson(jsonDecode(resp.body)['data']));
-        Toast.success(context, lang.get('Refund recorded', 'Refund tercatat'));
+        Toast.success(context, _exchange ? lang.get('Exchange recorded', 'Tukar barang tercatat') : lang.get('Refund recorded', 'Refund tercatat'));
         widget.onDone?.call();
       } else {
         String msg = lang.get('Refund failed', 'Refund gagal');
@@ -174,8 +257,10 @@ class _RefundDialogState extends State<_RefundDialog> {
     final done = _done;
     return AlertDialog(
       title: Text(done != null
-          ? lang.get('Refund recorded', 'Refund tercatat')
-          : 'Refund'),
+          ? (done.header.isExchange
+              ? lang.get('Exchange recorded', 'Tukar barang tercatat')
+              : lang.get('Refund recorded', 'Refund tercatat'))
+          : (_exchange ? lang.get('Exchange items', 'Tukar barang') : 'Refund')),
       content: SizedBox(
         width: double.maxFinite,
         child: _loading || d == null
@@ -234,37 +319,61 @@ class _RefundDialogState extends State<_RefundDialog> {
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : Text(lang.get('Process refund', 'Proses refund')),
+                    : Text(_exchange
+                        ? lang.get('Process exchange', 'Proses tukar barang')
+                        : lang.get('Process refund', 'Proses refund')),
               ),
             ],
     );
   }
 
   Widget _doneBody(LanguageProvider lang, RefundDetail done) {
+    Widget row(String left, double amount) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(child: Text(left)),
+              Text(TextFormatter.formatRupiah(amount)),
+            ],
+          ),
+        );
+    final h = done.header;
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('${done.header.refundNumber} – ${TextFormatter.formatRupiah(done.header.total)} (${refundMethodLabel(done.header.method)})',
+          Text(
+              h.isExchange
+                  ? '${lang.get('Exchange', 'Tukar barang')} ${h.refundNumber}'
+                  : '${h.refundNumber} – ${TextFormatter.formatRupiah(h.total)} (${refundMethodLabel(h.method)})',
               style: const TextStyle(fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
-          for (final l in done.lines)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(child: Text('${l.qty} × ${l.stockName}')),
-                  Text(TextFormatter.formatRupiah(l.amount)),
-                ],
-              ),
-            ),
-          const SizedBox(height: 10),
-          Text(
-              lang.get('Give the customer the money back and hand over the refund receipt.',
-                  'Kembalikan uang ke pelanggan dan berikan struk refund.'),
-              style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+          if (h.isExchange)
+            Text(lang.get('Returned', 'Dikembalikan'),
+                style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+          for (final l in done.lines) row('${l.qty} × ${l.stockName}', l.amount),
+          if (h.isExchange) ...[
+            const SizedBox(height: 6),
+            Text(lang.get('Replacement', 'Pengganti'),
+                style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+            for (final l in done.newLines) row('${l.qty} × ${l.stockName}', l.amount),
+            const SizedBox(height: 8),
+            Text(
+                h.net > 0
+                    ? '${lang.get('Customer pays', 'Pelanggan membayar')} ${TextFormatter.formatRupiah(h.net)} (${refundMethodLabel(h.netMethod)})'
+                    : h.net < 0
+                        ? '${lang.get('Give back to the customer', 'Kembalikan ke pelanggan')} ${TextFormatter.formatRupiah(-h.net)} (${refundMethodLabel(h.netMethod)})'
+                        : lang.get('Even exchange: no money changes hands.', 'Tukar sama nilai: tidak ada uang yang berpindah.'),
+                style: const TextStyle(fontWeight: FontWeight.w800)),
+          ] else ...[
+            const SizedBox(height: 10),
+            Text(
+                lang.get('Give the customer the money back and hand over the refund receipt.',
+                    'Kembalikan uang ke pelanggan dan berikan struk refund.'),
+                style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+          ],
         ],
       ),
     );
@@ -281,23 +390,42 @@ class _RefundDialogState extends State<_RefundDialog> {
               '${d.refundedTotal > 0 ? ' · ${lang.get('Already refunded', 'Sudah di-refund')} ${TextFormatter.formatRupiah(d.refundedTotal)}' : ''}',
               style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
           const SizedBox(height: 10),
-          for (final l in d.lines) _lineRow(lang, l),
-          const SizedBox(height: 10),
-          DropdownButtonFormField<String>(
-            initialValue: _method,
-            decoration: InputDecoration(
-                labelText: lang.get('Money returned via', 'Uang dikembalikan lewat'),
-                helperMaxLines: 2,
-                helperText: _method == 'TUNAI'
-                    ? lang.get('Cash: taken from the cash drawer and recorded in Cash History.',
-                        'Tunai: diambil dari laci kas dan tercatat di Kas History.')
-                    : lang.get('Not cash: the drawer cash is not reduced; transfer the money to the customer.',
-                        'Non-tunai: kas laci tidak berkurang; kirim uangnya ke pelanggan lewat transfer.')),
-            items: refundMethods
-                .map((m) => DropdownMenuItem(value: m, child: Text(refundMethodLabel(m))))
-                .toList(),
-            onChanged: (v) => setState(() => _method = v ?? 'TUNAI'),
+          SegmentedButton<bool>(
+            showSelectedIcon: false,
+            segments: [
+              ButtonSegment(value: false, label: Text(lang.get('Return money', 'Kembalikan uang'))),
+              ButtonSegment(value: true, label: Text(lang.get('Exchange items', 'Tukar barang'))),
+            ],
+            selected: {_exchange},
+            onSelectionChanged: (v) => setState(() => _exchange = v.first),
           ),
+          const SizedBox(height: 10),
+          for (final l in d.lines) _lineRow(lang, l),
+          if (_exchange) _exchangePanel(lang),
+          const SizedBox(height: 10),
+          if (!_exchange || _net.round() != 0)
+            DropdownButtonFormField<String>(
+              initialValue: _method,
+              decoration: InputDecoration(
+                  labelText: _exchange
+                      ? (_net > 0
+                          ? lang.get('Customer pays the difference via', 'Selisih dibayar pelanggan lewat')
+                          : lang.get('Difference returned via', 'Selisih dikembalikan lewat'))
+                      : lang.get('Money returned via', 'Uang dikembalikan lewat'),
+                  helperMaxLines: 2,
+                  helperText: _method == 'TUNAI'
+                      ? (_exchange && _net > 0
+                          ? lang.get('Cash: goes into the cash drawer and is recorded in Cash History.',
+                              'Tunai: masuk ke laci kas dan tercatat di Kas History.')
+                          : lang.get('Cash: taken from the cash drawer and recorded in Cash History.',
+                              'Tunai: diambil dari laci kas dan tercatat di Kas History.'))
+                      : lang.get('Not cash: the drawer cash is not changed; settle by transfer.',
+                          'Non-tunai: kas laci tidak berubah; selesaikan lewat transfer.')),
+              items: refundMethods
+                  .map((m) => DropdownMenuItem(value: m, child: Text(refundMethodLabel(m))))
+                  .toList(),
+              onChanged: (v) => setState(() => _method = v ?? 'TUNAI'),
+            ),
           const SizedBox(height: 12),
           TextField(
             controller: _reason,
@@ -305,18 +433,145 @@ class _RefundDialogState extends State<_RefundDialog> {
             minLines: 2,
             maxLines: 3,
             decoration: InputDecoration(
-                labelText: lang.get('Reason (required)', 'Alasan refund (wajib)')),
+                labelText: _exchange
+                    ? lang.get('Reason for the exchange (required)', 'Alasan tukar barang (wajib)')
+                    : lang.get('Reason (required)', 'Alasan refund (wajib)')),
           ),
           const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Total refund',
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
-              Text(TextFormatter.formatRupiah(_total),
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-            ],
+          if (_exchange) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(lang.get('Returned value', 'Nilai dikembalikan')),
+                Text(TextFormatter.formatRupiah(_total)),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(lang.get('Replacement value', 'Nilai pengganti')),
+                Text(TextFormatter.formatRupiah(_replTotal)),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                    _net.round() > 0
+                        ? lang.get('Customer pays', 'Pelanggan membayar')
+                        : _net.round() < 0
+                            ? lang.get('Give back to customer', 'Kembalikan ke pelanggan')
+                            : lang.get('Even exchange', 'Tukar sama nilai'),
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                Text(TextFormatter.formatRupiah(_net.abs()),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
+                        color: _net > 0
+                            ? Colors.green.shade700
+                            : _net < 0
+                                ? Colors.red.shade700
+                                : null)),
+              ],
+            ),
+          ] else
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Total refund',
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                Text(TextFormatter.formatRupiah(_total),
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _exchangePanel(LanguageProvider lang) {
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.warningDark),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(lang.get('Replacement items', 'Barang pengganti'),
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _search,
+            onChanged: _onSearch,
+            decoration: InputDecoration(
+                isDense: true,
+                prefixIcon: const Icon(Icons.search_rounded),
+                hintText: lang.get('Search a registered product', 'Cari produk terdaftar')),
           ),
+          if (_searching)
+            const Padding(
+                padding: EdgeInsets.all(6),
+                child: SizedBox(
+                    width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 180),
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final s in _results)
+                  Opacity(
+                    opacity: (!s.isTherapy && s.stock_qty <= 0) ? 0.5 : 1,
+                    child: ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(s.stock_name,
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                      subtitle: Text(
+                          '${TextFormatter.formatRupiah(s.stock_price.toDouble())} · ${s.isTherapy ? lang.get('service', 'jasa') : '${lang.get('stock', 'stok')} ${s.stock_qty}'}'),
+                      trailing: TextButton(
+                          onPressed: (!s.isTherapy && s.stock_qty <= 0) ? null : () => _addRepl(s),
+                          child: Text(lang.get('Add', 'Tambah'))),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          for (final e in _replQty.entries)
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_replStock[e.key]?.stock_name ?? e.key,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                      Text(
+                          '${TextFormatter.formatRupiah((_replStock[e.key]?.stock_price ?? 0).toDouble())} × ${e.value} = ${TextFormatter.formatRupiah((_replStock[e.key]?.stock_price ?? 0) * e.value.toDouble())}',
+                          style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(e.value == 1 ? Icons.delete_outline_rounded : Icons.remove_rounded),
+                    onPressed: () => _stepRepl(e.key, -1)),
+                Text('${e.value}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.add_rounded),
+                    onPressed: () => _stepRepl(e.key, 1)),
+              ],
+            ),
+          Text(
+              lang.get(
+                  "Replacement items are priced at today's selling price (no discount) and their stock is reduced.",
+                  'Barang pengganti memakai harga jual hari ini (tanpa diskon) dan stoknya dikurangi.'),
+              style: const TextStyle(color: AppColors.muted, fontSize: 11.5)),
         ],
       ),
     );

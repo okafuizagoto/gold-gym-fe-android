@@ -1,4 +1,4 @@
-// Padanan models/refund.ts di web -- Refund Tahap 1 (kembalikan barang + uang).
+// Padanan models/refund.ts di web -- Refund Tahap 1 (kembalikan barang + uang) dan Tahap 2 (tukar barang).
 
 double _n(dynamic v) => double.tryParse('$v') ?? 0;
 int _i(dynamic v) => int.tryParse('$v') ?? (double.tryParse('$v')?.toInt() ?? 0);
@@ -13,7 +13,16 @@ String refundMethodLabel(String m) =>
 String defaultRefundMethod(String payType) =>
     (payType.isEmpty || payType == 'TUNAI' || payType == 'CAMPUR') ? 'TUNAI' : 'BANK';
 
+bool isExchangeMode(String mode) => mode == 'EXCHANGE';
+String refundModeLabel(String mode) => mode == 'EXCHANGE' ? 'Tukar barang' : 'Refund';
+
 class RefundHeader {
+  final String mode; // MONEY_BACK | EXCHANGE
+  final double exchangeTotal; // nilai barang pengganti
+  final double net; // exchange - total: + pelanggan bayar, - dikembalikan
+  final String netMethod;
+  final double cashDelta;
+  bool get isExchange => mode == 'EXCHANGE';
   final String refundId;
   final String refundNumber;
   final String outcode;
@@ -27,6 +36,11 @@ class RefundHeader {
   final String time;
 
   RefundHeader({
+    this.mode = 'MONEY_BACK',
+    this.exchangeTotal = 0,
+    this.net = 0,
+    this.netMethod = '',
+    this.cashDelta = 0,
     required this.refundId,
     required this.refundNumber,
     required this.outcode,
@@ -41,6 +55,11 @@ class RefundHeader {
   });
 
   factory RefundHeader.fromJson(Map<String, dynamic> j) => RefundHeader(
+        mode: '${j['refund_mode'] ?? 'MONEY_BACK'}',
+        exchangeTotal: _n(j['refund_exchange_total']),
+        net: _n(j['refund_net']),
+        netMethod: '${j['refund_net_method'] ?? ''}',
+        cashDelta: _n(j['refund_cash_delta']),
         refundId: '${j['refund_id'] ?? ''}',
         refundNumber: '${j['refund_number'] ?? ''}',
         outcode: '${j['refund_outcode'] ?? ''}',
@@ -82,15 +101,42 @@ class RefundLine {
       );
 }
 
+/// Barang PENGGANTI pada tukar barang.
+class RefundNewLine {
+  final String stockId;
+  final String stockName;
+  final int qty;
+  final double unitPrice;
+  final double amount;
+
+  RefundNewLine({
+    required this.stockId,
+    required this.stockName,
+    required this.qty,
+    required this.unitPrice,
+    required this.amount,
+  });
+
+  factory RefundNewLine.fromJson(Map<String, dynamic> j) => RefundNewLine(
+        stockId: '${j['stock_id'] ?? ''}',
+        stockName: '${j['stock_name'] ?? ''}',
+        qty: _i(j['qty']),
+        unitPrice: _n(j['unit_price']),
+        amount: _n(j['line_amount']),
+      );
+}
+
 class RefundDetail {
   final RefundHeader header;
   final List<RefundLine> lines;
+  final List<RefundNewLine> newLines;
   final String outletName;
   final String outletAddress;
 
   RefundDetail({
     required this.header,
     required this.lines,
+    this.newLines = const [],
     this.outletName = '',
     this.outletAddress = '',
   });
@@ -99,6 +145,9 @@ class RefundDetail {
         header: RefundHeader.fromJson((j['header'] ?? {}) as Map<String, dynamic>),
         lines: ((j['lines'] ?? []) as List)
             .map((e) => RefundLine.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        newLines: ((j['new_lines'] ?? []) as List)
+            .map((e) => RefundNewLine.fromJson(e as Map<String, dynamic>))
             .toList(),
         outletName: '${j['outlet_name'] ?? ''}',
         outletAddress: '${j['outlet_address'] ?? ''}',
