@@ -3,7 +3,15 @@
 double _n(dynamic v) => double.tryParse('$v') ?? 0;
 int _i(dynamic v) => int.tryParse('$v') ?? (double.tryParse('$v')?.toInt() ?? 0);
 
-const List<String> refundMethods = ['TUNAI', 'BANK', 'DEBIT', 'TRANSFER'];
+// Sama dengan POS: Tunai atau Transfer Bank (backend juga menerima DEBIT/TRANSFER untuk data lama).
+const List<String> refundMethods = ['TUNAI', 'BANK'];
+
+String refundMethodLabel(String m) =>
+    m == 'TUNAI' ? 'Tunai' : (m == 'BANK' ? 'Transfer Bank' : m);
+
+/// Default metode refund mengikuti cara bayar nota: tunai/campur -> TUNAI, selain itu -> BANK.
+String defaultRefundMethod(String payType) =>
+    (payType.isEmpty || payType == 'TUNAI' || payType == 'CAMPUR') ? 'TUNAI' : 'BANK';
 
 class RefundHeader {
   final String refundId;

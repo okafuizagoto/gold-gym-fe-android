@@ -64,7 +64,7 @@ class _RefundDialogState extends State<_RefundDialog> {
         final r = Refundable.fromJson(jsonDecode(resp.body)['data']);
         setState(() {
           _data = r;
-          _method = refundMethods.contains(r.payType) ? r.payType : 'TUNAI';
+          _method = defaultRefundMethod(r.payType);
           _loading = false;
         });
       } else {
@@ -246,7 +246,7 @@ class _RefundDialogState extends State<_RefundDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('${done.header.refundNumber} – ${TextFormatter.formatRupiah(done.header.total)} (${done.header.method})',
+          Text('${done.header.refundNumber} – ${TextFormatter.formatRupiah(done.header.total)} (${refundMethodLabel(done.header.method)})',
               style: const TextStyle(fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
           for (final l in done.lines)
@@ -294,7 +294,7 @@ class _RefundDialogState extends State<_RefundDialog> {
                     : lang.get('Not cash: the drawer cash is not reduced; transfer the money to the customer.',
                         'Non-tunai: kas laci tidak berkurang; kirim uangnya ke pelanggan lewat transfer.')),
             items: refundMethods
-                .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                .map((m) => DropdownMenuItem(value: m, child: Text(refundMethodLabel(m))))
                 .toList(),
             onChanged: (v) => setState(() => _method = v ?? 'TUNAI'),
           ),

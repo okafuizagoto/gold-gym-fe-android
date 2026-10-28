@@ -132,7 +132,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
                 ],
               ),
               const SizedBox(height: 6),
-              Text('${d.header.method} · ${d.header.reason} · ${d.header.by}',
+              Text('${refundMethodLabel(d.header.method)} · ${d.header.reason} · ${d.header.by}',
                   style: const TextStyle(color: AppColors.muted, fontSize: 12)),
             ],
           ),
@@ -245,7 +245,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
             Text(r.reason, style: const TextStyle(fontSize: 12.5)),
             Row(
               children: [
-                Chip(label: Text(r.method), visualDensity: VisualDensity.compact),
+                Chip(label: Text(refundMethodLabel(r.method)), visualDensity: VisualDensity.compact),
                 const Spacer(),
                 IconButton(
                   tooltip: lang.get('Detail', 'Detail'),
