@@ -11,6 +11,7 @@ import '../utils/navigation.dart';
 import '../utils/onboarding_steps.dart';
 import '../utils/seller_outlet_gate.dart';
 import '../utils/storage.dart';
+import 'language_switch.dart';
 import 'tour_target.dart';
 
 /// Panduan tooltip pertama kali per role (2026-10-22, diperluas 2026-10-23; porting dari
@@ -130,7 +131,9 @@ class OnboardingTour {
       final lang = ctx.read<LanguageProvider>();
       final outletType =
           await Storage.get(AppConstants.outletTypeKey) ?? 'RETAIL';
-      final steps = onboardingStepsFor(
+      // Teks langkah dihitung ULANG tiap langkah (lihat _runSteps) supaya mengganti bahasa di tengah panduan
+      // langsung berlaku di langkah berikutnya.
+      List<OnboardingStep> stepsFn() => onboardingStepsFor(
           role, outletType == AppConstants.outletTherapy, lang);
       if (await _welcomeDialog(ctx, role, lang)) {
         // Dialog (route) disisipkan Navigator DI BAWAH penutup ini, jadi penutup hanya dipasang di antara
@@ -143,7 +146,7 @@ class OnboardingTour {
             await OutletsApi().ensureDummyOutlet();
           } catch (_) {}
         }
-        await _runSteps(nav, ctx, steps, lang);
+        await _runSteps(nav, ctx, stepsFn, lang);
       }
       completed = true;
     } catch (e, st) {
@@ -172,11 +175,12 @@ class OnboardingTour {
   }
 
   static Future<void> _runSteps(NavigatorState nav, BuildContext ctx,
-      List<OnboardingStep> steps, LanguageProvider lang) async {
+      List<OnboardingStep> Function() stepsFn, LanguageProvider lang) async {
+    final total = stepsFn().length;
     String? current; // rute yang sedang dibuka tour (null = layar utama)
-    for (var idx = 0; idx < steps.length; idx++) {
-      final s = steps[idx];
-      final progress = '${idx + 1}/${steps.length}';
+    for (var idx = 0; idx < total; idx++) {
+      final s = stepsFn()[idx];
+      final progress = '${idx + 1}/$total';
       switch (s.kind) {
         case OnboardingStepKind.menu:
           await _returnToRoot(nav);
@@ -390,12 +394,21 @@ class OnboardingTour {
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => PopScope(
+      builder: (ctx) => Consumer<LanguageProvider>(
+        builder: (ctx, lang, _) => PopScope(
         canPop: _replay,
         child: AlertDialog(
           icon: const Icon(Icons.tour_rounded, color: AppColors.blue, size: 36),
           title: Text(lang.get('Welcome!', 'Selamat Datang!')),
-          content: Text(onboardingWelcome(role, lang)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(onboardingWelcome(role, lang)),
+              const SizedBox(height: 8),
+              const Align(alignment: Alignment.centerRight, child: LanguageSwitch()),
+            ],
+          ),
           actions: [
             if (_replay)
               TextButton(
@@ -408,6 +421,7 @@ class OnboardingTour {
             ),
           ],
         ),
+      ),
       ),
     );
     return result == true;
@@ -500,6 +514,9 @@ class _StepCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              // Tombol bahasa tetap bisa dipakai selama panduan (layar di bawahnya dikunci, kartu ini tidak)
+              const LanguageSwitch(),
+              const Spacer(),
               if (showSkip) ...[
                 TextButton(
                   onPressed: onSkip,

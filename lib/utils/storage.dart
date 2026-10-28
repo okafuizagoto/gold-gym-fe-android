@@ -51,7 +51,10 @@ class Storage {
   static Future<void> clear() async {
     await _secure.deleteAll();
     final prefs = await SharedPreferences.getInstance();
+    // Pilihan bahasa manual adalah preferensi PERANGKAT, bukan data akun: tetap ada setelah logout.
+    final langPref = prefs.getString(AppConstants.languagePrefKey);
     await prefs.clear();
+    if (langPref != null) await prefs.setString(AppConstants.languagePrefKey, langPref);
   }
 
   // Custom menu management

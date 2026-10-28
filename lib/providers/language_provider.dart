@@ -16,10 +16,13 @@ class LanguageProvider with ChangeNotifier {
     }
   }
 
-  Future<void> setLanguage(String lang) async {
+  /// [remember] (default true): pilihan MANUAL pengguna disimpan sebagai preferensi perangkat (tetap setelah
+  /// logout, mengalahkan bahasa bawaan negara). Pemanggil otomatis (login/daftar) memakai remember: false.
+  Future<void> setLanguage(String lang, {bool remember = true}) async {
     if (lang == 'EN' || lang == 'ID') {
       _language = lang;
       await Storage.set('language', lang);
+      if (remember) await Storage.set('language_pref', lang);
       notifyListeners();
     }
   }

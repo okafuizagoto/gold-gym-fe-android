@@ -1,12 +1,17 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../config/theme.dart';
+import '../providers/language_provider.dart';
 import '../services/core_api.dart';
 import '../utils/bidang_usaha.dart';
 import '../utils/constants.dart';
+import '../utils/language_pref.dart';
 import '../utils/password_strength.dart';
 import '../utils/toast.dart';
 import '../widgets/auth_card.dart';
+import '../widgets/country_autocomplete.dart';
+import '../widgets/language_switch.dart';
 import '../widgets/password_strength_bar.dart';
 import '../widgets/segmented_tabs.dart';
 
@@ -32,6 +37,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isLoading = false;
   String _role = AppConstants.roleBuyer;
   String _bidangUsaha = '';
+  // Negara akun (kode ISO2). Awalnya dari lokal perangkat (id_ID -> ID); wajib dipilih kecuali daftar negara gagal dimuat.
+  String _countryIso2 = '';
+  bool _countriesOk = true;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   // BOTH (default) / BUYER_ONLY / SELLER_ONLY — diatur admin lewat menu
@@ -43,6 +51,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void initState() {
     super.initState();
     _loadRegistrationMode();
+    _countryIso2 = (WidgetsBinding.instance.platformDispatcher.locale.countryCode ?? '').toUpperCase();
+  }
+
+  /// Bahasa form mengikuti negara (Indonesia -> Indonesia, lainnya -> Inggris), KECUALI pengguna sudah memilih
+  /// bahasa sendiri di perangkat ini (tombol ID/EN) -- pilihan manual menang.
+  Future<void> _onCountryChanged(String iso2) async {
+    setState(() => _countryIso2 = iso2);
+    if (iso2.isEmpty || await readLanguagePref() != null || !mounted) return;
+    await context.read<LanguageProvider>().setLanguage(languageForCountry(iso2), remember: false);
   }
 
   Future<void> _loadRegistrationMode() async {
@@ -76,19 +93,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   bool get _canSubmit {
-    return _namaController.text.isNotEmpty &&
+    return (!_countriesOk || _countryIso2.isNotEmpty) &&
+        _namaController.text.isNotEmpty &&
         _emailController.text.contains('@') &&
         evaluatePassword(_passwordController.text).valid &&
         _passwordController.text == _confirmController.text;
   }
 
   Future<void> _handleRegister() async {
+    final lang = context.read<LanguageProvider>();
     if (!_canSubmit) {
       Toast.error(
           context,
           !evaluatePassword(_passwordController.text).valid
               ? passwordPolicyMessage
-              : 'Lengkapi data. Password harus sama dengan konfirmasi.');
+              : context.read<LanguageProvider>().get(
+                  'Complete the form. Password must match the confirmation.',
+                  'Lengkapi data. Password harus sama dengan konfirmasi.'));
       return;
     }
 
@@ -105,19 +126,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
         role: _role,
         namaPT: _namaPTController.text,
         bidangUsaha: bidangUsahaFinal,
+        countryIso2: _countryIso2,
       );
 
       if (response.statusCode == 201) {
         if (mounted) {
           Toast.success(
             context,
-            'Registrasi berhasil. Kami telah mengirimkan tautan verifikasi ke email Anda. Silakan periksa kotak masuk (atau folder spam) untuk memverifikasi email sebelum masuk.',
+lang.get('Registration successful. We sent a verification link to your email. Please check your inbox (or spam folder) to verify your email before logging in.',
+                            'Registrasi berhasil. Kami telah mengirimkan tautan verifikasi ke email Anda. Silakan periksa kotak masuk (atau folder spam) untuk memverifikasi email sebelum masuk.'),
             duration: const Duration(seconds: 8),
           );
           Navigator.pop(context);
         }
       } else {
-        String message = 'Registrasi gagal';
+        String message = lang.get('Registration failed', 'Registrasi gagal');
         try {
           final body = jsonDecode(response.body);
           if (body['error'] != null) message = body['error'];
@@ -125,7 +148,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         if (mounted) Toast.error(context, message);
       }
     } catch (e) {
-      if (mounted) Toast.error(context, 'Registrasi gagal: $e');
+      if (mounted) Toast.error(context, '${lang.get('Registration failed', 'Registrasi gagal')}: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -133,32 +156,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageProvider>();
     final textTheme = Theme.of(context).textTheme;
     final passwordMismatch = _confirmController.text.isNotEmpty &&
         _passwordController.text != _confirmController.text;
 
     return AuthCard(
-      title: 'Buat Akun',
-      subtitle: 'Daftar sebagai pembeli atau penjual, langsung aktif',
+      title: lang.get('Create Account', 'Buat Akun'),
+      subtitle: lang.get('Sign up as a buyer or seller, active right away',
+          'Daftar sebagai pembeli atau penjual, langsung aktif'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
+          const LanguageSwitch(),
           // Pilihan role: pembeli atau penjual — admin bisa
           // membatasi lewat menu Akses Admin -> Daftar Akun.
           if (_registrationMode == 'BOTH')
             SegmentedTabs<String>(
               value: _role,
               onChanged: (v) => setState(() => _role = v),
-              tabs: const [
+              tabs: [
                 SegmentedTab(
                   value: AppConstants.roleBuyer,
-                  label: 'Pembeli',
+                  label: lang.get('Buyer', 'Pembeli'),
                   icon: Icons.shopping_bag_outlined,
                 ),
                 SegmentedTab(
                   value: AppConstants.roleSeller,
-                  label: 'Penjual',
+                  label: lang.get('Seller', 'Penjual'),
                   icon: Icons.storefront_outlined,
                 ),
               ],
@@ -172,8 +198,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               child: Text(
                 _registrationMode == 'SELLER_ONLY'
-                    ? 'Pendaftaran saat ini hanya untuk akun penjual'
-                    : 'Pendaftaran saat ini hanya untuk akun pembeli',
+                    ? lang.get('Registration is currently for seller accounts only', 'Pendaftaran saat ini hanya untuk akun penjual')
+                    : lang.get('Registration is currently for buyer accounts only', 'Pendaftaran saat ini hanya untuk akun pembeli'),
                 textAlign: TextAlign.center,
                 style: textTheme.bodySmall?.copyWith(color: AppColors.infoDark),
               ),
@@ -183,29 +209,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
             controller: _namaController,
             textCapitalization: TextCapitalization.words,
             textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              labelText: 'Nama Lengkap',
-              prefixIcon: Icon(Icons.person_outline_rounded),
+            decoration: InputDecoration(
+              labelText: lang.get('Full Name', 'Nama Lengkap'),
+              prefixIcon: const Icon(Icons.person_outline_rounded),
             ),
             onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 14),
+          CountryAutocomplete(
+            value: _countryIso2,
+            onChanged: _onCountryChanged,
+            onLoaded: (ok) => setState(() => _countriesOk = ok),
+            enabled: !_isLoading,
           ),
           const SizedBox(height: 14),
           TextField(
             controller: _namaPTController,
             textCapitalization: TextCapitalization.words,
             textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              labelText: 'Nama PT (opsional)',
-              prefixIcon: Icon(Icons.business_outlined),
+            decoration: InputDecoration(
+              labelText: lang.get('Company Name (optional)', 'Nama PT (opsional)'),
+              prefixIcon: const Icon(Icons.business_outlined),
             ),
           ),
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
             isExpanded: true, // isi memenuhi lebar & pilihan panjang dipotong (tanpa ini meluap di layar 360dp)
             initialValue: _bidangUsaha.isEmpty ? null : _bidangUsaha,
-            decoration: const InputDecoration(
-              labelText: 'Bidang Usaha (opsional)',
-              prefixIcon: Icon(Icons.category_outlined),
+            decoration: InputDecoration(
+              labelText: lang.get('Line of Business (optional)', 'Bidang Usaha (opsional)'),
+              prefixIcon: const Icon(Icons.category_outlined),
             ),
             items: bidangUsahaOptions
                 .map((opt) => DropdownMenuItem(
@@ -219,9 +252,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             TextField(
               controller: _bidangUsahaLainnyaController,
               textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                labelText: 'Sebutkan Bidang Usaha',
-                prefixIcon: Icon(Icons.edit_outlined),
+              decoration: InputDecoration(
+                labelText: lang.get('Specify Line of Business', 'Sebutkan Bidang Usaha'),
+                prefixIcon: const Icon(Icons.edit_outlined),
               ),
             ),
           ],
@@ -243,9 +276,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             keyboardType: TextInputType.phone,
             autofillHints: const [AutofillHints.telephoneNumber],
             textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              labelText: 'Nomor HP',
-              prefixIcon: Icon(Icons.phone_outlined),
+            decoration: InputDecoration(
+              labelText: lang.get('Phone Number', 'Nomor HP'),
+              prefixIcon: const Icon(Icons.phone_outlined),
             ),
             onChanged: (_) => setState(() {}),
           ),
@@ -257,8 +290,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             textInputAction: TextInputAction.next,
             decoration: InputDecoration(
               labelText: 'Password',
-              helperText:
-                  'Minimal 6 karakter, huruf besar, huruf kecil, dan angka',
+              helperText: lang.get(
+                  'At least 6 characters, with uppercase, lowercase and a number',
+                  'Minimal 6 karakter, huruf besar, huruf kecil, dan angka'),
               prefixIcon: const Icon(Icons.lock_outline_rounded),
               suffixIcon: IconButton(
                 icon: Icon(
@@ -284,8 +318,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _handleRegister(),
             decoration: InputDecoration(
-              labelText: 'Konfirmasi Password',
-              errorText: passwordMismatch ? 'Password tidak sama' : null,
+              labelText: lang.get('Confirm Password', 'Konfirmasi Password'),
+              errorText: passwordMismatch
+                  ? lang.get('Passwords do not match', 'Password tidak sama')
+                  : null,
               prefixIcon: const Icon(Icons.lock_reset_rounded),
               suffixIcon: IconButton(
                 icon: Icon(
@@ -319,7 +355,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         color: Colors.white,
                       ),
                     )
-                  : const Text('DAFTAR'),
+                  : Text(lang.get('REGISTER', 'DAFTAR')),
             ),
           ),
           const SizedBox(height: 14),
@@ -328,7 +364,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(
-                'Sudah punya akun? ',
+                lang.get('Already have an account? ', 'Sudah punya akun? '),
                 style: textTheme.bodyMedium?.copyWith(color: AppColors.muted),
               ),
               InkWell(
@@ -338,7 +374,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
                   child: Text(
-                    'Masuk',
+                    lang.get('Log in', 'Masuk'),
                     style: textTheme.bodyMedium?.copyWith(
                       color: AppColors.blue,
                       fontWeight: FontWeight.w600,

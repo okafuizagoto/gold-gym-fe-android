@@ -15,6 +15,8 @@ class LoginResponseModel {
   final String menuDaftarPembeli;
   final String menuModePembeli;
   final bool emailVerified;
+  // Negara akun (kode ISO2, mis. "ID"); kosong untuk akun lama. Menentukan bahasa awal.
+  final String countryIso2;
 
   LoginResponseModel({
     required this.tokenType,
@@ -30,6 +32,7 @@ class LoginResponseModel {
     this.menuDaftarPembeli = 'Y',
     this.menuModePembeli = 'Y',
     this.emailVerified = false,
+    this.countryIso2 = '',
   });
 
   factory LoginResponseModel.fromJson(Map<String, dynamic> json) {
@@ -47,6 +50,7 @@ class LoginResponseModel {
       menuDaftarPembeli: json['metadata']['menu_daftar_pembeli'] ?? 'Y',
       menuModePembeli: json['metadata']['menu_mode_pembeli'] ?? 'Y',
       emailVerified: json['metadata']['email_verified'] == true,
+      countryIso2: (json['metadata']['country_iso2'] ?? '').toString(),
     );
   }
 

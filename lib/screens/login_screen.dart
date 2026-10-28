@@ -14,6 +14,7 @@ import '../config/theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/auth_card.dart';
 import '../utils/seller_outlet_gate.dart';
+import '../utils/language_pref.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -109,8 +110,12 @@ class _LoginScreenState extends State<LoginScreen> {
             loginResponse.emailVerified.toString());
         await Storage.set(AppConstants.forceChangePasswordKey,
             loginResponse.forceChangePassword.toString());
-        await Storage.set(
-            AppConstants.languageKey, AppConstants.defaultLanguage);
+        // Bahasa: pilihan manual di perangkat > bahasa bawaan negara akun > bawaan lama (lihat language_pref.dart).
+        if (mounted) {
+          await context.read<LanguageProvider>().setLanguage(
+              await languageAfterLogin(loginResponse.countryIso2),
+              remember: false);
+        }
         if (rawCookie != null) {
           final cookie = rawCookie.split(';').first;
           await Storage.set('refresh_cookie', cookie);

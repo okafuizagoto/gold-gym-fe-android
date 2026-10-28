@@ -8,6 +8,8 @@ class AppConstants {
   static const String userNIPKey = 'userNIP';
   static const String userEmail = 'userEmail';
   static const String languageKey = 'language';
+  /// Pilihan bahasa MANUAL pengguna (tombol ID/EN); tetap ada setelah logout dan mengalahkan bahasa bawaan negara.
+  static const String languagePrefKey = 'language_pref';
   static const String accessListKey = 'access_list';
   static const String customMenusKey = 'user_custom_menus';
   // Harus sama dengan key yang ditulis outlet_screen ('outcode'); dulu 'out_code'
