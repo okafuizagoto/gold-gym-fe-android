@@ -119,7 +119,7 @@ class _CashMoveScreenState extends State<CashMoveScreen> {
 
   Widget _row(CashMove m) {
     final incoming = cashMoveIsIncoming(m.kind);
-    final color = incoming ? Colors.green.shade700 : Colors.red.shade700;
+    final color = incoming ? Colors.blue.shade700 : Colors.red.shade700;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
