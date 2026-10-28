@@ -6,6 +6,7 @@ import '../providers/language_provider.dart';
 import '../services/core_api.dart';
 import '../utils/bidang_usaha.dart';
 import '../utils/constants.dart';
+import '../utils/countries.dart';
 import '../utils/language_pref.dart';
 import '../utils/password_strength.dart';
 import '../utils/toast.dart';
@@ -37,9 +38,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isLoading = false;
   String _role = AppConstants.roleBuyer;
   String _bidangUsaha = '';
-  // Negara akun (kode ISO2). Awalnya dari lokal perangkat (id_ID -> ID); wajib dipilih kecuali daftar negara gagal dimuat.
+  // Negara akun (kode ISO2). Awalnya dari lokal perangkat (id_ID -> ID); wajib dipilih.
   String _countryIso2 = '';
-  bool _countriesOk = true;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   // BOTH (default) / BUYER_ONLY / SELLER_ONLY — diatur admin lewat menu
@@ -51,7 +51,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void initState() {
     super.initState();
     _loadRegistrationMode();
-    _countryIso2 = (WidgetsBinding.instance.platformDispatcher.locale.countryCode ?? '').toUpperCase();
+    final cc = (WidgetsBinding.instance.platformDispatcher.locale.countryCode ?? '').toUpperCase();
+    _countryIso2 = countryOptions.any((c) => c.iso2 == cc) ? cc : '';
   }
 
   /// Bahasa form mengikuti negara (Indonesia -> Indonesia, lainnya -> Inggris), KECUALI pengguna sudah memilih
@@ -93,7 +94,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   bool get _canSubmit {
-    return (!_countriesOk || _countryIso2.isNotEmpty) &&
+    return _countryIso2.isNotEmpty &&
         _namaController.text.isNotEmpty &&
         _emailController.text.contains('@') &&
         evaluatePassword(_passwordController.text).valid &&
@@ -219,7 +220,6 @@ lang.get('Registration successful. We sent a verification link to your email. Pl
           CountryAutocomplete(
             value: _countryIso2,
             onChanged: _onCountryChanged,
-            onLoaded: (ok) => setState(() => _countriesOk = ok),
             enabled: !_isLoading,
           ),
           const SizedBox(height: 14),
