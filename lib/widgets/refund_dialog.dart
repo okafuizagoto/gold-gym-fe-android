@@ -286,7 +286,13 @@ class _RefundDialogState extends State<_RefundDialog> {
           DropdownButtonFormField<String>(
             initialValue: _method,
             decoration: InputDecoration(
-                labelText: lang.get('Money returned via', 'Uang dikembalikan lewat')),
+                labelText: lang.get('Money returned via', 'Uang dikembalikan lewat'),
+                helperMaxLines: 2,
+                helperText: _method == 'TUNAI'
+                    ? lang.get('Cash: taken from the cash drawer and recorded in Cash History.',
+                        'Tunai: diambil dari laci kas dan tercatat di Kas History.')
+                    : lang.get('Not cash: the drawer cash is not reduced; transfer the money to the customer.',
+                        'Non-tunai: kas laci tidak berkurang; kirim uangnya ke pelanggan lewat transfer.')),
             items: refundMethods
                 .map((m) => DropdownMenuItem(value: m, child: Text(m)))
                 .toList(),

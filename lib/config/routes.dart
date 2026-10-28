@@ -66,6 +66,7 @@ import '../screens/forgot_password_screen.dart';
 import '../screens/pos_queue_screen.dart';
 import '../screens/my_queue_screen.dart';
 import '../screens/refund_history_screen.dart';
+import '../screens/cash_history_screen.dart';
 
 class AppRoutes {
   static const String home = '/';
@@ -125,6 +126,7 @@ class AppRoutes {
   static const String absenStaff = '/absen-staff';
   static const String lokasiKantor = '/lokasi-kantor';
   static const String riwayatRefund = '/riwayat-refund';
+  static const String kasHistory = '/kas-history';
   static const String absen = '/absen';
   static const String checkEmail = '/check-email';
   static const String gantiPassword = '/ganti-password';
@@ -197,6 +199,7 @@ class AppRoutes {
         absenStaff: (context) => const StaffAttendanceScreen(),
         lokasiKantor: (context) => const OfficeLocationScreen(),
         riwayatRefund: (context) => const RefundHistoryScreen(),
+        kasHistory: (context) => const CashHistoryScreen(),
         absen: (context) => const StaffClockScreen(),
         checkEmail: (context) => const CheckEmailScreen(),
         gantiPassword: (context) => const ChangePasswordScreen(),

@@ -184,6 +184,13 @@ class _AppDrawerState extends State<AppDrawer> {
           icon: Icons.replay_rounded,
           route: '/riwayat-refund',
         ),
+      // Kas History (2026-10-28): buku kas harian; penjual dan staff yang diizinkan (menu_key "/kas-history").
+      if (!buyerView && !isAdmin && (isSeller || isStaff))
+        MenuItem(
+          title: 'Kas History',
+          icon: Icons.account_balance_wallet_rounded,
+          route: '/kas-history',
+        ),
       // PENJUAL (retail & therapy): satu menu laporan penjualan; per hari /
       // minggu / bulan dipilih lewat TAB di dalam layarnya.
       if (!buyerView && (isSeller || isStaff))

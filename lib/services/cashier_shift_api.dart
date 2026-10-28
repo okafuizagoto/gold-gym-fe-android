@@ -27,6 +27,12 @@ class CashierShiftApi extends ApiClient {
     });
   }
 
+  /// GET /ledger: buku kas satu hari (Kas History). date "YYYY-MM-DD".
+  Future<http.Response> ledger(String outcode, String date) {
+    return _client.get('/gold-gym/v2/cashier-shift/ledger',
+        queryParams: {'code': outcode, 'date': date});
+  }
+
   /// POST /open: buka sesi kasir baru dengan modal awal.
   Future<http.Response> open(String outcode, double openingCash) {
     return _client.post('/gold-gym/v2/cashier-shift/open', {

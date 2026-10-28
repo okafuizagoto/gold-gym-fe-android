@@ -7,6 +7,7 @@ void main() {
     final keys = StaffMenuKeys.options.map((o) => o.key).toList();
     expect(keys, contains('/lokasi-kantor'));
     expect(keys, contains('/riwayat-refund'));
+    expect(keys, contains('/kas-history'));
     expect(keys.toSet().length, keys.length);
   });
 }
