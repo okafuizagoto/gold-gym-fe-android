@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/customer_api.dart';
+import '../services/customer_type_api.dart';
 import '../utils/constants.dart';
 import '../utils/responsive.dart';
 import '../utils/storage.dart';
@@ -23,7 +24,10 @@ class CustomerListScreen extends StatefulWidget {
 
 class _CustomerListScreenState extends State<CustomerListScreen> {
   final _api = CustomerApi();
+  final _typeApi = CustomerTypeApi();
   List<Map<String, dynamic>> _customers = [];
+  // Tipe Pelanggan outlet (opsional, tag saat menambah customer) -- padanan pages/daftar-customer di web.
+  List<Map<String, dynamic>> _types = [];
   bool _loading = true;
   String _outcode = '';
 
@@ -35,7 +39,29 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
   Future<void> _init() async {
     _outcode = await Storage.get(AppConstants.outcode) ?? '';
-    await _load();
+    await Future.wait([_load(), _loadTypes()]);
+  }
+
+  Future<void> _loadTypes() async {
+    try {
+      final r = await _typeApi.getAll(_outcode);
+      if (r.statusCode == 200) {
+        final list = (jsonDecode(r.body)['data'] ?? []) as List;
+        _types = list.map((e) => Map<String, dynamic>.from(e)).toList();
+        if (mounted) setState(() {});
+      }
+    } catch (_) {
+      /* tipe bersifat opsional: abaikan bila gagal dimuat */
+    }
+  }
+
+  String _typeName(dynamic id) {
+    final n = int.tryParse('$id') ?? 0;
+    if (n == 0) return '';
+    for (final t in _types) {
+      if (int.tryParse('${t['ct_id']}') == n) return '${t['ct_name'] ?? ''}';
+    }
+    return '';
   }
 
   Future<void> _load() async {
@@ -58,9 +84,11 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     final tokoC = TextEditingController();
     final phoneC = TextEditingController();
     final addrC = TextEditingController();
+    int typeId = 0; // 0 = tanpa tipe
     final ok = await showDialog<bool>(
       context: context,
-      builder: (dc) => AlertDialog(
+      builder: (dc) => StatefulBuilder(
+        builder: (dc, setD) => AlertDialog(
         title: const Text('Tambah Customer'),
         insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
         content: SizedBox(
@@ -104,6 +132,24 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                     prefixIcon: Icon(Icons.place_outlined),
                   ),
                 ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int>(
+                  initialValue: typeId,
+                  decoration: const InputDecoration(
+                    labelText: 'Tipe Pelanggan',
+                    helperText: 'Opsional -- kelola daftar tipe di menu Tipe Pelanggan',
+                    helperMaxLines: 2,
+                    prefixIcon: Icon(Icons.label_outline_rounded),
+                  ),
+                  items: [
+                    const DropdownMenuItem(value: 0, child: Text('Tanpa tipe')),
+                    for (final t in _types)
+                      DropdownMenuItem(
+                          value: int.tryParse('${t['ct_id']}') ?? 0,
+                          child: Text('${t['ct_name'] ?? ''}')),
+                  ],
+                  onChanged: (v) => setD(() => typeId = v ?? 0),
+                ),
               ],
             ),
           ),
@@ -117,13 +163,14 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
               child: const Text('Simpan')),
         ],
       ),
+      ),
     );
     if (ok != true) return;
     if (nameC.text.trim().isEmpty) {
       if (mounted) Toast.error(context, 'Nama customer wajib diisi');
       return;
     }
-    final cust = _custMap(nameC.text, tokoC.text, phoneC.text, addrC.text);
+    final cust = _custMap(nameC.text, tokoC.text, phoneC.text, addrC.text, typeId: typeId);
     try {
       final resp = await _api.insertCustomer([cust]);
       if (resp.statusCode == 200 || resp.statusCode == 201) {
@@ -225,8 +272,10 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   }
 
   Map<String, dynamic> _custMap(
-      String name, String toko, String phone, String addr) {
+      String name, String toko, String phone, String addr,
+      {int typeId = 0}) {
     return {
+      if (typeId > 0) "cust_type_id": typeId,
       "cust_outcode": _outcode,
       "cust_name": name.trim(),
       "cust_outlet_name": toko.trim(),
@@ -321,6 +370,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                               if (phone.isNotEmpty) phone,
                             ].join(' • '),
                             code: code,
+                            typeName: _typeName(c['cust_type_id']),
                           );
                         },
                       ),
@@ -335,11 +385,13 @@ class _CustomerTile extends StatelessWidget {
   final String name;
   final String subtitle;
   final String code;
+  final String typeName;
 
   const _CustomerTile({
     required this.name,
     required this.subtitle,
     required this.code,
+    this.typeName = '',
   });
 
   @override
@@ -372,11 +424,34 @@ class _CustomerTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.titleSmall),
-                  if (subtitle.isNotEmpty)
-                    Text(subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodySmall),
+                  if (subtitle.isNotEmpty || typeName.isNotEmpty)
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(subtitle.isEmpty ? '-' : subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.bodySmall),
+                        ),
+                        if (typeName.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: AppColors.blueLight,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(typeName,
+                                maxLines: 1,
+                                style: const TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.blueDark)),
+                          ),
+                        ],
+                      ],
+                    ),
                 ],
               ),
             ),
