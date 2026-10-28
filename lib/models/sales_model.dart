@@ -72,7 +72,8 @@ class SaleHistoryModel {
       saleTranstime: json['sale_transtime'] ?? '',
       saleTransdate: json['sale_transdate'] == null
           ? null
-          : DateTime.tryParse(json['sale_transdate']),
+          // toLocal: JSON membawa zona (+07:00); tanpa ini nota tengah malam tampil mundur sehari (bug 27-10 vs 28-10).
+          : DateTime.tryParse(json['sale_transdate'])?.toLocal(),
       saleTranstotal: _toDouble(json['sale_transtotal']),
       saleTranspayment: _toDouble(json['sale_transpayment']),
       saleTranschange: _toDouble(json['sale_transchange']),
