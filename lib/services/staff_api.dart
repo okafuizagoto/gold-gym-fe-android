@@ -12,13 +12,21 @@ class StaffApi extends ApiClient {
     required String email,
     required String password,
     required String nomorHp,
+    List<String>? deniedMenuKeys,
   }) {
     return _client.post("/gold-gym/v2/staff?type=register", {
       "gold_nama": nama,
       "gold_email": email,
       "gold_password": password,
       "gold_nomorhp": nomorHp,
+      // Pilihan centang akses menu (juga disimpan server sebagai template staff berikutnya).
+      if (deniedMenuKeys != null) "denied_menu_keys": deniedMenuKeys,
     });
+  }
+
+  /// Menu yang DITOLAK untuk staff baru: template terakhir penjual, atau default (menu sensitif ditolak).
+  Future<http.Response> getMenuTemplate() {
+    return _client.get("/gold-gym/v2/staff", queryParams: {"type": "menutemplate"});
   }
 
   Future<http.Response> list() {

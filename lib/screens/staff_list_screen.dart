@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../utils/password_generator.dart';
 import '../utils/password_strength.dart';
 import '../utils/responsive.dart';
+import '../utils/staff_menu_keys.dart';
 import '../utils/toast.dart';
 import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
@@ -55,6 +56,18 @@ class _StaffListScreenState extends State<StaffListScreen> {
     final hpC = TextEditingController();
     final passC = TextEditingController();
     bool obscure = true;
+
+    // Menu yang DITOLAK untuk staff baru (centang = boleh). Awal dari template server; pilihan disimpan server
+    // sebagai template pendaftaran staff berikutnya.
+    final denied = <String>{};
+    try {
+      final tr = await _api.getMenuTemplate();
+      if (tr.statusCode == 200) {
+        final keys = (jsonDecode(tr.body)['data']?['denied_menu_keys']) as List?;
+        if (keys != null) denied.addAll(keys.map((e) => e.toString()));
+      }
+    } catch (_) {}
+    if (!mounted) return;
 
     final ok = await showDialog<bool>(
       context: context,
@@ -147,12 +160,33 @@ class _StaffListScreenState extends State<StaffListScreen> {
                   PasswordStrengthBar(password: passC.text),
                   const SizedBox(height: 8),
                   const Text(
-                    'Tautan verifikasi akan dikirim ke email staff; pastikan email aktif dan bisa dibuka staff. '
-                    'Akses awal staff: Dashboard, Booking Terapi, Point of Sale, '
-                    'Pesanan Masuk, Sales History, dan Kelola Meja. '
-                    'Tambahkan menu lain lewat Akses Staff.',
+                    'Tautan verifikasi akan dikirim ke email staff; pastikan email aktif dan bisa dibuka staff.',
                     style: TextStyle(fontSize: 12, color: Colors.black54),
                   ),
+                  const SizedBox(height: 12),
+                  const Text('Menu yang boleh diakses staff',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Menu sensitif (refund, kas, tarik kas, outlet, lokasi kantor, meja & area) tidak dicentang secara default. '
+                    'Pilihan Anda diingat untuk pendaftaran staff berikutnya dan bisa diubah kapan saja lewat Akses Staff.',
+                    style: TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+                  for (final opt in StaffMenuKeys.options)
+                    CheckboxListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: Text(opt.label, style: const TextStyle(fontSize: 13)),
+                      value: !denied.contains(opt.key),
+                      onChanged: (v) => setDialogState(() {
+                        if (v == true) {
+                          denied.remove(opt.key);
+                        } else {
+                          denied.add(opt.key);
+                        }
+                      }),
+                    ),
                 ],
               ),
             ),
@@ -185,6 +219,10 @@ class _StaffListScreenState extends State<StaffListScreen> {
         email: emailC.text.trim(),
         password: passC.text,
         nomorHp: hpC.text.trim(),
+        deniedMenuKeys: StaffMenuKeys.options
+            .map((o) => o.key)
+            .where(denied.contains)
+            .toList(),
       );
       if (resp.statusCode == 200 || resp.statusCode == 201) {
         if (mounted) {
