@@ -13,6 +13,7 @@ import '../utils/toast.dart';
 import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/private_route.dart';
+import '../widgets/tour_target.dart';
 
 /// Tarik Kas (incoming=false, uang KELUAR laci) dan Tambah Kas (incoming=true, uang MASUK laci) -- padanan
 /// pages/tarik-kas dan pages/tambah-kas di web. Pencatat diambil server dari akun yang login; catatan tidak bisa
@@ -197,14 +198,17 @@ class _CashMoveScreenState extends State<CashMoveScreen> {
                                 ? 'mis. modal tambahan dari pemilik'
                                 : 'mis. kas membengkak, disetor ke bank BCA'),
                       ),
-                      ElevatedButton(
-                        onPressed: _saving ? null : _save,
-                        child: _saving
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Text('CATAT'),
+                      TourTarget(
+                        id: 'cash-move-save',
+                        child: ElevatedButton(
+                          onPressed: _saving ? null : _save,
+                          child: _saving
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Text('CATAT'),
+                        ),
                       ),
                       const SizedBox(height: 6),
                       const Text(

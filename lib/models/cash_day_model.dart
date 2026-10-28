@@ -39,6 +39,11 @@ class CashMovement {
 
 /// Selisih serah-terima saat sebuah sesi dibuka (kas akhir sesi sebelumnya vs uang awal), lengkap dengan alasan + penulisnya.
 class HandoffNote {
+  final int shiftId;
+  final String? verifyStatus; // RESOLVED | ACCEPTED | null (belum diverifikasi)
+  final String verifyNote;
+  final String verifyBy;
+  final String verifyAt;
   final double diff;
   final double? gapNet;
   final double prevCounted;
@@ -48,6 +53,11 @@ class HandoffNote {
   final String by;
 
   HandoffNote({
+    required this.shiftId,
+    required this.verifyStatus,
+    required this.verifyNote,
+    required this.verifyBy,
+    required this.verifyAt,
     required this.diff,
     required this.gapNet,
     required this.prevCounted,
@@ -57,7 +67,14 @@ class HandoffNote {
     required this.by,
   });
 
+  bool get verified => verifyStatus != null;
+
   factory HandoffNote.fromShift(Map<String, dynamic> j) => HandoffNote(
+        shiftId: _n(j['shift_id']).toInt(),
+        verifyStatus: j['verify_status'] == null ? null : '${j['verify_status']}',
+        verifyNote: '${j['verify_note'] ?? ''}',
+        verifyBy: '${j['verify_by'] ?? ''}',
+        verifyAt: '${j['verify_at'] ?? ''}',
         diff: _n(j['handoff_diff']),
         gapNet: j['handoff_gap_net'] == null ? null : _n(j['handoff_gap_net']),
         prevCounted: _n(j['handoff_prev_counted']),

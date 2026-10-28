@@ -14,6 +14,7 @@ import '../widgets/app_bar_custom.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
+import '../widgets/tour_target.dart';
 
 /// Kas History (2026-10-28) -- padanan pages/kas-history/index.tsx di web. Buku kas harian outlet aktif:
 /// modal awal, uang tunai dari penjualan (bagian tunai nota campur sudah dipotong kembalian), refund tunai dan
@@ -30,6 +31,7 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
   DateTime _date = DateTime.now();
   CashDay? _day;
   bool _loading = true;
+  bool _isSeller = true;
 
   String get _dateStr =>
       '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}';
@@ -37,7 +39,67 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
   @override
   void initState() {
     super.initState();
+    Storage.get(AppConstants.userRoleKey).then((r) {
+      if (mounted) {
+        setState(() => _isSeller = (r ?? AppConstants.roleSeller) == AppConstants.roleSeller);
+      }
+    });
     _load();
+  }
+
+  Future<void> _verify(HandoffNote h) async {
+    final noteC = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dc) => AlertDialog(
+        title: const Text('Verifikasi selisih serah-terima'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                  'Verifikasi hanya jika Anda sudah merasa oke. Jika selisih belum ditutup catatan Tarik/Tambah Kas, statusnya "diterima apa adanya"; '
+                  'jika sudah ditutup, statusnya "terselesaikan". Catatan wajib diisi pada kedua kasus, dan tidak bisa diubah setelahnya.',
+                  style: TextStyle(fontSize: 13)),
+              const SizedBox(height: 10),
+              TextField(
+                controller: noteC,
+                maxLength: 255,
+                autofocus: true,
+                decoration: const InputDecoration(
+                    labelText: 'Catatan verifikasi (wajib)',
+                    hintText: 'mis. uang sudah dikembalikan / diterima, dipakai beli perlengkapan'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dc, false), child: const Text('Batal')),
+          ElevatedButton(onPressed: () => Navigator.pop(dc, true), child: const Text('Verifikasi')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    if (noteC.text.trim().length < 3) {
+      if (mounted) Toast.error(context, 'Tulis catatan verifikasi terlebih dahulu');
+      return;
+    }
+    try {
+      final r = await _api.verifyHandoff(h.shiftId, noteC.text.trim());
+      if (r.statusCode == 200) {
+        if (mounted) Toast.success(context, 'Selisih diverifikasi');
+        await _load();
+      } else {
+        String msg = 'Gagal memverifikasi';
+        try {
+          msg = jsonDecode(r.body)['error'] ?? msg;
+        } catch (_) {}
+        if (mounted) Toast.error(context, msg);
+      }
+    } catch (e) {
+      if (mounted) Toast.error(context, 'Gagal: $e');
+    }
   }
 
   Future<void> _load() async {
@@ -109,6 +171,12 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
       case 'HANDOFF_OK':
         return (lang.get('Handover OK ✓', 'Serah-terima SESUAI ✓'), Colors.green.shade700);
       case 'HANDOFF_DIFF':
+        if (flag == 'VERIFIED_RESOLVED') {
+          return (lang.get('Handover difference · VERIFIED ✓ resolved', 'Selisih serah-terima · TERVERIFIKASI ✓ terselesaikan'), Colors.green.shade700);
+        }
+        if (flag == 'VERIFIED_ACCEPTED') {
+          return (lang.get('Handover difference · VERIFIED ✓ accepted', 'Selisih serah-terima · TERVERIFIKASI ✓ diterima'), Colors.blue.shade700);
+        }
         return flag == 'PARTIAL'
             ? (lang.get('Handover difference (partial)', 'Selisih serah-terima (sebagian)'), Colors.amber.shade800)
             : (lang.get('Handover difference', 'Selisih serah-terima'), Colors.red.shade700);
@@ -206,7 +274,9 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
                     title: lang.get('Could not load cash history.',
                         'Kas history tidak bisa dimuat.'))
               else ...[
-                GridView.count(
+                TourTarget(
+                  id: 'kas-history-main',
+                  child: GridView.count(
                   crossAxisCount: 2,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -221,6 +291,7 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
                         color: day.cashRefunds > 0 ? Colors.red.shade700 : null),
                     _stat(lang.get('Expected cash', 'Kas seharusnya'), day.expected),
                   ],
+                ),
                 ),
                 if (day.cashIn > 0 || day.cashOut > 0) ...[
                   const SizedBox(height: 8),
@@ -240,6 +311,7 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
                     _chip(lang.get('Add cash (recorded)', 'Tambah Kas (tercatat)'), Colors.blue.shade700),
                     _chip(lang.get('Handover difference: CHECK', 'Selisih serah-terima: PERLU DICEK'), Colors.red.shade700),
                     _chip(lang.get('Handover OK', 'Serah-terima sesuai'), Colors.green.shade700, outlined: true),
+                    _chip(lang.get('Difference verified by owner ✓', 'Selisih terverifikasi penjual ✓'), Colors.green.shade700),
                   ],
                 ),
                 for (final h in day.handoffs.where((h) => h.diff != 0)) ...[
@@ -249,9 +321,11 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
                         borderRadius: BorderRadius.circular(12),
                         side: BorderSide(
                             width: 2,
-                            color: (h.gapNet ?? 0) != 0
-                                ? Colors.amber.shade800
-                                : Colors.red.shade700)),
+                            color: h.verified
+                                ? Colors.green.shade700
+                                : (h.gapNet ?? 0) != 0
+                                    ? Colors.amber.shade800
+                                    : Colors.red.shade700)),
                     child: Padding(
                       padding: const EdgeInsets.all(12),
                       child: Column(
@@ -261,13 +335,19 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
                             spacing: 8,
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              _chip(
-                                  (h.gapNet ?? 0) != 0
-                                      ? lang.get('PARTIAL', 'SEBAGIAN')
-                                      : lang.get('CHECK', 'PERLU DICEK'),
-                                  (h.gapNet ?? 0) != 0
-                                      ? Colors.amber.shade800
-                                      : Colors.red.shade700),
+                              h.verified
+                                  ? _chip(
+                                      h.verifyStatus == 'RESOLVED'
+                                          ? lang.get('VERIFIED ✓ resolved', 'TERVERIFIKASI ✓ terselesaikan')
+                                          : lang.get('VERIFIED ✓ accepted as is', 'TERVERIFIKASI ✓ diterima apa adanya'),
+                                      Colors.green.shade700)
+                                  : _chip(
+                                      (h.gapNet ?? 0) != 0
+                                          ? lang.get('PARTIAL', 'SEBAGIAN')
+                                          : lang.get('CHECK', 'PERLU DICEK'),
+                                      (h.gapNet ?? 0) != 0
+                                          ? Colors.amber.shade800
+                                          : Colors.red.shade700),
                               Text(
                                   '${lang.get('Handover difference', 'Selisih serah-terima')}: ${h.diff > 0 ? '+' : ''}${TextFormatter.formatRupiah(h.diff)}',
                                   style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -277,8 +357,21 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
                               '${lang.get('Previous close', 'Kas akhir sebelumnya')} ${TextFormatter.formatRupiah(h.prevCounted)} → ${lang.get('expected', 'seharusnya')} ${TextFormatter.formatRupiah(h.expected)} → ${lang.get('opened with', 'dibuka dengan')} ${TextFormatter.formatRupiah(h.opening)}'
                               '${(h.gapNet ?? 0) == 0 ? ' · ${h.diff < 0 ? lang.get('no Withdraw Cash record', 'tidak ada catatan Tarik Kas') : lang.get('no Add Cash record', 'tidak ada catatan Tambah Kas')}' : ''}'),
                           Text(
-                              '${lang.get("Cashier's explanation (not verified)", 'Penjelasan kasir (belum terverifikasi)')}: “${h.reason}” — ${h.by}',
+                              '${h.verified ? lang.get("Cashier's explanation", 'Penjelasan kasir') : lang.get("Cashier's explanation (not verified)", 'Penjelasan kasir (belum terverifikasi)')}: “${h.reason}” — ${h.by}',
                               style: const TextStyle(color: AppColors.muted)),
+                          if (h.verified)
+                            Text(
+                                '✓ ${lang.get('Verified by', 'Diverifikasi oleh')} ${h.verifyBy} · ${h.verifyAt.length >= 16 ? h.verifyAt.substring(0, 16).replaceFirst('T', ' ') : h.verifyAt}: “${h.verifyNote}”',
+                                style: TextStyle(
+                                    color: Colors.green.shade700,
+                                    fontWeight: FontWeight.w600)),
+                          if (!h.verified && _isSeller)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: OutlinedButton(
+                                  onPressed: () => _verify(h),
+                                  child: Text(lang.get('Verify', 'Verifikasi'))),
+                            ),
                         ],
                       ),
                     ),

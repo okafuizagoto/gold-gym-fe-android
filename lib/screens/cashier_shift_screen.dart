@@ -372,7 +372,8 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
                                       subtitle: Text(
                                           'Modal: ${formatRupiah(_toDouble(h['shift_opening_cash']).round())}'
                                           '${closed ? ' • Selisih: ${diff! >= 0 ? '+' : ''}${formatRupiah(diff.round())}' : ''}'
-                                          '${h['handoff_diff'] != null && _toDouble(h['handoff_diff']) != 0 ? '\nSelisih serah-terima ${_toDouble(h['handoff_diff']) > 0 ? '+' : ''}${formatRupiah(_toDouble(h['handoff_diff']).round())}${(h['handoff_gap_net'] != null && _toDouble(h['handoff_gap_net']) == 0) ? (_toDouble(h['handoff_diff']) < 0 ? ' (belum ada catatan Tarik Kas)' : ' (belum ada catatan Tambah Kas)') : ''}, alasan selisih: "${h['handoff_reason']}" — ${h['handoff_by']}' : ''}'),
+                                          '${h['handoff_diff'] != null && _toDouble(h['handoff_diff']) != 0 ? '\nSelisih serah-terima ${_toDouble(h['handoff_diff']) > 0 ? '+' : ''}${formatRupiah(_toDouble(h['handoff_diff']).round())}${(h['handoff_gap_net'] != null && _toDouble(h['handoff_gap_net']) == 0) ? (_toDouble(h['handoff_diff']) < 0 ? ' (belum ada catatan Tarik Kas)' : ' (belum ada catatan Tambah Kas)') : ''}, alasan selisih: "${h['handoff_reason']}" — ${h['handoff_by']}'
+                                          '${h['verify_status'] != null ? ' · TERVERIFIKASI ✓ ${h['verify_status'] == 'RESOLVED' ? 'terselesaikan' : 'diterima apa adanya'} oleh ${h['verify_by']}: "${h['verify_note']}"' : ' · belum terverifikasi penjual'}' : ''}'),
                                       trailing: closed && diff != 0
                                           ? Icon(Icons.warning_amber_rounded,
                                               color: AppColors.warningDark,

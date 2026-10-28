@@ -153,8 +153,38 @@ List<OnboardingStep> onboardingStepsFor(
       OnboardingStep.page(
           '/cashier-shift',
           'shift-main',
-          t('OPEN CASHIER SESSION: enter the starting cash. At the end of the day tap the same button to close and reconcile.',
-              'BUKA SESI KASIR: isi modal awal. Di akhir hari ketuk tombol yang sama untuk menutup dan rekonsiliasi kas.')),
+          t('OPEN CASHIER SESSION: enter the starting cash. The app compares it with the previous session\'s closing cash; if it differs, you must write a reason (your name is recorded). At the end of the day tap the same button to close and reconcile.',
+              'BUKA SESI KASIR: isi modal awal. Aplikasi membandingkannya dengan kas akhir sesi sebelumnya; jika berbeda, Anda wajib menulis alasannya (nama Anda tercatat). Di akhir hari ketuk tombol yang sama untuk menutup dan rekonsiliasi kas.')),
+      OnboardingStep.menu(
+          'Kas History',
+          '/kas-history',
+          t('The daily cash book: every cash sale, refund, Withdraw/Add Cash and handover check, in time order. Tap Next to open it.',
+              'Buku kas harian: semua penjualan tunai, refund, Tarik/Tambah Kas, dan cek serah-terima, urut waktu. Ketuk Lanjut untuk membukanya.')),
+      OnboardingStep.page(
+          '/kas-history',
+          'kas-history-main',
+          t('Colour guide: orange = Withdraw Cash, blue = Add Cash, red = handover difference that needs checking, green = handover OK or verified. The owner can VERIFY a difference (a note is required).',
+              'Panduan warna: oranye = Tarik Kas, biru = Tambah Kas, merah = selisih serah-terima yang perlu dicek, hijau = serah-terima sesuai atau sudah terverifikasi. Penjual bisa MEMVERIFIKASI selisih (catatan wajib).')),
+      OnboardingStep.menu(
+          'Tarik Kas',
+          '/tarik-kas',
+          t('Record money taken OUT of the drawer (owner withdrawal, bank deposit, expense) with a reason. Tap Next to open it.',
+              'Catat uang yang KELUAR dari laci (tarik owner, setor bank, pengeluaran) beserta alasannya. Ketuk Lanjut untuk membukanya.')),
+      OnboardingStep.page(
+          '/tarik-kas',
+          'cash-move-save',
+          t('Choose the type, enter the amount and the reason, then RECORD. Your name and the time are saved automatically and the record cannot be edited.',
+              'Pilih jenis, isi jumlah dan alasan, lalu CATAT. Nama dan jam Anda tersimpan otomatis dan catatan tidak bisa diubah.')),
+      OnboardingStep.menu(
+          'Tambah Kas',
+          '/tambah-kas',
+          t('Record money put INTO the drawer (extra capital, other cash in) with a reason. Tap Next to open it.',
+              'Catat uang yang MASUK ke laci (tambah modal, kas masuk lainnya) beserta alasannya. Ketuk Lanjut untuk membukanya.')),
+      OnboardingStep.page(
+          '/tambah-kas',
+          'cash-move-save',
+          t('Enter the amount and the reason, then RECORD. It appears in Cash History as Add Cash.',
+              'Isi jumlah dan alasan, lalu CATAT. Tampil di Kas History sebagai Tambah Kas.')),
       OnboardingStep.menu(
           'Point of Sale',
           '/penjualan',

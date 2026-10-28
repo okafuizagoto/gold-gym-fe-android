@@ -49,6 +49,12 @@ class CashierShiftApi extends ApiClient {
     });
   }
 
+  /// POST /verify-handoff: penjual memverifikasi selisih serah-terima sebuah sesi (catatan wajib; sekali, tidak bisa diubah).
+  Future<http.Response> verifyHandoff(int shiftId, String note) {
+    return _client.post('/gold-gym/v2/cashier-shift/verify-handoff',
+        {'shift_id': shiftId, 'note': note});
+  }
+
   /// POST /cash-move: catat Tarik Kas (penjual / staff yang diizinkan).
   Future<http.Response> addCashMove(
       String outcode, String kind, double amount, String reason) {
