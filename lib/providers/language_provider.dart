@@ -9,9 +9,11 @@ class LanguageProvider with ChangeNotifier {
   bool get isIndonesian => _language == 'ID';
 
   Future<void> loadLanguage() async {
-    final savedLang = await Storage.get('language');
-    if (savedLang != null) {
-      _language = savedLang;
+    // Setelah logout 'language' terhapus tapi pilihan manual pengguna ('language_pref') tetap ada -- pakai itu.
+    final savedLang =
+        await Storage.get('language') ?? await Storage.get('language_pref');
+    if (savedLang == 'EN' || savedLang == 'ID') {
+      _language = savedLang!;
       notifyListeners();
     }
   }
