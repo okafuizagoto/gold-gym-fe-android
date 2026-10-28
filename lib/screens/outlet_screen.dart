@@ -183,7 +183,7 @@ class _OutletScreenState extends State<OutletScreen> {
             TourTarget(id: 'outlet-confirm', child: SizedBox(
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: _handleOutlet,
+                onPressed: _types.isEmpty ? null : _handleOutlet, // belum ada outlet: hanya NEW OUTLET dan LOGOUT yang aktif
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.successDark,
                 ),
@@ -195,7 +195,7 @@ class _OutletScreenState extends State<OutletScreen> {
             TourTarget(id: 'outlet-list', child: SizedBox(
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: _handleListOutlet,
+                onPressed: _types.isEmpty ? null : _handleListOutlet,
                 icon: const Icon(Icons.list_alt_rounded, size: 20),
                 label: const Text('LIST OUTLET'),
               ),

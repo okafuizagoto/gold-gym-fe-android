@@ -13,6 +13,7 @@ import '../config/env.dart';
 import '../config/theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/auth_card.dart';
+import '../utils/seller_outlet_gate.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -156,6 +157,11 @@ class _LoginScreenState extends State<LoginScreen> {
               ? '/pilih-outlet'
               : '/belanja';
         } else if (loginResponse.role == AppConstants.roleAdmin) {
+          dest = '/';
+        } else if (loginResponse.role == AppConstants.roleSeller &&
+            await SellerOutletGate.sellerNeedsTourFirst()) {
+          // Penjual baru tanpa outlet: panduan pertama jalan DULU (dengan outlet dummy), baru wajib buat
+          // outlet -- padanan alur web. Layar Dashboard cukup untuk memicu panduan.
           dest = '/';
         }
 

@@ -54,6 +54,18 @@ class OutletsApi extends ApiClient {
     );
   }
 
+  /// POST ?type=dummyensure -- siapkan outlet dummy panduan (hanya penjual yang belum punya outlet asli; idempoten).
+  Future<http.Response> ensureDummyOutlet() async {
+    final ApiClient client = ApiClient();
+    return client.post("/gold-gym/v2/outlet?type=dummyensure", {});
+  }
+
+  /// DELETE ?type=dummyclear -- hapus outlet dummy panduan milik penjual (idempoten).
+  Future<http.Response> clearDummyOutlet() async {
+    final ApiClient client = ApiClient();
+    return client.delete("/gold-gym/v2/outlet?type=dummyclear");
+  }
+
   // // GET /gold-gym/v2/userdata?type=getonestock&stockcode=XXX
   // Future<http.Response> getAllItems(
   //     String name, int page, int length) async {

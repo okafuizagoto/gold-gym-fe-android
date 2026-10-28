@@ -9,6 +9,7 @@ import '../utils/responsive.dart';
 import '../utils/storage.dart';
 import 'onboarding_tour.dart';
 import '../services/play_integrity.dart';
+import '../utils/seller_outlet_gate.dart';
 
 /// Bilah atas (web: Navbar): outlet aktif / mode pembeli, toggle bahasa
 /// EN/ID, avatar inisial dengan menu (nama, email, role, logout).
@@ -56,7 +57,10 @@ class _AppBarCustomState extends State<AppBarCustom> {
     // Panduan tooltip pertama kali per role (2026-10-22) -- AppBarCustom ada di
     // semua layar ber-drawer, jadi cukup dipicu dari sini (cek sekali per role).
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) OnboardingTour.maybeAutoStart(context);
+      if (mounted) {
+        SellerOutletGate.check(); // penjual tanpa outlet asli -> /outlet (kecuali panduan pertama belum jalan)
+        OnboardingTour.maybeAutoStart(context);
+      }
     });
   }
 

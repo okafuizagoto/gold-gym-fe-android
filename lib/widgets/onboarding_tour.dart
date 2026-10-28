@@ -5,9 +5,11 @@ import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../config/theme.dart';
 import '../providers/language_provider.dart';
 import '../services/onboarding_api.dart';
+import '../services/outlet_api.dart';
 import '../utils/constants.dart';
 import '../utils/navigation.dart';
 import '../utils/onboarding_steps.dart';
+import '../utils/seller_outlet_gate.dart';
 import '../utils/storage.dart';
 import 'tour_target.dart';
 
@@ -134,6 +136,13 @@ class OnboardingTour {
         // Dialog (route) disisipkan Navigator DI BAWAH penutup ini, jadi penutup hanya dipasang di antara
         // dialog: selama dialog tampil, dialognya sendiri sudah modal. Coach mark (OverlayEntry) tetap di atasnya.
         _raiseBlocker(overlay);
+        // Penjual baru (belum punya outlet asli) dapat outlet dummy supaya tombol seperti ANTRIAN bisa
+        // disorot; backend tidak membuat apa pun untuk penjual yang sudah punya outlet. Gagal = tanpa dummy.
+        if (role == onboardingRoleSeller) {
+          try {
+            await OutletsApi().ensureDummyOutlet();
+          } catch (_) {}
+        }
         await _runSteps(nav, ctx, steps, lang);
       }
       completed = true;
@@ -141,10 +150,23 @@ class OnboardingTour {
       // gagal di tengah jalan: jangan tandai "sudah dilihat" supaya bisa muncul lagi
       debugPrint('[OnboardingTour] gagal: $e\n$st');
     } finally {
+      // Penutup layar tetap terpasang sampai SEMUA pembersihan di bawah selesai (tidak ada celah sentuh).
+      _raiseBlocker(overlay);
       await _closeDrawer();
       await _returnToRoot(nav);
-      _removeBlocker();
+      if (role == onboardingRoleSeller) {
+        // Penjual: buang outlet dummy panduan. Kalau tetap belum punya outlet asli, wajib membuatnya dulu:
+        // arahkan ke /outlet (hanya NEW OUTLET dan LOGOUT yang aktif).
+        try {
+          await OutletsApi().clearDummyOutlet();
+        } catch (_) {}
+      }
       if (completed) await OnboardingApi().markSeen(role);
+      if (role == onboardingRoleSeller &&
+          await SellerOutletGate.realOutletCount() == 0) {
+        nav.pushNamedAndRemoveUntil('/outlet', (route) => false);
+      }
+      _removeBlocker();
       _running = false;
     }
   }
