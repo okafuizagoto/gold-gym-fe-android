@@ -178,9 +178,12 @@ class OnboardingTour {
       List<OnboardingStep> Function() stepsFn, LanguageProvider lang) async {
     final total = stepsFn().length;
     String? current; // rute yang sedang dibuka tour (null = layar utama)
+    // Langkah yang dilewati (target tidak ada, mis. outlet baru belum punya nota) tidak dihitung supaya penghitung
+    // tetap berurutan (1/N, 2/N, ...) dan N menyusut sesuai langkah yang benar-benar ditampilkan.
+    var skipped = 0;
     for (var idx = 0; idx < total; idx++) {
       final s = stepsFn()[idx];
-      final progress = '${idx + 1}/$total';
+      final progress = '${idx + 1 - skipped}/${total - skipped}';
       switch (s.kind) {
         case OnboardingStepKind.menu:
           await _returnToRoot(nav);
@@ -188,11 +191,13 @@ class OnboardingTour {
           final key = await _openDrawerFor(s.menuTitle!);
           if (key == null) {
             await _closeDrawer();
+            skipped++;
             continue;
           }
           final host = _liveContext();
           if (host == null) {
             await _closeDrawer();
+            skipped++;
             continue;
           }
           final next = await _coach(
@@ -224,17 +229,29 @@ class OnboardingTour {
           }
           break;
         case OnboardingStepKind.page:
-          if (s.page != current) continue;
+          if (s.page != current) {
+            skipped++;
+            continue;
+          }
           final tctx = await _waitTarget(s.targetId!, 3500);
-          if (tctx == null) continue;
+          if (tctx == null) {
+            skipped++;
+            continue;
+          }
           final box = tctx.findRenderObject();
-          if (box is! RenderBox || !box.attached) continue;
+          if (box is! RenderBox || !box.attached) {
+            skipped++;
+            continue;
+          }
           await Scrollable.ensureVisible(tctx,
               duration: const Duration(milliseconds: 200), alignment: 0.4);
           // Tunggu posisi benar-benar diam (transisi halaman/gulir/animasi masuk selesai) -- membaca posisi
           // di tengah animasi membuat sorotan meleset (terlihat di emulator 2026-10-23).
           final rect = await _stableRect(tctx);
-          if (rect == null) continue;
+          if (rect == null) {
+            skipped++;
+            continue;
+          }
           final offset = rect.$1;
           final size = rect.$2;
           final screenH = MediaQuery.of(ctx).size.height;
@@ -456,12 +473,6 @@ class OnboardingTour {
                         const TextStyle(fontSize: 12, color: AppColors.muted)),
               ],
             ),
-            const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(progress,
-                  style: const TextStyle(fontSize: 12, color: AppColors.muted)),
-            ),
           ],
         ),
       ),
@@ -529,6 +540,13 @@ class _StepCard extends StatelessWidget {
                 child: Text(lang.get('Next', 'Lanjut')),
               ),
             ],
+          ),
+          // Penghitung langkah (sama dengan web): 1/30, 2/30, ...
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(progress,
+                style: const TextStyle(fontSize: 12, color: AppColors.muted)),
           ),
         ],
       ),
