@@ -326,6 +326,11 @@ class _AppDrawerState extends State<AppDrawer> {
               route: '/admin-statistik-pengguna',
             ),
             MenuItem(
+              title: 'Kelola Akun (Ban)',
+              icon: Icons.block,
+              route: '/admin-akun',
+            ),
+            MenuItem(
               title: 'Daftar Request Fitur',
               icon: Icons.feedback_outlined,
               route: '/admin-request-fitur',

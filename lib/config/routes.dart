@@ -34,6 +34,7 @@ import '../screens/cashier_shift_screen.dart';
 import '../screens/thermal_printer_screen.dart';
 import '../screens/admin_pricing_ui_screen.dart';
 import '../screens/admin_usage_stats_screen.dart';
+import '../screens/admin_accounts_screen.dart';
 import '../screens/edit_profile_screen.dart';
 import '../screens/keamanan_akun_screen.dart';
 import '../screens/admin_payment_report_screen.dart';
@@ -108,6 +109,7 @@ class AppRoutes {
   static const String adminPaymentReport = '/admin-payment-report';
   static const String adminStorageUsage = '/admin-storage-usage';
   static const String adminStatistikPengguna = '/admin-statistik-pengguna';
+  static const String adminAkun = '/admin-akun';
   static const String keamananAkun = '/keamanan-akun';
   static const String editProfil = '/edit-profil';
   static const String requestFitur = '/request-fitur';
@@ -183,6 +185,7 @@ class AppRoutes {
         adminPaymentReport: (context) => const AdminPaymentReportScreen(),
         adminStorageUsage: (context) => const AdminStorageUsageScreen(),
         adminStatistikPengguna: (context) => const AdminUsageStatsScreen(),
+        adminAkun: (context) => const AdminAccountsScreen(),
         keamananAkun: (context) => const KeamananAkunScreen(),
         editProfil: (context) => const EditProfileScreen(),
         requestFitur: (context) => const FeatureRequestScreen(),

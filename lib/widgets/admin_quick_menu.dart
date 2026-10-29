@@ -70,6 +70,9 @@ class AdminQuickMenu extends StatelessWidget {
     final statistik = _QuickLink(Icons.assessment_rounded,
         lang.get('User Statistics', 'Statistik Pengguna'),
         AppRoutes.adminStatistikPengguna);
+    final kelolaAkun = _QuickLink(Icons.block,
+        lang.get('Manage Accounts (Ban)', 'Kelola Akun (Ban)'),
+        AppRoutes.adminAkun);
     final requestFitur = _QuickLink(Icons.feedback_outlined,
         lang.get('Feature Requests', 'Daftar Request Fitur'),
         AppRoutes.adminRequestFitur);
@@ -122,7 +125,7 @@ class AdminQuickMenu extends StatelessWidget {
         lang.get('Operations & Others', 'Operasional & Lainnya'),
         lang.get('Not directly related to the groups above',
             'Tidak terkait langsung dengan grup-grup di atas'),
-        [storage, backup, statistik, requestFitur],
+        [storage, backup, statistik, kelolaAkun, requestFitur],
       ),
     ];
   }
