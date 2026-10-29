@@ -15,17 +15,25 @@ class OnboardingStep {
   final String? page;
   final String? goto;
   final String text;
+
+  /// Hanya STAF: lewati langkah ini kalau kunci menu ini DITOLAK pemilik (Akses Staff).
+  final String? requires;
   const OnboardingStep._(this.kind, this.text,
-      {this.menuTitle, this.targetId, this.page, this.goto});
+      {this.menuTitle, this.targetId, this.page, this.goto, this.requires});
 
   factory OnboardingStep.menu(String title, String goto, String text) =>
       OnboardingStep._(OnboardingStepKind.menu, text,
           menuTitle: title, goto: goto);
 
   factory OnboardingStep.page(String page, String id, String text,
-          {String? goto}) =>
+          {String? goto, String? requires}) =>
       OnboardingStep._(OnboardingStepKind.page, text,
-          targetId: id, page: page, goto: goto);
+          targetId: id, page: page, goto: goto, requires: requires);
+
+  /// Kunci menu (rute) yang menentukan apakah langkah ini boleh tampil untuk STAF: kunci eksplisit [requires],
+  /// rute tujuan (langkah menu), atau halamannya (langkah halaman). Dibandingkan dengan daftar menu yang
+  /// DITOLAK pemilik. null = selalu boleh.
+  String? get deniedKey => requires ?? (kind == OnboardingStepKind.menu ? goto : page);
 
   factory OnboardingStep.done(String text) =>
       OnboardingStep._(OnboardingStepKind.done, text);
@@ -82,8 +90,32 @@ List<OnboardingStep> onboardingStepsFor(
       t('PROCESS / FINISH: move a queue number forward (Waiting -> Processing -> Done).',
           'PROSES / SELESAI: majukan status nomor antrian (Menunggu -> Diproses -> Selesai).'));
 
-  if (role == onboardingRoleSeller) {
-    return [
+  // Langkah operasional kasir yang dipakai penjual DAN staf. Untuk staf, langkah yang menunya/halamannya DITOLAK
+  // pemilik dilewati otomatis oleh OnboardingTour (lihat OnboardingStep.deniedKey) -- panduan staf mengikuti akses
+  // yang diberikan pemilik.
+  final isStaff = role == onboardingRoleStaff;
+  final tableSteps = <OnboardingStep>[
+      // Outlet THERAPY tidak punya menu "Atur Meja" (diganti "Booking Terapi").
+      if (isTherapy)
+        OnboardingStep.menu(
+            'Booking Terapi',
+            '/booking',
+            t('Manage your therapy appointment slots here. Tap Next to open this page.',
+                'Atur jadwal slot terapi pelanggan Anda di sini. Ketuk Lanjut untuk membukanya.'))
+      else ...[
+        OnboardingStep.menu(
+            'Atur Meja',
+            '/meja-area',
+            t('Set up your areas (indoor/outdoor) and tables -- needed before taking dine-in orders. Tap Next to open this page.',
+                'Atur area (indoor/outdoor) dan meja di sini -- perlu diisi sebelum menerima transaksi dine-in. Ketuk Lanjut untuk membukanya.')),
+        OnboardingStep.page(
+            '/meja-area',
+            'meja-add',
+            t('ADD TABLE: create a new table (or a new area on the Area tab).',
+                'TAMBAH MEJA: buat meja baru (atau area baru di tab Area).')),
+      ],
+  ];
+  final ownerOutletSteps = <OnboardingStep>[
       OnboardingStep.menu(
           'Ganti Outlet',
           '/outlet',
@@ -110,25 +142,8 @@ List<OnboardingStep> onboardingStepsFor(
           'outlet-queue-toggle',
           t("QUEUE button: ON gives every sale a queue number and shows it on the Antrian POS board. Leave it OFF if you don't need queue numbers.",
               'Tombol ANTRIAN: AKTIF = tiap transaksi mendapat nomor antrian dan tampil di papan Antrian POS. Biarkan NONAKTIF kalau tidak butuh nomor antrian.')),
-      // Outlet THERAPY tidak punya menu "Atur Meja" (diganti "Booking Terapi").
-      if (isTherapy)
-        OnboardingStep.menu(
-            'Booking Terapi',
-            '/booking',
-            t('Manage your therapy appointment slots here. Tap Next to open this page.',
-                'Atur jadwal slot terapi pelanggan Anda di sini. Ketuk Lanjut untuk membukanya.'))
-      else ...[
-        OnboardingStep.menu(
-            'Atur Meja',
-            '/meja-area',
-            t('Set up your areas (indoor/outdoor) and tables -- needed before taking dine-in orders. Tap Next to open this page.',
-                'Atur area (indoor/outdoor) dan meja di sini -- perlu diisi sebelum menerima transaksi dine-in. Ketuk Lanjut untuk membukanya.')),
-        OnboardingStep.page(
-            '/meja-area',
-            'meja-add',
-            t('ADD TABLE: create a new table (or a new area on the Area tab).',
-                'TAMBAH MEJA: buat meja baru (atau area baru di tab Area).')),
-      ],
+  ];
+  final ownerStaffSteps = <OnboardingStep>[
       OnboardingStep.menu(
           'Staff',
           '/daftar-staff',
@@ -145,6 +160,8 @@ List<OnboardingStep> onboardingStepsFor(
           'staff-access-save',
           t('Tick the menus a staff member may use, then tap SAVE. Unticked menus stay hidden for them. Sensitive menus (Refund History, Cash History, Withdraw Cash, Add Cash, Change Outlet, Office Location, Tables & Areas) are unticked by default: tick them only for staff you trust.',
               'Centang menu yang boleh dipakai staff, lalu ketuk SIMPAN. Menu yang tidak dicentang tetap tersembunyi untuknya. Menu sensitif (Riwayat Refund, Kas History, Tarik Kas, Tambah Kas, Ganti Outlet, Lokasi Kantor, Meja & Area) tidak dicentang secara default: centang hanya untuk staff yang Anda percaya.')),
+  ];
+  final operationalSteps = <OnboardingStep>[
       OnboardingStep.menu(
           'Kas',
           '/cashier-shift',
@@ -194,7 +211,7 @@ List<OnboardingStep> onboardingStepsFor(
           '/history-sales',
           'sale-refund',
           t("REFUND button (round arrow) on a paid, not-voided sale. In the window choose: RETURN MONEY (set the quantity per item; the value already includes discounts and vouchers; keep 'Return to stock' ticked for resellable items; pay back in cash or bank transfer) or EXCHANGE ITEMS (pick replacement products from your registered list at today's price; the customer pays or gets back the price difference). Write the reason, process, then print the receipt. Only CASH differences move the cash drawer.",
-              "Tombol REFUND (panah melingkar) pada nota yang sudah lunas dan belum dibatalkan. Di jendelanya pilih: KEMBALIKAN UANG (atur jumlah tiap barang; nilainya sudah memperhitungkan diskon dan voucher; biarkan 'Kembalikan ke stok' tercentang untuk barang yang bisa dijual lagi; uang dikembalikan tunai atau transfer bank) atau TUKAR BARANG (pilih barang pengganti dari daftar produk terdaftar dengan harga hari ini; pelanggan membayar atau menerima kembali selisih harga). Tulis alasan, proses, lalu cetak struk. Hanya selisih TUNAI yang menggerakkan laci kas.")),
+              "Tombol REFUND (panah melingkar) pada nota yang sudah lunas dan belum dibatalkan. Di jendelanya pilih: KEMBALIKAN UANG (atur jumlah tiap barang; nilainya sudah memperhitungkan diskon dan voucher; biarkan 'Kembalikan ke stok' tercentang untuk barang yang bisa dijual lagi; uang dikembalikan tunai atau transfer bank) atau TUKAR BARANG (pilih barang pengganti dari daftar produk terdaftar dengan harga hari ini; pelanggan membayar atau menerima kembali selisih harga). Tulis alasan, proses, lalu cetak struk. Hanya selisih TUNAI yang menggerakkan laci kas."), requires: '/riwayat-refund'),
       OnboardingStep.menu(
           'Riwayat Refund',
           '/riwayat-refund',
@@ -203,29 +220,42 @@ List<OnboardingStep> onboardingStepsFor(
       OnboardingStep.page(
           '/riwayat-refund',
           'refund-howto',
-          t("Each entry shows the refund number, original sale, who processed it and the price difference (green = customer paid, red = returned). Use the info button for details and the print button to reprint the receipt. Refunds lower the day's sales and exchanges add the replacement value, both on the day they happen. Open 'How to refund' for the full steps. Staff only see this menu if the owner ticks it in Staff Access.",
-              "Tiap catatan menampilkan nomor refund, nota asal, siapa yang memproses, dan selisih harga (hijau = pelanggan membayar, merah = dikembalikan). Tombol info untuk detail, tombol cetak untuk mencetak ulang struk. Refund mengurangi omzet hari itu dan tukar barang menambah nilai barang pengganti, keduanya pada hari kejadian. Buka 'Cara refund' untuk langkah lengkapnya. Staff hanya melihat menu ini bila penjual mencentangnya di Akses Staff.")),
+          t("Each entry shows the refund number, original sale, who processed it and the price difference (green = customer paid, red = returned). Use the info button for details and the print button to reprint the receipt. Refunds lower the day's sales and exchanges add the replacement value, both on the day they happen. Open 'How to refund' for the full steps.${isStaff ? '' : ' Staff only see this menu if the owner ticks it in Staff Access.'}",
+              "Tiap catatan menampilkan nomor refund, nota asal, siapa yang memproses, dan selisih harga (hijau = pelanggan membayar, merah = dikembalikan). Tombol info untuk detail, tombol cetak untuk mencetak ulang struk. Refund mengurangi omzet hari itu dan tukar barang menambah nilai barang pengganti, keduanya pada hari kejadian. Buka 'Cara refund' untuk langkah lengkapnya.${isStaff ? '' : ' Staff hanya melihat menu ini bila penjual mencentangnya di Akses Staff.'}")),
       OnboardingStep.menu(
           'Point of Sale',
           '/penjualan',
-          t('This is where you record sales at the counter. Tap Next to open this page.',
-              'Di sinilah Anda mencatat transaksi penjualan di kasir. Ketuk Lanjut untuk membukanya.')),
+          isStaff
+              ? t('Record sales for customers here. Tap Next to open this page.',
+                  'Catat transaksi penjualan pelanggan di sini. Ketuk Lanjut untuk membukanya.')
+              : t('This is where you record sales at the counter. Tap Next to open this page.',
+                  'Di sinilah Anda mencatat transaksi penjualan di kasir. Ketuk Lanjut untuk membukanya.')),
       posOpenShift,
       posSearch,
       posPay,
-      queueMenu(t(
-          'The queue board. It only works after you turn the QUEUE button on in the outlet list. Tap Next to open it.',
-          'Papan antrian. Baru berfungsi setelah tombol ANTRIAN diaktifkan di daftar outlet. Ketuk Lanjut untuk membukanya.')),
+      queueMenu(isStaff
+          ? t('If the outlet uses queue numbers, manage the queue board here. Tap Next to open it.',
+              'Kalau outlet memakai nomor antrian, kelola papan antrian di sini. Ketuk Lanjut untuk membukanya.')
+          : t('The queue board. It only works after you turn the QUEUE button on in the outlet list. Tap Next to open it.',
+              'Papan antrian. Baru berfungsi setelah tombol ANTRIAN diaktifkan di daftar outlet. Ketuk Lanjut untuk membukanya.')),
       queueAdvance,
       OnboardingStep.menu(
           'Laporan Penjualan',
           '/laporan',
           t('Daily, weekly, and monthly sales reports live here. Tap Next to open it.',
               'Laporan penjualan harian, mingguan, dan bulanan ada di sini. Ketuk Lanjut untuk membukanya.')),
+  ];
+  if (role == onboardingRoleSeller) {
+    return [
+      ...ownerOutletSteps,
+      ...tableSteps,
+      ...ownerStaffSteps,
+      ...operationalSteps,
       done,
     ];
   }
   if (role == onboardingRoleStaff) {
+    // Menu staf bergantung pada Akses Staff dari pemilik: langkah yang menunya/halamannya ditolak dilewati otomatis.
     return [
       OnboardingStep.menu(
           'Absen',
@@ -237,18 +267,8 @@ List<OnboardingStep> onboardingStepsFor(
           'absen-main',
           t('CLOCK IN when you start working. The same button becomes CLOCK OUT at the end of your shift.',
               'ABSEN MASUK saat mulai kerja. Tombol yang sama berubah jadi ABSEN PULANG saat shift selesai.')),
-      OnboardingStep.menu(
-          'Point of Sale',
-          '/penjualan',
-          t('Record sales for customers here. Tap Next to open this page.',
-              'Catat transaksi penjualan pelanggan di sini. Ketuk Lanjut untuk membukanya.')),
-      posOpenShift,
-      posSearch,
-      posPay,
-      queueMenu(t(
-          'If the outlet uses queue numbers, manage the queue board here. Tap Next to open it.',
-          'Kalau outlet memakai nomor antrian, kelola papan antrian di sini. Ketuk Lanjut untuk membukanya.')),
-      queueAdvance,
+      ...tableSteps,
+      ...operationalSteps,
       done,
     ];
   }

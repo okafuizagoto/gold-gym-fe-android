@@ -59,6 +59,9 @@ class Case {
   final bool tapAll;
   final int maxTaps;
 
+  /// Bahasa UI ('ID' | 'EN'); teks Inggris lebih panjang -> risiko overflow berbeda.
+  final String lang;
+
   /// Data lokal yang perlu disemai sebelum layar dibuka (mis. 'outbox' = antrean transaksi offline).
   final String? seed;
   const Case(this.route,
@@ -73,6 +76,7 @@ class Case {
       this.submitEmpty = false,
       this.tapAll = false,
       this.maxTaps = 12,
+      this.lang = 'ID',
       this.seed});
 }
 
@@ -104,6 +108,7 @@ Future<({List<String> overflows, bool sawMarker})> renderWithData(
       fileInput:
           'ENVIRONMENT=local\nBASE_API_URL=http://127.0.0.1:${server.port}');
   final prefs = sessionPrefs(role: c.role);
+  prefs[AppConstants.languageKey] = c.lang;
   _secure
     ..clear()
     ..[AppConstants.accessTokenKey] =
@@ -201,7 +206,7 @@ Future<({List<String> overflows, bool sawMarker})> renderWithData(
           w is TextButton ||
           w is IconButton ||
           w is FloatingActionButton);
-      final skip = RegExp('keluar|logout|hapus|delete|kembali|back|pilih paket|pulihkan',
+      final skip = RegExp('keluar|logout|kembali|back|pilih paket|pulihkan',
           caseSensitive: false);
       var taps = 0;
       for (var i = 0; i < 40 && taps < c.maxTaps; i++) {
@@ -480,6 +485,7 @@ void main() {
     Case('/admin-outlet-pembeli', role: AppConstants.roleAdmin),
     Case('/admin-pos-customer', role: AppConstants.roleAdmin),
     Case('/', marker: ''),
+    Case('/403', marker: ''),
     Case('/outlet', marker: ''),
     Case('/about-us', marker: ''),
     Case('/add-items'),
@@ -642,16 +648,36 @@ void main() {
     Case('/daftar-penjual', role: AppConstants.roleBuyer, marker: '', tapAll: true),
   ];
 
-  for (final c in cases) {
+  // Kasus dasar (tanpa isi form/tombol) juga diuji di HP kecil LANDSCAPE dan dalam bahasa Inggris.
+  bool isBase(Case c) => !c.fill && !c.submitEmpty && !c.tapAll;
+  final enCases = [
+    for (final c in cases)
+      if (isBase(c) && c.tabLabel == null && c.seed == null)
+        Case(c.route,
+            role: c.role,
+            marker: '',
+            pickFirstDropdown: c.pickFirstDropdown,
+            tabIndex: c.tabIndex,
+            lang: 'EN'),
+  ];
+  const landscape =
+      ScreenSize('hp-kecil-landscape-640x360', Size(640, 360));
+
+  for (final c in [...cases, ...enCases]) {
+    final sizesForCase = [
+      ...sizes,
+      if (isBase(c)) landscape,
+    ];
     group(
-        '${c.route} [data panjang]${c.tapAll ? ' [tap]' : c.fill ? ' [isi]' : c.submitEmpty ? ' [kosong]' : ''}',
+        '${c.route} [data panjang]${c.tapAll ? ' [tap]' : c.fill ? ' [isi]' : c.submitEmpty ? ' [kosong]' : c.lang == 'EN' ? ' [EN]' : ''}',
         () {
       for (final scale in [1.0, 1.3]) {
-        for (final s in sizes) {
+        for (final s in sizesForCase) {
           testWidgets('tidak ada overflow @ ${s.name} font ${scale}x',
               timeout: const Timeout(Duration(seconds: 90)), (tester) async {
             final r = await renderWithData(tester, c, s.size, scale);
-            expect(r.sawMarker, isTrue,
+            // landscape sangat pendek: data bisa di luar layar; yang diperiksa hanya overflow
+            expect(r.sawMarker || s.name == landscape.name, isTrue,
                 reason:
                     '${c.route}: data uji tidak tampil -- tes tidak bermakna');
             expect(r.overflows, isEmpty,

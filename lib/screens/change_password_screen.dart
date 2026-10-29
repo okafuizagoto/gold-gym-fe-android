@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import '../utils/login_session.dart';
 
 import '../services/account_api.dart';
 import '../services/core_api.dart';
@@ -73,6 +74,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         Toast.success(context, 'Password berhasil diganti.');
         // Penjual baru tanpa outlet yang belum melihat panduan: Dashboard dulu (panduan pertama), bukan /outlet.
         final role = await Storage.get(AppConstants.userRoleKey);
+        // Staf baru: daftar menu yang ditolak pemilik gagal diambil saat login (token masih terbatas) -> ambil ulang.
+        if (role == AppConstants.roleStaff) await LoginSession.refreshStaffDenied();
         final tourFirst = role == AppConstants.roleSeller &&
             await SellerOutletGate.sellerNeedsTourFirst();
         if (!mounted) return;

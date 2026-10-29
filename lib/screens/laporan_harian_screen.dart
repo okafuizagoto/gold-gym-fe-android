@@ -176,25 +176,38 @@ class _LaporanHarianViewState extends State<LaporanHarianView>
               scrollDirection: Axis.horizontal,
               child: SizedBox(
                 width: total,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _headerRow(widths),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: items.length,
-                        itemBuilder: (context, i) {
-                          final it = items[i];
-                          // baris pertama dari grup customer (customer berubah dari atas)
-                          final firstOfGroup =
-                              i == 0 || items[i - 1].customer != it.customer;
-                          return _bodyRow(
-                              widths, it, firstOfGroup, i == items.length - 1);
-                        },
+                child: Builder(builder: (context) {
+                  Widget rowAt(int i) {
+                    final it = items[i];
+                    // baris pertama dari grup customer (customer berubah dari atas)
+                    final firstOfGroup =
+                        i == 0 || items[i - 1].customer != it.customer;
+                    return _bodyRow(
+                        widths, it, firstOfGroup, i == items.length - 1);
+                  }
+
+                  // Ruang vertikal sempit (HP landscape + font besar): header tetap + daftar tidak muat dalam satu
+                  // Column (dulu meluap 15 px di bawah) -> semuanya, header termasuk, ikut menggulir.
+                  if (constraints.maxHeight < 220) {
+                    return ListView.builder(
+                      itemCount: items.length + 1,
+                      itemBuilder: (context, i) =>
+                          i == 0 ? _headerRow(widths) : rowAt(i - 1),
+                    );
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _headerRow(widths),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: items.length,
+                          itemBuilder: (context, i) => rowAt(i),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  );
+                }),
               ),
             );
           },

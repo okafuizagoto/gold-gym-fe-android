@@ -90,19 +90,15 @@ class _OutletScreenState extends State<OutletScreen> {
   }
 
   Future<void> _handleLogout() async {
+    // Server menolak (sesi sudah dicabut/digantikan) tidak boleh menghalangi keluar: sesi lokal selalu dihapus.
     try {
-      final response = await _coreApi.logout();
-      if (response.statusCode == 200) {
-        if (mounted) {
-          Storage.clear();
-          Navigator.pushReplacementNamed(context, '/login');
-        }
-      } else {
-        Toast.error(context, 'Logout gagal.');
-      }
-    } catch (e) {
-      Toast.error(context, 'Logout gagal.');
+      await _coreApi.logout();
+    } catch (_) {
+      // abaikan
     }
+    await Storage.clear();
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
   }
 
   Future<void> _handleOutlet() async {
@@ -158,6 +154,7 @@ class _OutletScreenState extends State<OutletScreen> {
                     : (_types.isEmpty
                         ? 'Belum ada outlet aktif -- buat lewat NEW OUTLET'
                         : null),
+                helperMaxLines: 2, // dulu terpotong "...NEW O..." 
               ),
               items: _types.map((type) {
                 // Outlet terkunci (melebihi batas paket): tetap terlihat tapi tidak bisa dipilih.

@@ -214,6 +214,33 @@ class _StaffListScreenState extends State<StaffListScreen> {
       return;
     }
 
+    // Server mengirim email verifikasi secara sinkron (bisa ~5 detik): tampilkan indikator supaya tidak terlihat
+    // seperti tidak terjadi apa-apa (dulu dialog langsung tertutup dan staf baru muncul belakangan).
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(children: [
+            SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 3)),
+            SizedBox(width: 16),
+            Expanded(child: Text('Mendaftarkan staff...')),
+          ]),
+        ),
+      ),
+    );
+    var progressOpen = true;
+    void closeProgress() {
+      if (progressOpen && mounted) {
+        progressOpen = false;
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    }
+
     try {
       final resp = await _api.register(
         nama: namaC.text.trim(),
@@ -225,6 +252,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
             .where(denied.contains)
             .toList(),
       );
+      closeProgress();
       if (resp.statusCode == 200 || resp.statusCode == 201) {
         if (mounted) {
           Toast.success(context,
@@ -235,6 +263,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
         _showErr(resp.body);
       }
     } catch (e) {
+      closeProgress();
       if (mounted) Toast.error(context, 'Gagal: $e');
     }
   }

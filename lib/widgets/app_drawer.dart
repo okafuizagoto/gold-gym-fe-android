@@ -8,7 +8,6 @@ import '../utils/constants.dart';
 import '../utils/subscription_state.dart';
 import '../services/core_api.dart';
 import '../services/feature_request_api.dart';
-import '../utils/toast.dart';
 import 'brand_logo.dart';
 import 'onboarding_tour.dart';
 
@@ -798,19 +797,17 @@ class _AppDrawerState extends State<AppDrawer> {
   }
 
   Future<void> _logout() async {
+    // Cabut sesi di server (best-effort), lalu SELALU hapus sesi lokal. Dulu logout dibatalkan kalau server
+    // menolak (mis. sesi sudah digantikan perangkat lain / token kedaluwarsa) dengan pesan salah "Login failed."
+    // -> pengguna tidak bisa keluar sama sekali.
     try {
-      final response = await _coreApi.logout();
-      if (response.statusCode == 200) {
-        Storage.clear();
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/login');
-        }
-      } else {
-        Toast.error(context, 'Login failed.');
-      }
-    } catch (e) {
-      Toast.error(context, 'Login failed.');
+      await _coreApi.logout();
+    } catch (_) {
+      // abaikan: sesi lokal tetap dihapus
     }
+    await Storage.clear();
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
   }
 
   bool _isActive(String currentRoute, String route) {

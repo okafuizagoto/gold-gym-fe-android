@@ -54,14 +54,26 @@ class _PrivateRouteState extends State<PrivateRoute> {
     _messenger = ScaffoldMessenger.maybeOf(context);
   }
 
+  LanguageProvider? _langProvider;
+
   @override
   void initState() {
     super.initState();
     _showSubscriptionBanner();
+    // Pita langganan dibuat dengan bahasa saat layar dibuka; ganti bahasa (ID/EN) harus ikut mengubahnya.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _langProvider = context.read<LanguageProvider>()..addListener(_onLanguageChanged);
+    });
+  }
+
+  void _onLanguageChanged() {
+    if (mounted) _showSubscriptionBanner(fetch: false);
   }
 
   @override
   void dispose() {
+    _langProvider?.removeListener(_onLanguageChanged);
     // banner milik layar ini; layar berikutnya (kalau butuh) menampilkannya lagi
     _messenger?.clearMaterialBanners();
     super.dispose();
@@ -69,13 +81,15 @@ class _PrivateRouteState extends State<PrivateRoute> {
 
   /// Pita pemberitahuan masa percobaan / mode baca-saja (hanya penjual & staff, dan tidak
   /// di layar Langganan sendiri). Status dimuat dari cache dulu lalu disegarkan dari backend.
-  Future<void> _showSubscriptionBanner() async {
+  Future<void> _showSubscriptionBanner({bool fetch = true}) async {
     final role = await Storage.get(AppConstants.userRoleKey);
     if (role != AppConstants.roleSeller && role != AppConstants.roleStaff) {
       return;
     }
-    await SubscriptionState.load();
-    final fresh = await SubscriptionState.refresh();
+    // fetch=false (ganti bahasa): pakai status yang sudah ada, tanpa panggilan jaringan baru
+    final fresh = fetch
+        ? (await SubscriptionState.load(), await SubscriptionState.refresh()).$2
+        : null;
     final s = fresh ?? SubscriptionState.current;
     if (!mounted || s == null) return;
     if (ModalRoute.of(context)?.settings.name == '/langganan') return;

@@ -164,8 +164,20 @@ class OnboardingTour {
           await Storage.get(AppConstants.outletTypeKey) ?? 'RETAIL';
       // Teks langkah dihitung ULANG tiap langkah (lihat _runSteps) supaya mengganti bahasa di tengah panduan
       // langsung berlaku di langkah berikutnya.
-      List<OnboardingStep> stepsFn() => onboardingStepsFor(
-          role, outletType == AppConstants.outletTherapy, lang);
+      // STAF: saring dulu langkah yang menunya/halamannya DITOLAK pemilik (Akses Staff) supaya panduan mengikuti
+      // akses yang diberikan dan penghitung langkah (n/total) langsung benar, bukan menyusut di tengah jalan.
+      final staffDenied = role == onboardingRoleStaff
+          ? await Storage.getStaffDeniedMenuKeys()
+          : const <String>[];
+      List<OnboardingStep> stepsFn() {
+        final all = onboardingStepsFor(
+            role, outletType == AppConstants.outletTherapy, lang);
+        if (staffDenied.isEmpty) return all;
+        return all
+            .where((st) =>
+                st.deniedKey == null || !staffDenied.contains(st.deniedKey))
+            .toList();
+      }
       if (await _welcomeDialog(ctx, role, lang)) {
         // Dialog (route) disisipkan Navigator DI BAWAH penutup ini, jadi penutup hanya dipasang di antara
         // dialog: selama dialog tampil, dialognya sendiri sudah modal. Coach mark (OverlayEntry) tetap di atasnya.
@@ -240,6 +252,7 @@ class OnboardingTour {
             keyTarget: key,
             progress: progress,
             alignTop: false,
+            maxCardHeight: MediaQuery.of(ctx).size.height * 0.5,
             beforeFocus: () async {
               final c = key.currentContext;
               if (c != null && c.mounted) {
@@ -291,6 +304,11 @@ class OnboardingTour {
           final offset = rect.$1;
           final size = rect.$2;
           final screenH = MediaQuery.of(ctx).size.height;
+          // Kartu ditaruh di sisi yang ruangnya lebih lega, dan tingginya dibatasi sesuai ruang itu (teks panjang,
+          // mis. bahasa Inggris, dulu terpotong di bawah layar).
+          final spaceAbove = offset.dy - 24;
+          final spaceBelow = screenH - (offset.dy + size.height) - 24;
+          final above = spaceAbove > spaceBelow;
           _busy.value = false;
           final next = await _coach(
             tctx, // context target = di dalam Overlay layar ini
@@ -299,7 +317,8 @@ class OnboardingTour {
             text: s.text,
             position: TargetPosition(size, offset),
             progress: progress,
-            alignTop: offset.dy + size.height / 2 > screenH * 0.55,
+            alignTop: above,
+            maxCardHeight: (above ? spaceAbove : spaceBelow).clamp(180.0, screenH * 0.8),
           );
           if (!next) return;
           if (s.goto != null) {
@@ -410,6 +429,7 @@ class OnboardingTour {
     GlobalKey? keyTarget,
     TargetPosition? position,
     required bool alignTop,
+    double? maxCardHeight,
     Future<void> Function()? beforeFocus,
   }) {
     final done = Completer<bool>();
@@ -432,6 +452,7 @@ class OnboardingTour {
                 text: text,
                 lang: lang,
                 progress: progress,
+                maxHeight: maxCardHeight,
                 showSkip: _replay,
                 onSkip: controller.skip,
                 onNext: controller.next,
@@ -536,6 +557,7 @@ class _StepCard extends StatelessWidget {
   final String text;
   final LanguageProvider lang;
   final String progress;
+  final double? maxHeight;
   final bool showSkip;
   final VoidCallback onSkip;
   final VoidCallback onNext;
@@ -545,6 +567,7 @@ class _StepCard extends StatelessWidget {
     required this.text,
     required this.lang,
     required this.progress,
+    this.maxHeight,
     required this.showSkip,
     required this.onSkip,
     required this.onNext,
@@ -552,26 +575,34 @@ class _StepCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Judul + teks bisa digulir bila kartu dibatasi tinggi; tombol dan penghitung selalu terlihat.
+    final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (title.isNotEmpty) ...[
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.ink)),
+          const SizedBox(height: 6),
+        ],
+        Text(text, style: const TextStyle(fontSize: 14, color: AppColors.ink)),
+      ],
+    );
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
+      constraints: maxHeight == null ? null : BoxConstraints(maxHeight: maxHeight!),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (title.isNotEmpty) ...[
-            Text(title,
-                style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ink)),
-            const SizedBox(height: 6),
-          ],
-          Text(text,
-              style: const TextStyle(fontSize: 14, color: AppColors.ink)),
+          Flexible(child: SingleChildScrollView(child: body)),
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,

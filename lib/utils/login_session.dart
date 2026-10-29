@@ -47,18 +47,7 @@ class LoginSession {
     // staff tidak tiba-tiba kehilangan semua menu. Non-staff: bersihkan
     // sisa cache akun STAFF sebelumnya di device yang sama.
     if (r.role == AppConstants.roleStaff) {
-      try {
-        final resp = await StaffApi().myDeniedMenus();
-        if (resp.statusCode == 200) {
-          final body = jsonDecode(resp.body);
-          final keys = ((body['data'] ?? []) as List)
-              .map((e) => e.toString())
-              .toList();
-          await Storage.setStaffDeniedMenuKeys(keys);
-        }
-      } catch (_) {
-        // fail-open
-      }
+      await refreshStaffDenied();
     } else {
       await Storage.setStaffDeniedMenuKeys([]);
     }
@@ -91,5 +80,23 @@ class LoginSession {
       dest = '/';
     }
     return dest;
+  }
+
+  /// Ambil daftar menu yang DITOLAK pemilik untuk staf ini dan simpan (dibaca drawer & penjaga rute).
+  /// Gagal fetch (jaringan dsb.) -> daftar lama dibiarkan (fail-open). Dipanggil saat login DAN setelah staf
+  /// berhasil mengganti password awal: pada login pertama token masih terbatas (wajib ganti password), jadi
+  /// pengambilan saat login gagal diam-diam dan staf melihat SEMUA menu sampai login berikutnya.
+  static Future<void> refreshStaffDenied() async {
+    try {
+      final resp = await StaffApi().myDeniedMenus();
+      if (resp.statusCode == 200) {
+        final body = jsonDecode(resp.body);
+        final keys =
+            ((body['data'] ?? []) as List).map((e) => e.toString()).toList();
+        await Storage.setStaffDeniedMenuKeys(keys);
+      }
+    } catch (_) {
+      // fail-open
+    }
   }
 }
