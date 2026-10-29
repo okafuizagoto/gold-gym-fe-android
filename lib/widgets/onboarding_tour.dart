@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
@@ -115,6 +116,17 @@ class OnboardingTour {
     await _run(role, manual);
   }
 
+  /// Kode outlet dummy dari respons dummyensure ({"data":{"outlet_code":"ADM-..."}}); null kalau tidak ada.
+  static String? _dummyCodeFrom(String body) {
+    try {
+      final data = (jsonDecode(body) as Map<String, dynamic>)['data'];
+      final code = data is Map ? data['outlet_code'] : null;
+      return code is String && code.startsWith('ADM-') ? code : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<void> _delay(int ms) =>
       Future.delayed(Duration(milliseconds: ms));
 
@@ -126,6 +138,7 @@ class OnboardingTour {
     if (nav == null || overlay == null) return;
     _running = true;
     var completed = false;
+    String? dummyCode; // kode outlet dummy yang dipilih sementara selama panduan pertama
     try {
       final ctx = overlay.context;
       final lang = ctx.read<LanguageProvider>();
@@ -141,9 +154,18 @@ class OnboardingTour {
         _raiseBlocker(overlay);
         // Penjual baru (belum punya outlet asli) dapat outlet dummy supaya tombol seperti ANTRIAN bisa
         // disorot; backend tidak membuat apa pun untuk penjual yang sudah punya outlet. Gagal = tanpa dummy.
-        if (role == onboardingRoleSeller) {
+        // HANYA panduan pertama setelah buat akun (bukan ulang lewat menu Panduan Penggunaan): backend mengisi
+        // outlet dummy itu dengan data contoh (area/meja, barang, nota, antrean, staff) supaya langkah yang
+        // menyorot isi halaman punya sasaran, dan outlet dummy dipilih sementara supaya halaman membacanya.
+        if (role == onboardingRoleSeller && !manual) {
           try {
-            await OutletsApi().ensureDummyOutlet();
+            final resp = await OutletsApi().ensureDummyOutlet();
+            final code = _dummyCodeFrom(resp.body);
+            if (resp.statusCode == 200 && code != null) {
+              dummyCode = code;
+              await Storage.set(AppConstants.outcode, code);
+              await Storage.set(AppConstants.outletTypeKey, 'RETAIL');
+            }
           } catch (_) {}
         }
         await _runSteps(nav, ctx, stepsFn, lang);
@@ -158,6 +180,12 @@ class OnboardingTour {
       await _closeDrawer();
       await _returnToRoot(nav);
       if (role == onboardingRoleSeller) {
+        // Lepas pilihan outlet dummy dulu (hanya kalau memang masih dummy tadi), lalu hapus outlet + data contohnya.
+        if (dummyCode != null &&
+            await Storage.get(AppConstants.outcode) == dummyCode) {
+          await Storage.delete(AppConstants.outcode);
+          await Storage.delete(AppConstants.outletTypeKey);
+        }
         // Penjual: buang outlet dummy panduan. Kalau tetap belum punya outlet asli, wajib membuatnya dulu:
         // arahkan ke /outlet (hanya NEW OUTLET dan LOGOUT yang aktif).
         try {
