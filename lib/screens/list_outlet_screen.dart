@@ -11,6 +11,7 @@ import '../widgets/empty_state.dart';
 import '../widgets/pagination_bar.dart';
 import '../widgets/search_field.dart';
 import '../widgets/tour_target.dart';
+import '../utils/tour_demo.dart';
 
 class ListOutletScreen extends StatefulWidget {
   const ListOutletScreen({super.key});
@@ -228,13 +229,30 @@ class _OutletScreenState extends State<ListOutletScreen> {
                 );
               }
               if (pagination == null || pagination.data.isEmpty) {
-                return const EmptyState(
-                  icon: Icons.storefront_outlined,
-                  title: 'Belum ada outlet',
-                  description:
-                      'Outlet yang Anda buat akan tampil di sini. Buat lewat '
-                      'tombol NEW OUTLET di halaman Pilih Outlet.',
-                  compact: true,
+                return TourDemo.when(
+                  demo: () => TourDemoBlock(
+                    child: Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.storefront_outlined),
+                        title: const Text('Outlet Contoh',
+                            style: TextStyle(fontWeight: FontWeight.w700)),
+                        subtitle: const Text('Jl. Contoh No. 1 - ACTIVE'),
+                        trailing: TourTarget(
+                          id: 'outlet-queue-toggle',
+                          child: ElevatedButton(
+                              onPressed: null, child: const Text('AKTIF')),
+                        ),
+                      ),
+                    ),
+                  ),
+                  normal: () => const EmptyState(
+                    icon: Icons.storefront_outlined,
+                    title: 'Belum ada outlet',
+                    description:
+                        'Outlet yang Anda buat akan tampil di sini. Buat lewat '
+                        'tombol NEW OUTLET di halaman Pilih Outlet.',
+                    compact: true,
+                  ),
                 );
               }
 

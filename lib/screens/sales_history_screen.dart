@@ -24,6 +24,7 @@ import '../widgets/refund_dialog.dart';
 import '../widgets/tour_target.dart';
 import 'proof_viewer_screen.dart';
 import 'sales_detail_screen.dart';
+import '../utils/tour_demo.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
   const SalesHistoryScreen({super.key});
@@ -115,11 +116,15 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           }
         });
       } else {
-        if (mounted) Toast.error(context, 'Gagal memuat history sales');
+        if (mounted && !TourDemo.running.value) {
+          Toast.error(context, 'Gagal memuat history sales');
+        }
       }
     } catch (e) {
       debugPrint('Error loading sales history: $e');
-      if (mounted) Toast.error(context, 'Gagal memuat history sales');
+      if (mounted && !TourDemo.running.value) {
+        Toast.error(context, 'Gagal memuat history sales');
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -369,6 +374,29 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                         : _sales.isEmpty
                             ? ListView(
                                 children: [
+                                  if (TourDemo.running.value)
+                                    TourDemoBlock(
+                                      child: Card(
+                                        child: ListTile(
+                                          leading: const CircleAvatar(
+                                              child: Icon(Icons.check)),
+                                          title: const Text('NOTA-CONTOH-0001',
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.w700)),
+                                          subtitle: const Text(
+                                              'LUNAS - TUNAI - Rp40.000'),
+                                          trailing: TourTarget(
+                                            id: 'sale-refund',
+                                            child: IconButton(
+                                              onPressed: null,
+                                              icon: const Icon(
+                                                  Icons.replay_rounded),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  else
                                   EmptyState(
                                     icon: Icons.receipt_long_outlined,
                                     title: langProvider.get(

@@ -12,6 +12,7 @@ import '../widgets/app_bar_custom.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
 import '../widgets/tour_target.dart';
+import '../utils/tour_demo.dart';
 
 /// Papan antrian POS -- penjual/staf lihat & majukan status. Aktif/nonaktifkan dari Daftar Outlet.
 class PosQueueScreen extends StatefulWidget {
@@ -96,6 +97,27 @@ class _PosQueueScreenState extends State<PosQueueScreen> {
     }
   }
 
+  /// Antrean CONTOH (tampilan saja) untuk panduan: dipakai bila belum ada antrean asli.
+  Widget _demoQueue(LanguageProvider lang) => ListView(
+        children: [
+          TourDemoBlock(
+            child: Card(
+              child: ListTile(
+                leading: const CircleAvatar(child: Text('1')),
+                title: Text(lang.get('WAITING', 'MENUNGGU')),
+                trailing: TourTarget(
+                  id: 'queue-advance',
+                  child: ElevatedButton(
+                    onPressed: null,
+                    child: Text(lang.get('Process', 'Proses')),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+
   @override
   Widget build(BuildContext context) {
     return PrivateRoute(
@@ -111,17 +133,21 @@ class _PosQueueScreenState extends State<PosQueueScreen> {
           return Scaffold(
             appBar: AppBarCustom(title: lang.get('POS Queue', 'Antrian POS')),
             body: _outcode.isEmpty
-                ? EmptyState(
-                    title: lang.get('No outlet selected', 'Belum ada outlet dipilih'),
-                    description: lang.get('Choose an outlet first.', 'Pilih outlet terlebih dahulu.'))
+                ? TourDemo.when(
+                    demo: () => _demoQueue(lang),
+                    normal: () => EmptyState(
+                        title: lang.get('No outlet selected', 'Belum ada outlet dipilih'),
+                        description: lang.get('Choose an outlet first.', 'Pilih outlet terlebih dahulu.')))
                 : _loading
                     ? const Center(child: CircularProgressIndicator())
                     : _rows.isEmpty
-                        ? EmptyState(
-                            title: lang.get('No queue yet', 'Belum ada antrian'),
-                            description: lang.get(
-                                'Make sure the queue is active for this outlet, then save a POS transaction.',
-                                'Pastikan antrian sudah diaktifkan untuk outlet ini, lalu simpan transaksi di POS.'))
+                        ? TourDemo.when(
+                            demo: () => _demoQueue(lang),
+                            normal: () => EmptyState(
+                                title: lang.get('No queue yet', 'Belum ada antrian'),
+                                description: lang.get(
+                                    'Make sure the queue is active for this outlet, then save a POS transaction.',
+                                    'Pastikan antrian sudah diaktifkan untuk outlet ini, lalu simpan transaksi di POS.')))
                         : RefreshIndicator(
                             onRefresh: _load,
                             child: ListView.separated(

@@ -15,6 +15,7 @@ import '../widgets/empty_state.dart';
 import '../widgets/password_strength_bar.dart';
 import '../widgets/private_route.dart';
 import '../widgets/tour_target.dart';
+import '../utils/tour_demo.dart';
 
 /// Menu penjual: Daftar Staff. Registrasi akun staff (dibawahi owner, akses
 /// menu diatur lewat menu "Akses Staff") + daftar staff yang sudah terdaftar.
@@ -276,13 +277,26 @@ class _StaffListScreenState extends State<StaffListScreen> {
             ? const Center(child: CircularProgressIndicator())
             : _staff.isEmpty
                 ? ListView(
-                    children: const [
-                      EmptyState(
-                        icon: Icons.badge_outlined,
-                        title: 'Belum ada staff',
-                        description:
-                            'Daftarkan akun staff lewat tombol di kanan bawah. '
-                            'Atur menu yang boleh diakses lewat menu "Akses Staff".',
+                    children: [
+                      TourDemo.when(
+                        demo: () => const TourDemoBlock(
+                          child: Card(
+                            child: ListTile(
+                              leading: CircleAvatar(child: Text('S')),
+                              title: Text('Staff Contoh',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.w600)),
+                              subtitle: Text('staff.contoh@email.com'),
+                            ),
+                          ),
+                        ),
+                        normal: () => const EmptyState(
+                          icon: Icons.badge_outlined,
+                          title: 'Belum ada staff',
+                          description:
+                              'Daftarkan akun staff lewat tombol di kanan bawah. '
+                              'Atur menu yang boleh diakses lewat menu "Akses Staff".',
+                        ),
                       ),
                     ],
                   )

@@ -15,6 +15,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
 import '../widgets/tour_target.dart';
+import '../utils/tour_demo.dart';
 
 /// Kas History (2026-10-28) -- padanan pages/kas-history/index.tsx di web. Buku kas harian outlet aktif:
 /// modal awal, uang tunai dari penjualan (bagian tunai nota campur sudah dipotong kembalian), refund tunai dan
@@ -136,6 +137,28 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
       _load();
     }
   }
+
+  /// Kartu ringkasan CONTOH (teks saja) untuk panduan.
+  Widget _demoStat(String label, String value) => SizedBox(
+        width: 150,
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style:
+                        const TextStyle(color: AppColors.muted, fontSize: 12)),
+                const SizedBox(height: 2),
+                Text(value,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 16)),
+              ],
+            ),
+          ),
+        ),
+      );
 
   Widget _stat(String label, double value, {Color? color}) => Card(
         child: Padding(
@@ -305,10 +328,32 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
                     padding: EdgeInsets.all(40),
                     child: Center(child: CircularProgressIndicator()))
               else if (day == null)
-                EmptyState(
-                    icon: Icons.account_balance_wallet_outlined,
-                    title: lang.get('Could not load cash history.',
-                        'Kas history tidak bisa dimuat.'))
+                TourDemo.when(
+                  demo: () => TourDemoBlock(
+                    child: TourTarget(
+                      id: 'kas-history-main',
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _demoStat(lang.get('Opening cash', 'Modal awal'),
+                              'Rp200.000'),
+                          _demoStat(lang.get('Cash sales', 'Penjualan tunai'),
+                              'Rp40.000'),
+                          _demoStat(lang.get('Cash refunds', 'Refund tunai'),
+                              'Rp0'),
+                          _demoStat(
+                              lang.get('Expected cash', 'Kas seharusnya'),
+                              'Rp240.000'),
+                        ],
+                      ),
+                    ),
+                  ),
+                  normal: () => EmptyState(
+                      icon: Icons.account_balance_wallet_outlined,
+                      title: lang.get('Could not load cash history.',
+                          'Kas history tidak bisa dimuat.')),
+                )
               else ...[
                 TourTarget(
                   id: 'kas-history-main',

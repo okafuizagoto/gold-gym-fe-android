@@ -11,6 +11,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/private_route.dart';
 import '../widgets/tour_target.dart';
+import '../utils/tour_demo.dart';
 
 /// Menu penjual: Akses Staff. Pilih 1 staff, lalu centang menu mana yang
 /// boleh diakses (default semua tercentang -- lihat StaffMenuKeys).
@@ -48,6 +49,10 @@ class _StaffMenuAccessScreenState extends State<StaffMenuAccessScreen> {
       }
     } catch (_) {}
     if (mounted) setState(() => _loadingStaff = false);
+    // Panduan berjalan dan staff asli sudah ada: pilih staff pertama supaya tombol Simpan (yang disorot) tampil.
+    if (mounted && TourDemo.running.value && _selected == null && _staff.isNotEmpty) {
+      _selectStaff(_staff.first);
+    }
   }
 
   Future<void> _selectStaff(StaffRow s) async {
@@ -101,12 +106,62 @@ class _StaffMenuAccessScreenState extends State<StaffMenuAccessScreen> {
             ? const Center(child: CircularProgressIndicator())
             : _staff.isEmpty
                 ? ListView(
-                    children: const [
-                      EmptyState(
-                        icon: Icons.badge_outlined,
-                        title: 'Belum ada staff',
-                        description:
-                            'Daftarkan staff terlebih dahulu lewat menu "Daftar Staff".',
+                    children: [
+                      TourDemo.when(
+                        demo: () => TourDemoBlock(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 4),
+                                child: Text(
+                                    'Centang menu yang BOLEH diakses Staff Contoh. Menu "About Us" dan "Absen" selalu bisa diakses staff.',
+                                    style: TextStyle(fontSize: 12.5)),
+                              ),
+                              Card(
+                                child: Column(
+                                  children: [
+                                    for (final l in const [
+                                      'Point of Sale',
+                                      'Sales History',
+                                      'Stock'
+                                    ])
+                                      CheckboxListTile(
+                                          value: true,
+                                          onChanged: null,
+                                          title: Text(l)),
+                                    for (final l in const [
+                                      'Riwayat Refund',
+                                      'Kas History'
+                                    ])
+                                      CheckboxListTile(
+                                          value: false,
+                                          onChanged: null,
+                                          title: Text(l)),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TourTarget(
+                                  id: 'staff-access-save',
+                                  child: ElevatedButton.icon(
+                                    onPressed: null,
+                                    icon: const Icon(Icons.save_outlined),
+                                    label: const Text('Simpan'),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        normal: () => const EmptyState(
+                          icon: Icons.badge_outlined,
+                          title: 'Belum ada staff',
+                          description:
+                              'Daftarkan staff terlebih dahulu lewat menu "Daftar Staff".',
+                        ),
                       ),
                     ],
                   )

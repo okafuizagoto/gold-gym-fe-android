@@ -18,6 +18,7 @@ import '../widgets/private_route.dart';
 import '../widgets/segmented_tabs.dart';
 import '../config/routes.dart';
 import '../widgets/tour_target.dart';
+import '../utils/tour_demo.dart';
 
 /// Layar utama "Meja & Area": dropdown outlet (default outlet yang
 /// sedang aktif) + 2 tab (Meja / Area), masing-masing dengan tombol tambah.
@@ -128,12 +129,49 @@ class _MejaAreaScreenState extends State<MejaAreaScreen> {
                     ),
                     Expanded(
                       child: _selectedOutcode == null
-                          ? const SingleChildScrollView(
-                              child: EmptyState(
-                                icon: Icons.storefront_outlined,
-                                title: 'Belum ada outlet',
-                                description:
-                                    'Buat outlet dulu di menu Ganti Outlet > New Outlet.',
+                          ? TourDemo.when(
+                              demo: () => SingleChildScrollView(
+                                child: TourDemoBlock(
+                                  child: Column(
+                                    children: [
+                                      for (final n in const [
+                                        'Meja Contoh 1',
+                                        'Meja Contoh 2'
+                                      ])
+                                        Card(
+                                          child: ListTile(
+                                            leading: const Icon(
+                                                Icons.table_bar_rounded),
+                                            title: Text(n,
+                                                style: const TextStyle(
+                                                    fontWeight:
+                                                        FontWeight.w700)),
+                                            subtitle: const Text(
+                                                'Kapasitas 4 orang - Kosong'),
+                                          ),
+                                        ),
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: TourTarget(
+                                          id: 'meja-add',
+                                          child: ElevatedButton.icon(
+                                            onPressed: null,
+                                            icon: const Icon(Icons.add_rounded),
+                                            label: const Text('Tambah Meja'),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              normal: () => const SingleChildScrollView(
+                                child: EmptyState(
+                                  icon: Icons.storefront_outlined,
+                                  title: 'Belum ada outlet',
+                                  description:
+                                      'Buat outlet dulu di menu Ganti Outlet > New Outlet.',
+                                ),
                               ),
                             )
                           : IndexedStack(
@@ -353,6 +391,35 @@ class _MejaTabViewState extends State<_MejaTabView> {
               child: _mejaList.isEmpty
                   ? ListView(
                       children: [
+                        if (TourDemo.running.value)
+                          TourDemoBlock(
+                            child: Column(
+                              children: [
+                                const Card(
+                                  child: ListTile(
+                                    leading: Icon(Icons.table_bar_rounded),
+                                    title: Text('Meja Contoh 1',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.w700)),
+                                    subtitle:
+                                        Text('Kapasitas 4 orang - Kosong'),
+                                  ),
+                                ),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TourTarget(
+                                    id: 'meja-add',
+                                    child: ElevatedButton.icon(
+                                      onPressed: null,
+                                      icon: const Icon(Icons.add_rounded),
+                                      label: const Text('Tambah Meja'),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
                         EmptyState(
                           icon: Icons.table_bar_rounded,
                           title: 'Belum ada meja',
