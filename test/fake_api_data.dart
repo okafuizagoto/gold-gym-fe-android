@@ -62,6 +62,22 @@ class FakeApi {
         ],
       };
     }
+    if (path.contains('/stock-transfer/permissions/')) {
+      return {
+        'data': {'staff_gold_id': 101, 'send_level': 'PERSETUJUAN', 'receive_level': 'LANGSUNG'}
+      };
+    }
+    if (path.endsWith('/v2/staff') && q['type'] == 'office') {
+      return {
+        'data': {
+          'configured': true,
+          'name': '$long kantor $long',
+          'lat': -6.2,
+          'lng': 106.8,
+          'radius_m': 100
+        }
+      };
+    }
     if (path.endsWith('/v2/staff')) {
       if (q['type'] == 'menutemplate')
         return {
@@ -147,6 +163,213 @@ class FakeApi {
               'expense_recurring_period': 'MONTHLY',
               'expense_created_by_gold_id': 1,
               'expense_created_at': '2026-10-29T10:00:00Z',
+            }
+        ],
+      };
+    }
+    if (path.endsWith('/cashier-shift/current')) {
+      return {
+        'data': {
+          'shift_id': 1,
+          'shift_status': 'OPEN',
+          'shift_opening_cash': 100000,
+          'shift_opened_by': '$long kasir',
+          'has_prev': true,
+          'handoff_by': '$long',
+          'handoff_diff': 5000,
+          'handoff_gap_net': 5000,
+          'handoff_reason': '$long alasan selisih $long',
+          'verify_status': 'PENDING',
+          'verify_by': '$long',
+          'verify_note': '$long catatan',
+        }
+      };
+    }
+    if (path.endsWith('/cashier-shift/ledger')) {
+      return {
+        'data': {
+          'date': '2026-10-29',
+          'opening': 100000,
+          'cash_sales': 123456789,
+          'cash_in': 50000,
+          'cash_out': 20000,
+          'cash_refunds': 10000,
+          'non_cash': 999999,
+          'sales_count': 12,
+          'expected': 123576789,
+          'counted': 123456789,
+          'end_balance': 123456789,
+          'movements': [
+            for (var i = 1; i <= 3; i++)
+              {
+                'id': i,
+                'kind': i == 1 ? 'TAMBAH' : 'TARIK',
+                'amount': 12345678,
+                'at': '2026-10-29T10:00:00Z',
+                'by': '$long petugas',
+                'by_role': 'STAFF',
+                'description': '$long keterangan $long',
+                'ref': 'REF-NOMOR-REFERENSI-YANG-SANGAT-PANJANG-$i',
+                'balance': 123456789,
+              }
+          ],
+          'shifts': [
+            {
+              'shift_id': 1,
+              'verify_status': 'PENDING',
+              'verify_note': '$long',
+              'verify_by': '$long',
+              'handoff_diff': 5000,
+              'handoff_gap_net': 5000,
+              'handoff_prev_counted': 100000,
+              'handoff_expected': 105000,
+              'shift_opening_cash': 100000,
+              'handoff_reason': '$long alasan $long',
+              'handoff_by': '$long',
+            }
+          ],
+        }
+      };
+    }
+    if (path.endsWith('/v2/cashier-shift')) {
+      return {
+        'data': [
+          for (var i = 1; i <= 3; i++)
+            {
+              'shift_id': i,
+              'shift_status': 'CLOSED',
+              'shift_opening_cash': 100000,
+              'shift_opened_by': '$long kasir $i',
+              'shift_difference': -5000,
+              'verify_status': 'PENDING',
+              'verify_note': '$long',
+              'handoff_by': '$long',
+              'handoff_reason': '$long alasan $long',
+              'handoff_diff': 5000,
+            }
+        ]
+      };
+    }
+    if (path.endsWith('/v2/sales') && q['type'] == 'salesreport') {
+      return {
+        'data': {
+          'date': '2026-10-29',
+          'count': 3,
+          'grand_total': 123456789.0,
+          'refund_total': 1000.0,
+          'exchange_total': 0,
+          'net_total': 123455789.0,
+          'items': [
+            for (var i = 1; i <= 3; i++)
+              {
+                'sale_id': 'SALE-$i',
+                'trancnum': 'INV-NOMOR-NOTA-YANG-SANGAT-PANJANG-SEKALI-$i',
+                'customer': '$long customer',
+                'salesperson': '$long kasir',
+                'trans_time': '10:00:00',
+                'item_name': '$long barang',
+                'qty': 12,
+                'price': 123456.0,
+                'subtotal': 1481472.0,
+                'remaining': 5,
+              }
+          ],
+        }
+      };
+    }
+    if (path.endsWith('/v2/sales') && q['type'] == 'getallsales') {
+      return {
+        'data': [
+          for (var i = 1; i <= 3; i++)
+            {
+              'sale_id': 'SALE-$i',
+              'sale_outcode': 'OUT01',
+              'sale_trancnum': 'INV-NOMOR-NOTA-YANG-SANGAT-PANJANG-SEKALI-$i',
+              'sale_transtime': '10:00:00',
+              'sale_transdate': '2026-10-29T10:00:00+07:00',
+              'sale_transtotal': 123456789.0,
+              'sale_transpayment': 123456789.0,
+              'sale_transchange': 0,
+              'sale_salesperson': '$long kasir',
+              'sale_salescustomer': '$long customer',
+              'sale_paymentyn': 'Y',
+              'sale_pay_type': 'TRANSFER BANK',
+              'sale_meja_names': 'Meja 1, Meja Dengan Nama Yang Panjang Sekali, Meja 3, Meja 4',
+              'sale_void_yn': i == 3 ? 'Y' : 'N',
+              'sale_void_reason': '$long alasan void',
+              'sale_voided_by': '$long',
+            }
+        ],
+        'metadata': {'page': 1, 'limit': 10, 'total_data': 3, 'total_page': 1},
+      };
+    }
+    if (path.endsWith('/v2/discount') && q['type'] == 'getdiscounts') {
+      return {
+        'data': [
+          for (var i = 1; i <= 3; i++)
+            {
+              'discount_id': i,
+              'discount_gold_id': 1,
+              'discount_outcode': 'OUT01',
+              'discount_scope': 'ITEM',
+              'discount_item_id': i,
+              'discount_item_name': '$long barang $i',
+              'discount_type': 'PERCENT',
+              'discount_value': 12.5,
+              'discount_status': 'ACTIVE',
+              'discount_created_by': '$long',
+              'discount_created_at': '2026-10-29T10:00:00Z',
+            }
+        ],
+        'metadata': {'page': 1, 'limit': 10, 'total_data': 3, 'total_page': 1},
+      };
+    }
+    if (path.endsWith('/v2/refund') && q['type'] == 'list') {
+      return {
+        'data': [
+          for (var i = 1; i <= 3; i++)
+            {
+              'refund_id': 'R-$i',
+              'refund_number': 'RF-NOMOR-REFUND-YANG-SANGAT-PANJANG-SEKALI-$i',
+              'refund_sale_id': 'SALE-$i',
+              'refund_sale_number': 'INV-NOMOR-NOTA-YANG-SANGAT-PANJANG-SEKALI-$i',
+              'refund_outcode': 'OUT01',
+              'refund_date': '2026-10-29',
+              'refund_time': '10:00:00',
+              'refund_by': '$long petugas',
+              'refund_reason': '$long alasan refund $long',
+              'refund_method': 'CASH',
+              'refund_mode': i == 2 ? 'EXCHANGE' : 'MONEY_BACK',
+              'refund_total': 123456789.0,
+              'refund_exchange_total': i == 2 ? 100000.0 : 0,
+              'refund_net': -123456789.0,
+              'refund_net_method': 'CASH',
+              'refund_cash_delta': -123456789.0,
+            }
+        ],
+        'metadata': {'page': 1, 'limit': 20, 'total_data': 3, 'total_page': 1},
+      };
+    }
+    if (path.endsWith('/v2/stock-transfer')) {
+      return {
+        'data': [
+          for (var i = 1; i <= 3; i++)
+            {
+              'id': i,
+              'number': 'TRF-NOMOR-TRANSFER-YANG-SANGAT-PANJANG-SEKALI-$i',
+              'from_outcode': 'OUT01',
+              'from_name': '$long asal',
+              'to_outcode': 'OUT02',
+              'to_name': '$long tujuan',
+              'status': 'DIKIRIM',
+              'note': '$long catatan $long',
+              'created_by_name': '$long',
+              'created_at': '2026-10-29T10:00:00Z',
+              'sent_by_name': '$long',
+              'sent_at': '2026-10-29T10:00:00Z',
+              'items': [
+                {'item_id': 1, 'name': '$long barang', 'pack': 'KARTON-BESAR-PANJANG', 'qty': 12}
+              ],
             }
         ],
       };

@@ -160,6 +160,26 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
         ),
       );
 
+  /// Kartu disusun 2 per baris; tiap baris sama tinggi (IntrinsicHeight) dan tingginya mengikuti isi.
+  Widget _statRows(List<Widget> cards) {
+    final rows = <Widget>[];
+    for (var i = 0; i < cards.length; i += 2) {
+      if (i > 0) rows.add(const SizedBox(height: 8));
+      rows.add(IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: cards[i]),
+            const SizedBox(width: 8),
+            Expanded(
+                child: i + 1 < cards.length ? cards[i + 1] : const SizedBox()),
+          ],
+        ),
+      ));
+    }
+    return Column(children: rows);
+  }
+
   Widget _stat(String label, double value, {Color? color}) => Card(
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -357,14 +377,9 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
               else ...[
                 TourTarget(
                   id: 'kas-history-main',
-                  child: GridView.count(
-                  crossAxisCount: 2,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  childAspectRatio: 1.95,
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
-                  children: [
+                  // Baris berpasangan dgn tinggi mengikuti isi (bukan GridView rasio tetap: label yang
+                  // membungkus dua baris memotong isi kartu di layar sempit/font besar).
+                  child: _statRows([
                     _stat(lang.get('Opening cash', 'Modal awal'), day.opening),
                     _stat(lang.get('Cash sales', 'Penjualan tunai'), day.cashSales,
                         color: Colors.green.shade700),
@@ -379,8 +394,7 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
                         lang,
                         lang.get('Verified difference', 'Selisih sudah terverifikasi'),
                         day.handoffs.where((h) => h.diff != 0 && h.verified).toList()),
-                  ],
-                ),
+                  ]),
                 ),
                 if (day.cashIn > 0 || day.cashOut > 0) ...[
                   const SizedBox(height: 8),

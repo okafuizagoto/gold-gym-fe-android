@@ -167,8 +167,11 @@ class _LaporanHarianViewState extends State<LaporanHarianView>
         ),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final widths = _colWidths(constraints.maxWidth);
-            final total = widths.fold(0.0, (a, b) => a + b);
+            // Tiap baris punya padding horizontal 8+8 = 16: sisihkan dari lebar kolom lalu tambahkan
+            // kembali ke lebar tabel, kalau tidak setiap baris meluap 16px di kanan.
+            const rowPad = 16.0;
+            final widths = _colWidths(constraints.maxWidth - rowPad);
+            final total = widths.fold(0.0, (a, b) => a + b) + rowPad;
             return SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: SizedBox(
