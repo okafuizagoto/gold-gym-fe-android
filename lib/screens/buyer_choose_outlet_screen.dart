@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../utils/tour_demo.dart';
 import 'package:provider/provider.dart';
 import '../config/theme.dart';
 import '../models/order_model.dart';
@@ -83,6 +84,36 @@ class _BuyerChooseOutletScreenState extends State<BuyerChooseOutletScreen> {
 
   String _keyOf(PublicOutlet o) => '${o.outletGoldId}|${o.outletCode}';
 
+  /// Kartu outlet CONTOH untuk panduan (tampilan saja): tombol mulai pesan dinonaktifkan.
+  Widget _demoOutlet() => TourDemoBlock(
+        child: SectionCard(
+          title: 'OUTLET CONTOH',
+          description: 'Detail outlet terpilih',
+          icon: Icons.storefront_rounded,
+          child: Column(
+            children: [
+              const InfoRow(label: 'Penjual', value: 'Penjual Contoh'),
+              const InfoRow(label: 'Kode', value: 'CONTOH01'),
+              const InfoRow(label: 'Tipe', value: 'RETAIL'),
+              const InfoRow(label: 'Alamat', value: 'Jl. Contoh No. 1'),
+              const SizedBox(height: 14),
+              TourTarget(
+                id: 'pilih-outlet-start',
+                child: SizedBox(
+                  height: 48,
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.shopping_bag_outlined, size: 20),
+                    label: const Text('PILIH OUTLET INI'),
+                    onPressed: null,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final cart = Provider.of<BuyerOrderProvider>(context);
@@ -117,13 +148,30 @@ class _BuyerChooseOutletScreenState extends State<BuyerChooseOutletScreen> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _outlets.isEmpty
-                ? const PageBody(
-                    child: EmptyState(
-                    icon: Icons.storefront_outlined,
-                    title: 'Belum ada outlet tersedia',
-                    description:
-                        'Outlet penjual yang sudah diaktifkan admin akan tampil di sini.',
-                  ))
+                ? TourDemo.when(
+                    demo: () => PageBody(
+                      maxWidth: 720,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const PageHeader(
+                            title: 'Pilih Outlet Penjual',
+                            subtitle:
+                                'Barang yang bisa dipesan mengikuti outlet yang dipilih',
+                            icon: Icons.store_mall_directory_outlined,
+                          ),
+                          _demoOutlet(),
+                        ],
+                      ),
+                    ),
+                    normal: () => const PageBody(
+                        child: EmptyState(
+                      icon: Icons.storefront_outlined,
+                      title: 'Belum ada outlet tersedia',
+                      description:
+                          'Outlet penjual yang sudah diaktifkan admin akan tampil di sini.',
+                    )),
+                  )
                 : PageBody(
                     maxWidth: 720,
                     child: Column(
@@ -166,6 +214,10 @@ class _BuyerChooseOutletScreenState extends State<BuyerChooseOutletScreen> {
                             },
                           ),
                         ),
+                        if (_selected == null)
+                          TourDemo.when(
+                              demo: _demoOutlet,
+                              normal: () => const SizedBox.shrink()),
                         if (_selected != null) ...[
                           const SizedBox(height: 12),
                           SectionCard(

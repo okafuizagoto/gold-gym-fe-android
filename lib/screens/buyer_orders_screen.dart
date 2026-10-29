@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../utils/tour_demo.dart';
 import '../config/theme.dart';
 import '../models/order_model.dart';
 import '../services/order_api.dart';
@@ -67,7 +68,41 @@ class _BuyerOrdersScreenState extends State<BuyerOrdersScreen> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _orders.isEmpty
-                ? PageBody(
+                ? TourDemo.when(
+                    demo: () => PageBody(
+                      child: TourDemoBlock(
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('OUTLET CONTOH',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w700)),
+                                const SizedBox(height: 4),
+                                const Text('CASH • BELUM LUNAS  Rp15.000',
+                                    style: TextStyle(
+                                        fontSize: 12, color: AppColors.muted)),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TourTarget(
+                                    id: 'pesanan-detail',
+                                    child: TextButton.icon(
+                                      icon: const Icon(Icons.list_alt_rounded,
+                                          size: 18),
+                                      label: const Text('Detail'),
+                                      onPressed: null,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    normal: () => PageBody(
                     child: EmptyState(
                     icon: Icons.receipt_long_outlined,
                     title: 'Belum ada pesanan',
@@ -78,7 +113,8 @@ class _BuyerOrdersScreenState extends State<BuyerOrdersScreen> {
                       label: const Text('Pesan Barang'),
                       onPressed: () => Navigator.pushNamed(context, '/belanja'),
                     ),
-                  ))
+                  )),
+                  )
                 : RefreshIndicator(
                     onRefresh: _load,
                     child: ListView.builder(

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import '../utils/tour_demo.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../config/theme.dart';
@@ -258,6 +259,78 @@ class _BuyerOrderShopScreenState extends State<BuyerOrderShopScreen> {
     );
   }
 
+  /// Barang + keranjang CONTOH untuk panduan (tampilan saja): tombol tambah & BAYAR dinonaktifkan.
+  Widget _demoShop() => TourDemoBlock(
+        child: Column(
+          children: [
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Barang Contoh',
+                              style: TextStyle(fontWeight: FontWeight.w600)),
+                          Text('Rp15.000 • Stok: 20',
+                              style: TextStyle(
+                                  fontSize: 12, color: AppColors.muted)),
+                        ],
+                      ),
+                    ),
+                    TourTarget(
+                      id: 'belanja-add',
+                      child: SizedBox(
+                        width: 32,
+                        height: 32,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          tooltip: 'Tambah ke keranjang',
+                          icon: const Icon(Icons.add_shopping_cart_rounded,
+                              size: 16),
+                          onPressed: null,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('1 barang', style: TextStyle(fontSize: 12)),
+                          Text('Rp15.000',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.blue)),
+                        ],
+                      ),
+                    ),
+                    TourTarget(
+                      id: 'belanja-pay',
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.payment_rounded, size: 20),
+                        label: const Text('BAYAR'),
+                        onPressed: null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final cart = Provider.of<BuyerOrderProvider>(context);
@@ -268,7 +341,9 @@ class _BuyerOrderShopScreenState extends State<BuyerOrderShopScreen> {
         child: Scaffold(
           appBar: const AppBarCustom(title: 'Pesan Barang'),
           drawer: const AppDrawer(),
-          body: PageBody(
+          body: TourDemo.when(
+            demo: () => PageBody(child: _demoShop()),
+            normal: () => PageBody(
             child: EmptyState(
               icon: Icons.storefront_outlined,
               title: 'Pilih outlet penjual dulu',
@@ -281,6 +356,7 @@ class _BuyerOrderShopScreenState extends State<BuyerOrderShopScreen> {
                     Navigator.pushReplacementNamed(context, '/pilih-outlet'),
               ),
             ),
+          ),
           ),
         ),
       );
@@ -310,12 +386,17 @@ class _BuyerOrderShopScreenState extends State<BuyerOrderShopScreen> {
                   child: _loading
                       ? const Center(child: CircularProgressIndicator())
                       : _items.isEmpty
-                          ? EmptyState(
-                              icon: Icons.search_off_rounded,
-                              title: 'Barang tidak ditemukan',
-                              description:
-                                  'Coba kata kunci lain atau kosongkan pencarian.',
-                              compact: context.isShort,
+                          ? TourDemo.when(
+                              demo: () => SingleChildScrollView(
+                                  padding: EdgeInsets.all(pad),
+                                  child: _demoShop()),
+                              normal: () => EmptyState(
+                                icon: Icons.search_off_rounded,
+                                title: 'Barang tidak ditemukan',
+                                description:
+                                    'Coba kata kunci lain atau kosongkan pencarian.',
+                                compact: context.isShort,
+                              ),
                             )
                           : GridView.builder(
                               padding: EdgeInsets.fromLTRB(pad, 4, pad, pad),
