@@ -74,10 +74,13 @@ android {
             // Juga membuat staging & production bisa terpasang bersamaan.
             applicationIdSuffix = ".staging"
             manifestPlaceholders["appName"] = "Okejual-staging"
+            // domain web yang tautan verifikasi emailnya membuka aplikasi ini (App Links)
+            manifestPlaceholders["appLinkHost"] = "staging.okejual.com"
         }
         create("production") {
             dimension = "env"
             manifestPlaceholders["appName"] = "Okejual"
+            manifestPlaceholders["appLinkHost"] = "okejual.com"
         }
     }
 }

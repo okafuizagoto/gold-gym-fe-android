@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert';
 import '../services/core_api.dart';
-import '../services/staff_api.dart';
 import '../models/login_response_model.dart';
 import '../utils/storage.dart';
 import '../utils/toast.dart';
@@ -13,8 +12,7 @@ import '../config/env.dart';
 import '../config/theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/auth_card.dart';
-import '../utils/seller_outlet_gate.dart';
-import '../utils/language_pref.dart';
+import '../utils/login_session.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -91,84 +89,13 @@ class _LoginScreenState extends State<LoginScreen> {
           jsonDecode(response.body),
         );
 
-        // Save to storage
-        await Storage.set(
-            AppConstants.accessTokenKey, loginResponse.bearerToken);
-        await Storage.set(
-            AppConstants.expiresAtKey, loginResponse.expiresAt.toString());
-        await Storage.set(AppConstants.userNIPKey, loginResponse.username);
-        await Storage.set(AppConstants.userEmail, _userController.text.trim());
-        await Storage.set(AppConstants.userRoleKey, loginResponse.role);
-        await Storage.set(
-            AppConstants.userGoldIdKey, loginResponse.goldId.toString());
-        await Storage.set(AppConstants.userIsBuyerKey, loginResponse.buyerYn);
-        await Storage.set(
-            AppConstants.menuDaftarPembeliKey, loginResponse.menuDaftarPembeli);
-        await Storage.set(
-            AppConstants.menuModePembeliKey, loginResponse.menuModePembeli);
-        await Storage.set(AppConstants.emailVerifiedKey,
-            loginResponse.emailVerified.toString());
-        await Storage.set(AppConstants.forceChangePasswordKey,
-            loginResponse.forceChangePassword.toString());
-        // Bahasa: pilihan manual di perangkat > bahasa bawaan negara akun > bawaan lama (lihat language_pref.dart).
-        if (mounted) {
-          await context.read<LanguageProvider>().setLanguage(
-              await languageAfterLogin(loginResponse.countryIso2),
-              remember: false);
-        }
-        if (rawCookie != null) {
-          final cookie = rawCookie.split(';').first;
-          await Storage.set('refresh_cookie', cookie);
-        }
-
-        // Staff: cache menu yang TIDAK boleh diakses (dibaca app_drawer.dart).
-        // Gagal fetch (network dll) -> anggap tidak ada yang ditolak, supaya
-        // staff tidak tiba-tiba kehilangan semua menu. Non-staff: bersihkan
-        // sisa cache akun STAFF sebelumnya di device yang sama.
-        if (loginResponse.role == AppConstants.roleStaff) {
-          try {
-            final resp = await StaffApi().myDeniedMenus();
-            if (resp.statusCode == 200) {
-              final body = jsonDecode(resp.body);
-              final keys = ((body['data'] ?? []) as List)
-                  .map((e) => e.toString())
-                  .toList();
-              await Storage.setStaffDeniedMenuKeys(keys);
-            }
-          } catch (_) {
-            // fail-open
-          }
-        } else {
-          await Storage.setStaffDeniedMenuKeys([]);
-        }
-
-        // Tujuan setelah login berbeda per role: pembeli TIDAK melewati menu
-        // pilih-outlet milik penjual (/outlet), melainkan langsung ke menu
-        // pembeli (pilih outlet penjual → belanja). ADMIN juga tidak lewat
-        // pilih-outlet -- semua layar admin (grup "Akses Admin") bersifat
-        // global, tidak terikat 1 outlet -- langsung ke Dashboard.
-        //
-        // KECUALI email belum diverifikasi -- token yang baru saja disimpan
-        // TETAP tidak bisa akses endpoint terproteksi apa pun sampai user
-        // klik link verifikasi & login ULANG (lihat ValidateToken backend).
-        String dest = '/outlet';
-        if (!loginResponse.emailVerified) {
-          dest = '/check-email';
-        } else if (loginResponse.forceChangePassword == 1) {
-          dest = '/ganti-password'; // password awal dari penjual: wajib diganti dulu
-        } else if (loginResponse.role == AppConstants.roleBuyer) {
-          final buyerOutlet = await Storage.get(AppConstants.buyerOutcodeKey);
-          dest = (buyerOutlet == null || buyerOutlet.isEmpty)
-              ? '/pilih-outlet'
-              : '/belanja';
-        } else if (loginResponse.role == AppConstants.roleAdmin) {
-          dest = '/';
-        } else if (loginResponse.role == AppConstants.roleSeller &&
-            await SellerOutletGate.sellerNeedsTourFirst()) {
-          // Penjual baru tanpa outlet: panduan pertama jalan DULU (dengan outlet dummy), baru wajib buat
-          // outlet -- padanan alur web. Layar Dashboard cukup untuk memicu panduan.
-          dest = '/';
-        }
+        // Simpan sesi + tentukan layar tujuan (logika bersama dengan verifikasi lewat tautan email).
+        final dest = await LoginSession.save(
+          loginResponse,
+          _userController.text.trim(),
+          rawCookie: rawCookie,
+          lang: mounted ? context.read<LanguageProvider>() : null,
+        );
 
         // Update user provider
         if (mounted) {

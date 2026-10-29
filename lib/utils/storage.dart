@@ -11,10 +11,24 @@ class Storage {
 
   static const FlutterSecureStorage _secure = FlutterSecureStorage();
 
+  /// Salinan MEMORI dari kunci rahasia. Membaca Android Keystore lambat (puluhan sampai ratusan milidetik
+  /// di HP kelas menengah) dan dilakukan di SETIAP layar (PrivateRoute) dan SETIAP request API -- itu
+  /// penyebab jeda "macet" saat membuka menu. Diisi saat dibaca/ditulis, dibuang saat dihapus.
+  static final Map<String, String> _secretCache = {};
+
+  /// Naik tiap kali ada yang ditulis/dihapus lewat Storage: pemakai snapshot (mis. PrivateRoute) tahu
+  /// snapshot-nya sudah basi kalau nomor ini berubah.
+  static int generation = 0;
+
   static Future<String?> get(String key) async {
     if (_secretKeys.contains(key)) {
+      final cached = _secretCache[key];
+      if (cached != null) return cached;
       final secure = await _secure.read(key: key);
-      if (secure != null) return secure;
+      if (secure != null) {
+        _secretCache[key] = secure;
+        return secure;
+      }
       // Migrasi sekali jalan: token lama (versi aplikasi sebelumnya) ada di SharedPreferences.
       // Pindahkan ke penyimpanan aman lalu hapus salinan yang tidak terenkripsi.
       final prefs = await SharedPreferences.getInstance();
@@ -22,6 +36,7 @@ class Storage {
       if (legacy != null) {
         await _secure.write(key: key, value: legacy);
         await prefs.remove(key);
+        _secretCache[key] = legacy;
       }
       return legacy;
     }
@@ -30,7 +45,9 @@ class Storage {
   }
 
   static Future<void> set(String key, String value) async {
+    generation++;
     if (_secretKeys.contains(key)) {
+      _secretCache[key] = value;
       await _secure.write(key: key, value: value);
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(key); // pastikan tidak ada sisa salinan tak terenkripsi
@@ -41,7 +58,9 @@ class Storage {
   }
 
   static Future<void> delete(String key) async {
+    generation++;
     if (_secretKeys.contains(key)) {
+      _secretCache.remove(key);
       await _secure.delete(key: key);
     }
     final prefs = await SharedPreferences.getInstance();
@@ -49,6 +68,8 @@ class Storage {
   }
 
   static Future<void> clear() async {
+    generation++;
+    _secretCache.clear();
     await _secure.deleteAll();
     final prefs = await SharedPreferences.getInstance();
     // Pilihan bahasa manual adalah preferensi PERANGKAT, bukan data akun: tetap ada setelah logout.

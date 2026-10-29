@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show kReleaseMode;
+import 'package:flutter/services.dart' show appFlavor;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -16,6 +17,7 @@ import 'widgets/offline_banner.dart';
 import '../utils/storage.dart';
 import '../utils/constants.dart';
 import '../utils/navigation.dart';
+import 'utils/deep_links.dart';
 
 // Future<void> main() async {
 //   WidgetsFlutterBinding.ensureInitialized();
@@ -60,9 +62,14 @@ import '../utils/navigation.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final envFiles = kReleaseMode
-      ? [".env.production"]
-      : [".env.local", ".env.production"];
+  // Flavor "staging" SELALU memakai API staging (.env.local), termasuk di build rilis -- dulu build rilis
+  // flavor staging ikut memuat .env.production sehingga APK uji tersambung ke API PRODUKSI. Flavor production
+  // (Play Store) tetap .env.production; build debug tanpa flavor tetap .env.local lalu .env.production.
+  final envFiles = appFlavor == 'staging'
+      ? [".env.local"]
+      : kReleaseMode
+          ? [".env.production"]
+          : [".env.local", ".env.production"];
   for (final file in envFiles) {
     try {
       await dotenv.load(fileName: file);
@@ -114,6 +121,8 @@ Future<void> main() async {
   await SalesOutbox.instance.init();
 
   runApp(MyApp(startRoute: initialRoute, userProvider: userProvider));
+  // Tautan yang membuka aplikasi (verifikasi email) -- lihat utils/deep_links.dart
+  DeepLinks.init();
 }
 
 class MyApp extends StatelessWidget {

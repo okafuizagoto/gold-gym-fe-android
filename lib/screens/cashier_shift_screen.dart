@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../utils/tour_demo.dart';
 import '../config/theme.dart';
 import '../models/cash_day_model.dart';
 import '../services/cashier_shift_api.dart';
@@ -304,9 +305,40 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _outcode.isEmpty
-                ? const EmptyState(
-                    icon: Icons.storefront_outlined,
-                    title: 'Pilih outlet terlebih dahulu')
+                // Panduan penggunaan: akun baru belum punya outlet -> tampilkan kartu CONTOH supaya tombol
+                // BUKA SESI KASIR bisa dijelaskan (tampilan saja, tanpa API).
+                ? TourDemo.when(
+                    demo: () => ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        TourDemoBlock(
+                          child: SectionCard(
+                            title: 'Belum ada sesi berjalan',
+                            icon: Icons.point_of_sale_outlined,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                const Text(
+                                    'Buka sesi kasir untuk mulai mencatat modal awal & rekonsiliasi kas harian.'),
+                                const SizedBox(height: 12),
+                                TourTarget(
+                                  id: 'shift-main',
+                                  child: ElevatedButton.icon(
+                                    icon: const Icon(Icons.lock_open_rounded),
+                                    onPressed: null,
+                                    label: const Text('BUKA SESI KASIR'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    normal: () => const EmptyState(
+                        icon: Icons.storefront_outlined,
+                        title: 'Pilih outlet terlebih dahulu'),
+                  )
                 : RefreshIndicator(
                     onRefresh: _load,
                     child: ListView(

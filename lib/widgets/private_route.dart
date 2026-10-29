@@ -125,22 +125,47 @@ class _PrivateRouteState extends State<PrivateRoute> {
       );
   }
 
+  /// Snapshot terakhir hasil [_loadAuth] + nomor [Storage.generation] saat dibuat. Dipakai sebagai
+  /// initialData supaya berpindah menu tidak menampilkan spinner kosong dulu (dulu tiap layar membaca
+  /// Keystore + 4 kunci lain berurutan sebelum menggambar apa pun -> terasa macet). Dianggap basi begitu
+  /// ada tulisan/hapus apa pun lewat Storage (login, logout, ganti outlet, dsb).
+  static Map<String, String?>? _snapshot;
+  static int _snapshotGen = -1;
+
+  Map<String, String?>? get _freshSnapshot =>
+      (_snapshot != null && _snapshotGen == Storage.generation)
+          ? _snapshot
+          : null;
+
   Future<Map<String, String?>> _loadAuth() async {
-    return {
-      'token': await Storage.get(AppConstants.accessTokenKey),
-      'role': await Storage.get(AppConstants.userRoleKey),
-      'emailVerified': await Storage.get(AppConstants.emailVerifiedKey),
-      'forceChange': await Storage.get(AppConstants.forceChangePasswordKey),
-      'outcode': await Storage.get(AppConstants.outcode),
+    final gen = Storage.generation;
+    final v = await Future.wait([
+      Storage.get(AppConstants.accessTokenKey),
+      Storage.get(AppConstants.userRoleKey),
+      Storage.get(AppConstants.emailVerifiedKey),
+      Storage.get(AppConstants.forceChangePasswordKey),
+      Storage.get(AppConstants.outcode),
+    ]);
+    final map = <String, String?>{
+      'token': v[0],
+      'role': v[1],
+      'emailVerified': v[2],
+      'forceChange': v[3],
+      'outcode': v[4],
     };
+    _snapshot = map;
+    _snapshotGen = gen;
+    return map;
   }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, String?>>(
       future: _authFuture,
+      initialData: _freshSnapshot,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (!snapshot.hasData &&
+            snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );

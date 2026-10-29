@@ -46,7 +46,10 @@ class _StockBarangScreenState extends State<StockBarangScreen> {
   final _stockQtyController = TextEditingController();
   final stockArrNotifier = ValueNotifier<List<StockModel>>([]);
   TextEditingController? _autoCompleteController;
-  FocusNode _autoCompleteFocusNode = FocusNode();
+  // FocusNode awal milik layar ini; setelah Autocomplete membangun field, yang dipakai milik Autocomplete
+  // (ia yang men-dispose-nya), jadi hanya yang awal yang boleh di-dispose di sini.
+  final FocusNode _ownFocusNode = FocusNode();
+  late FocusNode _autoCompleteFocusNode = _ownFocusNode;
 
   final _debouncerSuggestion = Debouncer(milliseconds: 400);
 
@@ -76,7 +79,7 @@ class _StockBarangScreenState extends State<StockBarangScreen> {
     _stockPackController.dispose();
     _stockItemIDController.dispose();
     _stockQtyController.dispose();
-    _autoCompleteFocusNode.dispose();
+    _ownFocusNode.dispose();
     _debouncerSuggestion.dispose();
 
     _searchController.dispose();

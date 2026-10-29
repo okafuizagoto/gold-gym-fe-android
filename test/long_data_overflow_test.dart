@@ -49,6 +49,16 @@ class Case {
   /// Jumlah putaran tunggu awal (layar yang memuat banyak endpoint berurutan butuh lebih banyak).
   final int waits;
 
+  /// Isi semua kolom teks dengan teks sangat panjang (uji layar form).
+  final bool fill;
+
+  /// Tekan tombol simpan/kirim utama TANPA mengisi apa pun supaya pesan validasi tampil.
+  final bool submitEmpty;
+
+  /// Tekan tiap tombol di layar (maks. [maxTaps]); dialog/sheet/layar yang terbuka diisi teks panjang, dikirim kosong, lalu ditutup.
+  final bool tapAll;
+  final int maxTaps;
+
   /// Data lokal yang perlu disemai sebelum layar dibuka (mis. 'outbox' = antrean transaksi offline).
   final String? seed;
   const Case(this.route,
@@ -59,6 +69,10 @@ class Case {
       this.tabLabel,
       this.tapText,
       this.waits = 10,
+      this.fill = false,
+      this.submitEmpty = false,
+      this.tapAll = false,
+      this.maxTaps = 12,
       this.seed});
 }
 
@@ -179,6 +193,128 @@ Future<({List<String> overflows, bool sawMarker})> renderWithData(
         await tester.pump(const Duration(milliseconds: 250));
       }
     }
+    if (c.tapAll) {
+      Finder buttons() => find.byWidgetPredicate((w) =>
+          w is ElevatedButton ||
+          w is FilledButton ||
+          w is OutlinedButton ||
+          w is TextButton ||
+          w is IconButton ||
+          w is FloatingActionButton);
+      final skip = RegExp('keluar|logout|hapus|delete|kembali|back|pilih paket|pulihkan',
+          caseSensitive: false);
+      var taps = 0;
+      for (var i = 0; i < 40 && taps < c.maxTaps; i++) {
+        final all = buttons();
+        if (i >= all.evaluate().length) break;
+        final target = all.at(i);
+        // lewati tombol berbahaya / navigasi keluar berdasarkan teks atau tooltip di dalamnya
+        final label = find.descendant(of: target, matching: find.byType(Text));
+        final txt = label.evaluate().map((e) => (e.widget as Text).data ?? '').join(' ');
+        final tip = (target.evaluate().first.widget is IconButton)
+            ? ((target.evaluate().first.widget as IconButton).tooltip ?? '')
+            : '';
+        if (skip.hasMatch(txt) || skip.hasMatch(tip)) continue;
+        final before = find.byType(Scaffold).evaluate().length;
+        if (Platform.environment['DBG_FORM'] != null) {
+          stdout.writeln('TAP ${c.route} #$i "$txt" tip="$tip" ${target.evaluate().first.widget.runtimeType}');
+        }
+        try {
+          await tester.ensureVisible(target);
+          await tester.tap(target, warnIfMissed: false);
+        } catch (_) {
+          continue;
+        }
+        taps++;
+        for (var k = 0; k < 4; k++) {
+          await tester
+              .runAsync(() => Future.delayed(const Duration(milliseconds: 60)));
+          await tester.pump(const Duration(milliseconds: 250));
+        }
+        final overlay = find.byWidgetPredicate((w) =>
+            w is Dialog || w is BottomSheet || w is AlertDialog);
+        final pushed = find.byType(Scaffold).evaluate().length > before;
+        if (overlay.evaluate().isNotEmpty || pushed) {
+          // isi kolom di lapisan atas, lalu kirim kosong untuk memunculkan validasi
+          final top = overlay.evaluate().isNotEmpty ? overlay : find.byType(Scaffold).last;
+          final fields = find.descendant(of: top, matching: find.byType(EditableText));
+          for (var f = 0; f < fields.evaluate().length && f < 8; f++) {
+            try {
+              await tester.enterText(fields.at(f), _long);
+              await tester.pump(const Duration(milliseconds: 100));
+            } catch (_) {}
+          }
+          await tester.pump(const Duration(milliseconds: 300));
+          final subs = find.descendant(
+              of: top,
+              matching: find.byWidgetPredicate(
+                  (w) => w is ElevatedButton || w is FilledButton));
+          if (subs.evaluate().isNotEmpty) {
+            try {
+              await tester.tap(subs.last, warnIfMissed: false);
+              for (var k = 0; k < 3; k++) {
+                await tester.runAsync(
+                    () => Future.delayed(const Duration(milliseconds: 60)));
+                await tester.pump(const Duration(milliseconds: 250));
+              }
+            } catch (_) {}
+          }
+          // tutup lapisan: pop sampai kembali ke layar awal
+          for (var k = 0; k < 3; k++) {
+            final stillOver = find.byWidgetPredicate((w) =>
+                w is Dialog || w is BottomSheet || w is AlertDialog).evaluate().isNotEmpty;
+            final stillPushed = find.byType(Scaffold).evaluate().length > before;
+            if (!stillOver && !stillPushed) break;
+            final nav = tester.state<NavigatorState>(find.byType(Navigator).first);
+            if (!nav.canPop()) break;
+            await nav.maybePop();
+            await tester.pump(const Duration(milliseconds: 500));
+            await tester.pump(const Duration(milliseconds: 500));
+          }
+        }
+      }
+      if (Platform.environment['DBG_FORM'] != null) {
+        stdout.writeln('TAPS ${c.route} taps=$taps');
+      }
+    }
+    if (c.submitEmpty) {
+      final btn = find.byWidgetPredicate((w) =>
+          w is ElevatedButton || w is FilledButton || w is OutlinedButton);
+      if (btn.evaluate().isNotEmpty) {
+        try {
+          await tester.ensureVisible(btn.last);
+          await tester.tap(btn.last, warnIfMissed: false);
+        } catch (_) {}
+        for (var i = 0; i < 4; i++) {
+          await tester.runAsync(
+              () => Future.delayed(const Duration(milliseconds: 60)));
+          await tester.pump(const Duration(milliseconds: 250));
+        }
+      }
+    }
+    if (c.fill) {
+      final fields = find.byType(EditableText);
+      final n = fields.evaluate().length;
+      for (var i = 0; i < n && i < 14; i++) {
+        try {
+          await tester.ensureVisible(fields.at(i));
+          await tester.enterText(fields.at(i), _long);
+          await tester.pump(const Duration(milliseconds: 100));
+        } catch (_) {}
+      }
+      await tester.pump(const Duration(milliseconds: 400));
+      if (Platform.environment['DBG_FORM'] != null) {
+        stdout.writeln(
+            'FORM ${c.route} fields=$n filled=${find.textContaining('Nama Yang Sangat').evaluate().length}');
+      }
+    }
+    if (c.submitEmpty && Platform.environment['DBG_FORM'] != null) {
+      final errs = find.byWidgetPredicate((w) =>
+          w is Text &&
+          RegExp('wajib|harus|tidak boleh|isi |pilih|minimal', caseSensitive: false)
+              .hasMatch(w.data ?? ''));
+      stdout.writeln('SUBMIT ${c.route} pesan=${errs.evaluate().length}');
+    }
     sawMarker = find.textContaining(c.marker).evaluate().isNotEmpty;
     // Telusuri layar ke bawah: item list dibangun malas (lazy), jadi yang di luar layar baru dirender
     // (dan baru bisa meluap) saat di-scroll.
@@ -271,6 +407,23 @@ void mockPathProvider() {
   );
 }
 
+/// Plugin platform yang tidak ada di lingkungan tes (kamera/galeri, penagihan Play, buka tautan, berbagi,
+/// lokasi): dijawab null supaya tombol yang memanggilnya tidak melempar MissingPluginException.
+void mockPlatformPlugins() {
+  for (final name in const [
+    'plugins.flutter.io/image_picker',
+    'plugins.flutter.io/in_app_purchase',
+    'plugins.flutter.io/url_launcher',
+    'dev.fluttercommunity.plus/share',
+    'flutter.baseflow.com/geolocator',
+    'plugins.flutter.io/file_selector',
+    'flutter_blue_plus/methods',
+  ]) {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(MethodChannel(name), (call) async => null);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -279,6 +432,7 @@ void main() {
     HttpOverrides.global = null;
     mockSecureStorage();
     mockPathProvider();
+    mockPlatformPlugins();
     await initializeDateFormatting('id_ID', null);
     await loadAppFonts();
   });
@@ -364,10 +518,134 @@ void main() {
         role: AppConstants.roleAdmin, marker: 'Tanggal daftar tidak tercatat'),
     Case('/admin-storage-usage',
         role: AppConstants.roleAdmin, marker: 'PAKET-DENGAN'),
+    // ---- audit FORM: kolom diisi teks sangat panjang / tombol simpan ditekan kosong (pesan validasi) ----
+    Case('/add-items', marker: '', fill: true),
+    Case('/add-items', marker: '', submitEmpty: true),
+    Case('/add-menu', marker: '', fill: true),
+    Case('/add-menu', marker: '', submitEmpty: true),
+    Case('/tambah-kas', marker: '', fill: true),
+    Case('/tambah-kas', marker: '', submitEmpty: true),
+    Case('/tarik-kas', marker: '', fill: true),
+    Case('/tarik-kas', marker: '', submitEmpty: true),
+    Case('/tambah-meja', marker: '', fill: true),
+    Case('/tambah-meja', marker: '', submitEmpty: true),
+    Case('/tambah-area', marker: '', fill: true),
+    Case('/tambah-area', marker: '', submitEmpty: true),
+    Case('/new-outlet', marker: '', fill: true),
+    Case('/new-outlet', marker: '', submitEmpty: true),
+    Case('/edit-profil', marker: '', fill: true),
+    Case('/edit-profil', marker: '', submitEmpty: true),
+    Case('/ganti-password', marker: '', fill: true),
+    Case('/ganti-password', marker: '', submitEmpty: true),
+    Case('/keamanan-akun', marker: '', fill: true),
+    Case('/keamanan-akun', marker: '', submitEmpty: true),
+    Case('/request-fitur', marker: '', fill: true),
+    Case('/request-fitur', marker: '', submitEmpty: true),
+    Case('/request-aplikasi-baru', marker: '', fill: true),
+    Case('/request-aplikasi-baru', marker: '', submitEmpty: true),
+    Case('/daftar-customer', marker: '', fill: true),
+    Case('/daftar-customer', marker: '', submitEmpty: true),
+    Case('/customer-type', marker: '', fill: true),
+    Case('/customer-type', marker: '', submitEmpty: true),
+    Case('/expense', marker: '', fill: true),
+    Case('/expense', marker: '', submitEmpty: true),
+    Case('/diskon', marker: '', fill: true),
+    Case('/diskon', marker: '', submitEmpty: true),
+    Case('/qris-outlet', marker: '', fill: true),
+    Case('/qris-outlet', marker: '', submitEmpty: true),
+    Case('/lokasi-kantor', marker: '', fill: true),
+    Case('/lokasi-kantor', marker: '', submitEmpty: true),
+    Case('/transfer-stok', marker: '', fill: true),
+    Case('/transfer-stok', marker: '', submitEmpty: true),
+    Case('/penjualan', marker: '', fill: true),
+    Case('/penjualan', marker: '', submitEmpty: true),
+    Case('/booking', marker: '', fill: true),
+    Case('/booking', marker: '', submitEmpty: true),
+    Case('/login', marker: '', fill: true),
+    Case('/login', marker: '', submitEmpty: true),
+    Case('/register', marker: '', fill: true),
+    Case('/register', marker: '', submitEmpty: true),
+    Case('/lupa-password', marker: '', fill: true),
+    Case('/lupa-password', marker: '', submitEmpty: true),
+    Case('/check-email', marker: '', fill: true),
+    Case('/check-email', marker: '', submitEmpty: true),
+    Case('/thermal-printer', marker: '', fill: true),
+    Case('/thermal-printer', marker: '', submitEmpty: true),
+    Case('/daftar-pembeli', marker: '', fill: true),
+    Case('/daftar-pembeli', marker: '', submitEmpty: true),
+    Case('/daftar-penjual', role: AppConstants.roleBuyer, marker: '', fill: true),
+    Case('/daftar-penjual', role: AppConstants.roleBuyer, marker: '', submitEmpty: true),
+    Case('/admin-plan-pricing', role: AppConstants.roleAdmin, marker: '', fill: true),
+    Case('/admin-plan-pricing', role: AppConstants.roleAdmin, marker: '', submitEmpty: true),
+    Case('/admin-plan-features', role: AppConstants.roleAdmin, marker: '', fill: true),
+    Case('/admin-plan-features', role: AppConstants.roleAdmin, marker: '', submitEmpty: true),
+    Case('/admin-akun', role: AppConstants.roleAdmin, marker: '', fill: true),
+    Case('/admin-akun', role: AppConstants.roleAdmin, marker: '', submitEmpty: true),
+    Case('/admin-langganan-tampilan', role: AppConstants.roleAdmin, marker: '', fill: true),
+    Case('/admin-langganan-tampilan', role: AppConstants.roleAdmin, marker: '', submitEmpty: true),
+    // ---- audit TOMBOL: tiap tombol ditekan, dialog/sheet diisi teks panjang lalu ditutup ----
+    Case('/add-items', marker: '', tapAll: true),
+    Case('/tambah-kas', marker: '', tapAll: true),
+    Case('/tarik-kas', marker: '', tapAll: true),
+    Case('/tambah-meja', marker: '', tapAll: true),
+    Case('/tambah-area', marker: '', tapAll: true),
+    Case('/list-outlet', marker: '', tapAll: true),
+    Case('/daftar-customer', marker: '', tapAll: true),
+    Case('/customer-type', marker: '', tapAll: true),
+    Case('/daftar-staff', marker: '', tapAll: true),
+    Case('/meja-area', marker: '', tapAll: true),
+    Case('/expense', marker: '', tapAll: true),
+    Case('/stock-barang', marker: '', tapAll: true),
+    Case('/kelola-meja', marker: '', tapAll: true),
+    Case('/penjualan', marker: '', tapAll: true),
+    Case('/cashier-shift', marker: '', tapAll: true),
+    Case('/kas-history', marker: '', tapAll: true),
+    Case('/laporan', marker: '', tapAll: true),
+    Case('/qris-outlet', marker: '', tapAll: true),
+    Case('/lokasi-kantor', marker: '', tapAll: true),
+    Case('/history-sales', marker: '', tapAll: true),
+    Case('/diskon', marker: '', tapAll: true),
+    Case('/riwayat-refund', marker: '', tapAll: true),
+    Case('/transfer-stok', marker: '', tapAll: true),
+    Case('/akses-staff', marker: '', tapAll: true),
+    Case('/izin-transfer-staff', marker: '', tapAll: true),
+    Case('/absen-staff', marker: '', tapAll: true),
+    Case('/booking', marker: '', tapAll: true),
+    Case('/langganan', marker: '', tapAll: true),
+    Case('/storage', marker: '', tapAll: true),
+    Case('/request-fitur', marker: '', tapAll: true),
+    Case('/keamanan-akun', marker: '', tapAll: true),
+    Case('/edit-profil', marker: '', tapAll: true),
+    Case('/thermal-printer', marker: '', tapAll: true),
+    Case('/qris-saya', marker: '', tapAll: true),
+    Case('/outlet', marker: '', tapAll: true),
+    Case('/', marker: '', tapAll: true),
+    Case('/admin-outlet-pembeli', role: AppConstants.roleAdmin, marker: '', tapAll: true),
+    Case('/admin-pos-customer', role: AppConstants.roleAdmin, marker: '', tapAll: true),
+    Case('/admin-proof-access', role: AppConstants.roleAdmin, marker: '', tapAll: true),
+    Case('/admin-registration-mode', role: AppConstants.roleAdmin, marker: '', tapAll: true),
+    Case('/admin-outlet-type-settings', role: AppConstants.roleAdmin, marker: '', tapAll: true),
+    Case('/admin-langganan-tampilan', role: AppConstants.roleAdmin, marker: '', tapAll: true),
+    Case('/admin-plan-pricing', role: AppConstants.roleAdmin, marker: '', tapAll: true),
+    Case('/admin-plan-features', role: AppConstants.roleAdmin, marker: '', tapAll: true),
+    Case('/admin-storage-usage', role: AppConstants.roleAdmin, marker: '', tapAll: true),
+    Case('/admin-statistik-pengguna', role: AppConstants.roleAdmin, marker: '', tapAll: true),
+    Case('/admin-akun', role: AppConstants.roleAdmin, marker: '', tapAll: true),
+    Case('/admin-request-fitur', role: AppConstants.roleAdmin, marker: '', tapAll: true),
+    Case('/admin-backup', role: AppConstants.roleAdmin, marker: '', tapAll: true),
+    Case('/admin-payment-report', role: AppConstants.roleAdmin, marker: '', tapAll: true),
+    Case('/admin-akses-daftar-pembeli', role: AppConstants.roleAdmin, marker: '', tapAll: true),
+    Case('/admin-akses-mode-pembeli', role: AppConstants.roleAdmin, marker: '', tapAll: true),
+    Case('/pesanan-saya', role: AppConstants.roleBuyer, marker: '', tapAll: true),
+    Case('/pilih-outlet', role: AppConstants.roleBuyer, marker: '', tapAll: true),
+    Case('/antrian-saya', role: AppConstants.roleBuyer, marker: '', tapAll: true),
+    Case('/daftar-penjual', role: AppConstants.roleBuyer, marker: '', tapAll: true),
   ];
 
   for (final c in cases) {
-    group('${c.route} [data panjang]', () {
+    group(
+        '${c.route} [data panjang]${c.tapAll ? ' [tap]' : c.fill ? ' [isi]' : c.submitEmpty ? ' [kosong]' : ''}',
+        () {
       for (final scale in [1.0, 1.3]) {
         for (final s in sizes) {
           testWidgets('tidak ada overflow @ ${s.name} font ${scale}x',

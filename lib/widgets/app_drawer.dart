@@ -1,6 +1,7 @@
 import 'dart:convert';
 import '../services/sales_api.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../config/theme.dart';
 import '../utils/storage.dart';
 import '../utils/constants.dart';
@@ -10,6 +11,85 @@ import '../services/feature_request_api.dart';
 import '../utils/toast.dart';
 import 'brand_logo.dart';
 import 'onboarding_tour.dart';
+
+/// Dua bendera dari SERVER yang memengaruhi isi drawer. Dulu drawer menunggu keduanya (2 request berurutan)
+/// SEBELUM menggambar satu menu pun -> tiap membuka drawer terasa macet. Sekarang dipakai nilai terakhir yang
+/// diketahui (memori, lalu penyimpanan lokal), menu langsung tampil, dan bendera disegarkan di latar belakang.
+class _DrawerFlags {
+  static bool? requestApp; // menu "Request Aplikasi Baru" boleh tampil
+  static bool? proof; // fitur bukti bayar/QRIS aktif untuk akun ini
+  static DateTime? _lastRefresh;
+  static String? _owner; // cache hanya berlaku untuk akun ini (bendera ini per akun)
+  static Future<bool>? _inflight;
+
+  static const _kRequestApp = 'drawer_flag_request_app';
+  static const _kProof = 'drawer_flag_proof';
+
+  static Future<void> restore() async {
+    final prefs = await SharedPreferences.getInstance();
+    final owner = prefs.getString(AppConstants.userGoldIdKey) ?? '';
+    if (_owner == owner) return;
+    // akun berganti (login/logout): buang nilai akun sebelumnya
+    _owner = owner;
+    _lastRefresh = null;
+    final a = prefs.getString(_kRequestApp);
+    final b = prefs.getString(_kProof);
+    requestApp = a == null ? null : a == 'Y';
+    proof = b == null ? null : b == 'Y';
+  }
+
+  static bool get known => requestApp != null && proof != null;
+
+  /// Segarkan kedua bendera PARALEL (dengan batas waktu). true = ada yang berubah. Dibatasi 1x/45 dtk
+  /// kecuali [force] (pertama kali belum ada nilai sama sekali).
+  static Future<bool> refresh({bool force = false}) {
+    final last = _lastRefresh;
+    if (!force &&
+        last != null &&
+        DateTime.now().difference(last) < const Duration(seconds: 45)) {
+      return Future.value(false);
+    }
+    return _inflight ??= _doRefresh().whenComplete(() => _inflight = null);
+  }
+
+  static Future<bool> _doRefresh() async {
+    var changed = false;
+    final r = await Future.wait<Object?>([
+      FeatureRequestApi()
+          .getEnabled()
+          .timeout(const Duration(seconds: 5), onTimeout: () => true),
+      () async {
+        try {
+          final res = await SalesApi()
+              .getProofVisibility('')
+              .timeout(const Duration(seconds: 5));
+          if (res.statusCode == 200) {
+            return jsonDecode(res.body)['enabled'] != false;
+          }
+        } catch (_) {}
+        return null; // gagal: pertahankan nilai lama
+      }(),
+    ]);
+    _lastRefresh = DateTime.now();
+    final a = r[0] as bool;
+    final b = r[1] as bool?;
+    if (requestApp != a) {
+      requestApp = a;
+      changed = true;
+      await (await SharedPreferences.getInstance())
+          .setString(_kRequestApp, a ? 'Y' : 'N');
+    }
+    if (b != null && proof != b) {
+      proof = b;
+      changed = true;
+      await (await SharedPreferences.getInstance())
+          .setString(_kProof, b ? 'Y' : 'N');
+    } else if (proof == null) {
+      proof = false; // belum pernah berhasil dicek -> sembunyikan (sama seperti perilaku lama)
+    }
+    return changed;
+  }
+}
 
 /// Menu samping (web: Sidebar): latar putih, logo bergradasi, item aktif
 /// disorot biru muda, grup menu bisa dibuka-tutup, Logout merah di bawah.
@@ -34,10 +114,28 @@ class _AppDrawerState extends State<AppDrawer> {
 
   GlobalKey? _keyForTour(String title) => _tourKeys[title];
 
+  // Grup menu (mis. "Kas") menyembunyikan anak-anaknya saat tertutup: panduan perlu membukanya dulu supaya
+  // anak yang disorot (Kas History, Tarik Kas, Tambah Kas) ada di layar. Kunci grup per judul grup.
+  final Map<String, GlobalKey<_DrawerGroupState>> _groupKeys = {};
+
+  /// Buka grup yang memuat menu berjudul [title]; true kalau ada grup yang dibuka.
+  bool _expandGroupFor(String title) {
+    for (final item in menuItems) {
+      final kids = item.children;
+      if (kids == null || !kids.any((c) => c.title == title)) continue;
+      final st = _groupKeys[item.title]?.currentState;
+      if (st == null) return false;
+      st.expand();
+      return true;
+    }
+    return false;
+  }
+
   @override
   void initState() {
     super.initState();
     OnboardingTour.drawerKeyFor = _keyForTour;
+    OnboardingTour.drawerExpandFor = _expandGroupFor;
     _loadMenuItems();
   }
 
@@ -46,10 +144,13 @@ class _AppDrawerState extends State<AppDrawer> {
     if (OnboardingTour.drawerKeyFor == _keyForTour) {
       OnboardingTour.drawerKeyFor = null;
     }
+    if (OnboardingTour.drawerExpandFor == _expandGroupFor) {
+      OnboardingTour.drawerExpandFor = null;
+    }
     super.dispose();
   }
 
-  Future<void> _loadMenuItems() async {
+  Future<void> _loadMenuItems({bool refreshFlags = true}) async {
     // Menu menyesuaikan role (ADMIN/SELLER/BUYER), tipe outlet, dan MODE:
     // penjual/admin bisa beralih ke "mode pembeli" (berbelanja di outlet lain
     // sebagai pembeli — nota menampilkan nama toko miliknya) lalu kembali.
@@ -74,17 +175,19 @@ class _AppDrawerState extends State<AppDrawer> {
     // flag ADMIN global: sembunyikan menu Request Aplikasi Baru dari semua user (app_settings,
     // dicek langsung ke server tiap layar ini dibuka -- bukan dicache saat login seperti 2 flag
     // di atas, karena ini bukan bagian respons login).
-    final menuRequestAplikasiBaruEnabled =
-        await FeatureRequestApi().getEnabled();
+    await _DrawerFlags.restore();
+    if (!_DrawerFlags.known) {
+      await _DrawerFlags.refresh(force: true); // hanya pertama kali di perangkat ini
+    } else if (refreshFlags) {
+      // menu langsung digambar dari nilai terakhir; kalau di server ternyata berubah, bangun ulang
+      _DrawerFlags.refresh().then((changed) {
+        if (changed && mounted) _loadMenuItems(refreshFlags: false);
+      });
+    }
+    final menuRequestAplikasiBaruEnabled = _DrawerFlags.requestApp ?? true;
     // Fitur foto bukti bayar + QRIS (Akses Admin > Visibilitas Bukti Pembayaran): menu QRIS Outlet
-    // ikut hilang kalau dimatikan untuk user ini. Gagal cek = biarkan tampil.
-    bool proofFeatureEnabled = false;
-    try {
-      final r = await SalesApi().getProofVisibility('');
-      if (r.statusCode == 200) {
-        proofFeatureEnabled = jsonDecode(r.body)['enabled'] != false;
-      }
-    } catch (_) {}
+    // ikut hilang kalau dimatikan untuk user ini.
+    final proofFeatureEnabled = _DrawerFlags.proof ?? false;
     final isRealBuyer = role == AppConstants.roleBuyer;
     final isAdmin = role == AppConstants.roleAdmin;
     // penjual (retail & therapy sama-sama SELLER; dibedakan outlet_type)
@@ -764,7 +867,10 @@ class _AppDrawerState extends State<AppDrawer> {
                     final childActive = item.children!
                         .any((c) => _isActive(currentRoute, c.route));
                     return _DrawerGroup(
+                      key: _groupKeys.putIfAbsent(item.title,
+                          () => GlobalKey<_DrawerGroupState>()),
                       tourKey: _tourKey(item.title),
+                      childKeyFor: _tourKey,
                       item: item,
                       initiallyExpanded: childActive,
                       childActive: childActive,
@@ -870,8 +976,13 @@ class _DrawerGroup extends StatefulWidget {
   final Future<void> Function(MenuItem item) onTap;
   final GlobalKey? tourKey;
 
+  /// kunci sorot panduan untuk anak grup (per judul)
+  final GlobalKey Function(String title)? childKeyFor;
+
   const _DrawerGroup({
+    super.key,
     this.tourKey,
+    this.childKeyFor,
     required this.item,
     required this.initiallyExpanded,
     required this.childActive,
@@ -885,6 +996,11 @@ class _DrawerGroup extends StatefulWidget {
 
 class _DrawerGroupState extends State<_DrawerGroup> {
   late bool _open = widget.initiallyExpanded;
+
+  /// dipakai panduan: buka grup supaya anak-anaknya terender
+  void expand() {
+    if (!_open) setState(() => _open = true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -929,6 +1045,7 @@ class _DrawerGroupState extends State<_DrawerGroup> {
             children: [
               for (final child in widget.item.children!)
                 _DrawerTile(
+                  tourKey: widget.childKeyFor?.call(child.title),
                   icon: child.icon,
                   title: child.title,
                   active: !child.locked && widget.isActive(child.route),

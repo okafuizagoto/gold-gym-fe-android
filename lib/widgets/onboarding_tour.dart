@@ -38,11 +38,27 @@ class OnboardingTour {
   // yang bisa disentuh. Wajib di-raise lagi setelah halaman baru di-push, karena route baru masuk ke overlay
   // di atasnya.
   static OverlayEntry? _blocker;
+
+  /// true selama panduan sedang menyiapkan langkah berikutnya (pindah halaman, menunggu target muncul).
+  /// Penutup layar menampilkan indikator kecil kalau penantian lebih dari ~0,7 detik, supaya terlihat sedang
+  /// bekerja -- tanpa ini layar terkunci tanpa tanda apa pun dan terasa hang.
+  static final ValueNotifier<bool> _busy = ValueNotifier<bool>(false);
+
   static void _raiseBlocker(OverlayState overlay) {
     _blocker?.remove();
     _blocker = OverlayEntry(
-      builder: (_) => const Positioned.fill(
-        child: ModalBarrier(dismissible: false, color: Colors.transparent),
+      builder: (_) => Positioned.fill(
+        child: Stack(
+          children: [
+            const ModalBarrier(dismissible: false, color: Colors.transparent),
+            ValueListenableBuilder<bool>(
+              valueListenable: _busy,
+              builder: (_, busy, __) => busy
+                  ? const _DelayedSpinner()
+                  : const SizedBox.shrink(),
+            ),
+          ],
+        ),
       ),
     );
     overlay.insert(_blocker!);
@@ -55,6 +71,9 @@ class OnboardingTour {
 
   /// Diisi AppDrawer yang sedang terbuka: GlobalKey menu drawer per judul (null = belum ter-render).
   static GlobalKey? Function(String title)? drawerKeyFor;
+
+  /// Diisi AppDrawer: buka grup menu yang memuat menu berjudul ini (true kalau ada grup yang dibuka).
+  static bool Function(String title)? drawerExpandFor;
 
   /// Context AppBarCustom tiap layar ber-drawer (yang terakhir = layar paling atas) -- dipakai
   /// untuk membuka/menutup drawer layar itu dari luar.
@@ -119,6 +138,16 @@ class OnboardingTour {
   static Future<void> _delay(int ms) =>
       Future.delayed(Duration(milliseconds: ms));
 
+  /// Tunggu sampai [cond] true (dicek tiap 30 ms) maksimal [maxMs]; true kalau terpenuhi.
+  static Future<bool> _waitUntil(bool Function() cond, int maxMs) async {
+    final deadline = DateTime.now().add(Duration(milliseconds: maxMs));
+    while (!cond()) {
+      if (DateTime.now().isAfter(deadline)) return false;
+      await _delay(30);
+    }
+    return true;
+  }
+
   static Future<void> _run(String role, bool manual) async {
     if (_running) return;
     _replay = manual;
@@ -164,6 +193,7 @@ class OnboardingTour {
           await SellerOutletGate.realOutletCount() == 0) {
         nav.pushNamedAndRemoveUntil('/outlet', (route) => false);
       }
+      _busy.value = false;
       _removeBlocker();
       TourDemo.running.value = false;
       _running = false;
@@ -177,7 +207,12 @@ class OnboardingTour {
     // Langkah yang dilewati (target tidak ada, mis. outlet baru belum punya nota) tidak dihitung supaya penghitung
     // tetap berurutan (1/N, 2/N, ...) dan N menyusut sesuai langkah yang benar-benar ditampilkan.
     var skipped = 0;
+    // Halaman yang targetnya sudah pernah ditunggu: langkah halaman berikutnya di halaman yang SAMA tidak
+    // perlu menunggu lama lagi (halaman sudah selesai dimuat; kalau targetnya belum ada, memang tidak akan ada
+    // -- mis. POS terkunci sampai Sesi Kasir dibuka). Dulu tiap target ditunggu 3,5 dtk penuh -> layar tampak hang.
+    String? settledPage;
     for (var idx = 0; idx < total; idx++) {
+      _busy.value = true;
       final s = stepsFn()[idx];
       final progress = '${idx + 1 - skipped}/${total - skipped}';
       switch (s.kind) {
@@ -196,6 +231,7 @@ class OnboardingTour {
             skipped++;
             continue;
           }
+          _busy.value = false;
           final next = await _coach(
             host,
             lang: lang,
@@ -216,11 +252,13 @@ class OnboardingTour {
           await _closeDrawer();
           if (!next) return;
           if (s.goto != null) {
+            settledPage = null;
             nav.pushNamed(s.goto!);
             current = s.goto;
             await _delay(60);
             _raiseBlocker(nav.overlay!);
-            await _delay(640);
+            // kestabilan posisi target ditangani _stableRect, jadi tidak perlu menunggu seluruh animasi halaman
+            await _delay(250);
             _raiseBlocker(nav.overlay!);
           }
           break;
@@ -229,7 +267,9 @@ class OnboardingTour {
             skipped++;
             continue;
           }
-          final tctx = await _waitTarget(s.targetId!, 3500);
+          final firstOnPage = settledPage != s.page;
+          final tctx = await _waitTarget(s.targetId!, firstOnPage ? 3500 : 700);
+          settledPage = s.page;
           if (tctx == null) {
             skipped++;
             continue;
@@ -251,6 +291,7 @@ class OnboardingTour {
           final offset = rect.$1;
           final size = rect.$2;
           final screenH = MediaQuery.of(ctx).size.height;
+          _busy.value = false;
           final next = await _coach(
             tctx, // context target = di dalam Overlay layar ini
             lang: lang,
@@ -262,15 +303,18 @@ class OnboardingTour {
           );
           if (!next) return;
           if (s.goto != null) {
+            settledPage = null;
             nav.pushNamed(s.goto!);
             current = s.goto;
             await _delay(60);
             _raiseBlocker(nav.overlay!);
-            await _delay(640);
+            // kestabilan posisi target ditangani _stableRect, jadi tidak perlu menunggu seluruh animasi halaman
+            await _delay(250);
             _raiseBlocker(nav.overlay!);
           }
           break;
         case OnboardingStepKind.done:
+          _busy.value = false;
           _removeBlocker(); // lihat catatan di _run: dialog tidak boleh berada di bawah penutup
           await _doneDialog(ctx, s.text, lang, progress);
           break;
@@ -303,13 +347,13 @@ class OnboardingTour {
       final sz = box.size;
       latest = (o, sz);
       if (last != null && (o - last).distanceSquared < 1 && sz == lastSize) {
-        if (++stable >= 3) return latest;
+        if (++stable >= 2) return latest;
       } else {
         stable = 0;
       }
       last = o;
       lastSize = sz;
-      await _delay(100);
+      await _delay(80);
     }
     return latest;
   }
@@ -317,7 +361,10 @@ class OnboardingTour {
   static Future<void> _returnToRoot(NavigatorState nav) async {
     if (nav.canPop()) {
       nav.popUntil((r) => r.isFirst);
-      await _delay(550);
+      // tunggu animasi pop selesai (layar yang dibuang lepas dari pohon) -- dulu delay tetap 550 ms
+      await _waitUntil(
+          () => _scaffoldContexts.where((c) => c.mounted).length <= 1, 800);
+      await _delay(40);
     }
   }
 
@@ -326,12 +373,19 @@ class OnboardingTour {
     if (sc == null) return null;
     if (!sc.isDrawerOpen) {
       sc.openDrawer();
-      await _delay(450);
+      await _delay(280); // animasi geser drawer ~250 ms
     }
     final deadline = DateTime.now().add(const Duration(milliseconds: 2500));
+    var expanded = false;
     while (DateTime.now().isBefore(deadline)) {
       final key = drawerKeyFor?.call(title);
       if (key?.currentContext != null) return key;
+      // menu ini anak grup yang masih tertutup (mis. Kas History di grup Kas): buka grupnya sekali
+      if (!expanded && drawerExpandFor?.call(title) == true) {
+        expanded = true;
+        await _delay(350);
+        continue;
+      }
       await _delay(100);
     }
     return null;
@@ -341,7 +395,8 @@ class OnboardingTour {
     final sc = _topScaffold();
     if (sc != null && sc.isDrawerOpen) {
       sc.closeDrawer();
-      await _delay(400);
+      await _waitUntil(() => !sc.isDrawerOpen, 450);
+      await _delay(40);
     }
   }
 
@@ -545,6 +600,53 @@ class _StepCard extends StatelessWidget {
                 style: const TextStyle(fontSize: 12, color: AppColors.muted)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Indikator kecil di tengah layar yang baru muncul kalau penantian > ~0,7 dtk (penantian singkat tidak berkedip).
+class _DelayedSpinner extends StatefulWidget {
+  const _DelayedSpinner();
+
+  @override
+  State<_DelayedSpinner> createState() => _DelayedSpinnerState();
+}
+
+class _DelayedSpinnerState extends State<_DelayedSpinner> {
+  bool _show = false;
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer(const Duration(milliseconds: 700), () {
+      if (mounted) setState(() => _show = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_show) return const SizedBox.shrink();
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 12)],
+        ),
+        child: const SizedBox(
+          width: 26,
+          height: 26,
+          child: CircularProgressIndicator(strokeWidth: 3),
+        ),
       ),
     );
   }

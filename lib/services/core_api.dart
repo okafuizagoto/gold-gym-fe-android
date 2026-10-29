@@ -24,6 +24,15 @@ class CoreApi extends ApiClient {
         .timeout(ApiClient.timeout);
   }
 
+  // GET /gold-gym/v2/userdata?type=verifyemail&code=... (PUBLIK, tanpa token): memverifikasi email dari tautan
+  // di email dan -- untuk klien non-web -- langsung menerbitkan sesi di body (auto-login). 400 LINK_EXPIRED =
+  // tautan sudah dipakai / kedaluwarsa / bukan email terbaru.
+  Future<http.Response> verifyEmail(String code) {
+    final url = Uri.parse(
+        '${ApiClient.baseUrl}/gold-gym/v2/userdata?type=verifyemail&code=${Uri.encodeQueryComponent(code)}');
+    return http.get(url).timeout(ApiClient.timeout);
+  }
+
   // PUT /gold-gym/v2/userdata/buyer (wajib token) — konfirmasi "daftar
   // sebagai pembeli": set flag gold_buyer_yn = Y di akun sendiri.
   Future<http.Response> registerAsBuyer() async {
