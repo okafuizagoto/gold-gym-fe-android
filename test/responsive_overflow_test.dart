@@ -100,7 +100,7 @@ Future<void> loadAppFonts() async {
   await loader.load();
 }
 
-Widget buildApp(String route, {Object? arguments}) {
+Widget buildApp(String route, {Object? arguments, double textScale = 1.0}) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider(create: (_) => UserProvider()),
@@ -113,6 +113,13 @@ Widget buildApp(String route, {Object? arguments}) {
       navigatorKey: navigatorKey,
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
+      // textScale > 1 meniru pengaturan "Ukuran font" besar di Android (aksesibilitas) -- teks
+      // membesar di kolom yang sama, sehingga bug jenis "nama panjang meluap" ikut tertangkap.
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
       initialRoute: route,
       onGenerateInitialRoutes: (name) => [
         MaterialPageRoute(
@@ -133,6 +140,7 @@ Future<List<String>> renderAndCollectOverflows(
   Size size, {
   required Map<String, Object> prefs,
   Object? arguments,
+  double textScale = 1.0,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -144,7 +152,8 @@ Future<List<String>> renderAndCollectOverflows(
   final previous = FlutterError.onError;
   FlutterError.onError = errors.add;
   try {
-    await tester.pumpWidget(buildApp(route, arguments: arguments));
+    await tester.pumpWidget(
+        buildApp(route, arguments: arguments, textScale: textScale));
     // beri waktu Storage/FutureBuilder/HTTP (gagal cepat di test) selesai
     for (var i = 0; i < 8; i++) {
       await tester.pump(const Duration(milliseconds: 250));
@@ -216,9 +225,50 @@ void main() {
           expect(
             overflows,
             isEmpty,
-            reason: 'Layar $route meluap di ${s.name}:\n${overflows.join('\n')}',
+            reason:
+                'Layar $route meluap di ${s.name}:\n${overflows.join('\n')}',
           );
         });
+      }
+    });
+  }
+
+  // Audit font besar: semua route pada HP kecil & HP umum (portrait) dengan skala teks 1.3x dan 1.5x.
+  const textScales = [1.3, 1.5];
+  const textScaleSizes = [
+    ScreenSize('hp-kecil-360x640', Size(360, 640)),
+    ScreenSize('hp-umum-412x915', Size(412, 915)),
+  ];
+  for (final entry in AppRoutes.routes.entries) {
+    final route = entry.key;
+    if (routesWithArguments.contains(route)) continue;
+    final prefs = buyerRoutes.contains(route)
+        ? sessionPrefs(
+            role: AppConstants.roleBuyer,
+            shopMode: AppConstants.shopModeBuyer,
+          )
+        : sessionPrefs(role: AppConstants.roleSeller);
+
+    group('$route [font besar]', () {
+      for (final scale in textScales) {
+        for (final s in textScaleSizes) {
+          testWidgets('tidak ada overflow @ ${s.name} font ${scale}x',
+              (tester) async {
+            final overflows = await renderAndCollectOverflows(
+              tester,
+              route,
+              s.size,
+              prefs: prefs,
+              textScale: scale,
+            );
+            expect(
+              overflows,
+              isEmpty,
+              reason:
+                  'Layar $route meluap di ${s.name} font ${scale}x:\n${overflows.join('\n')}',
+            );
+          });
+        }
       }
     });
   }

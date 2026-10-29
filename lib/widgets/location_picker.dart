@@ -371,31 +371,12 @@ class _LocationPickerState extends State<LocationPicker> {
   }) {
     return Padding(
       padding: const EdgeInsets.only(top: 14),
-      child: DropdownButtonFormField<int>(
+      child: LocationDropdownField(
         key: key,
-        initialValue: value,
-        // isExpanded + ellipsis: nama panjang (mis. "DAERAH KHUSUS IBUKOTA JAKARTA") tidak lagi
-        // membuat RenderFlex overflow di baris dropdown.
-        isExpanded: true,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: const Icon(Icons.map_outlined),
-          suffixIcon: state.loading
-              ? const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2)),
-                )
-              : null,
-        ),
-        items: [
-          for (final d in options)
-            DropdownMenuItem(
-                value: d.divisionId,
-                child: Text(d.name, overflow: TextOverflow.ellipsis)),
-        ],
+        label: label,
+        options: options,
+        value: value,
+        loading: state.loading,
         onChanged: state.enabled ? onChanged : null,
       ),
     );
@@ -495,4 +476,53 @@ class _LocationPickerState extends State<LocationPicker> {
       _level2Options.where((d) => d.name.startsWith('Kabupaten')).toList();
   List<LocationDivision> get _kotaOptions =>
       _level2Options.where((d) => d.name.startsWith('Kota')).toList();
+}
+
+/// Satu dropdown wilayah. Dipisah jadi widget publik supaya bisa diuji dengan nama panjang
+/// (test/location_dropdown_overflow_test.dart): isExpanded + ellipsis mencegah RenderFlex overflow.
+class LocationDropdownField extends StatelessWidget {
+  final String label;
+  final List<LocationDivision> options;
+  final int? value;
+  final bool loading;
+  final void Function(int?)? onChanged;
+
+  const LocationDropdownField({
+    super.key,
+    required this.label,
+    required this.options,
+    required this.value,
+    this.loading = false,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<int>(
+      initialValue: value,
+      // isExpanded + ellipsis: nama panjang (mis. "DAERAH KHUSUS IBUKOTA JAKARTA") tidak lagi
+      // membuat RenderFlex overflow di baris dropdown.
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: const Icon(Icons.map_outlined),
+        suffixIcon: loading
+            ? const Padding(
+                padding: EdgeInsets.all(12),
+                child: SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2)),
+              )
+            : null,
+      ),
+      items: [
+        for (final d in options)
+          DropdownMenuItem(
+              value: d.divisionId,
+              child: Text(d.name, overflow: TextOverflow.ellipsis)),
+      ],
+      onChanged: onChanged,
+    );
+  }
 }
