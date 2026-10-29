@@ -76,6 +76,8 @@ const _planMessages = <String, String>{
   'PLAY_UNKNOWN_PRODUCT': 'Produk langganan tidak dikenali.',
   'SESSION_REPLACED':
       'Akun Anda sedang dipakai di perangkat lain. Silakan masuk lagi.',
+  'ACCOUNT_DISABLED':
+      'Akun Anda sudah tidak aktif. Hubungi admin untuk bantuan.',
 };
 
 String friendlyErrorMessage(String raw, {bool? production}) {
