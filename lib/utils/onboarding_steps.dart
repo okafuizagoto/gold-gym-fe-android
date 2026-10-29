@@ -143,8 +143,8 @@ List<OnboardingStep> onboardingStepsFor(
       OnboardingStep.page(
           '/akses-staff',
           'staff-access-save',
-          t('Tick the menus a staff member may use, then tap SAVE. Unticked menus stay hidden for them.',
-              'Centang menu yang boleh dipakai staff, lalu ketuk SIMPAN. Menu yang tidak dicentang tetap tersembunyi untuknya.')),
+          t('Tick the menus a staff member may use, then tap SAVE. Unticked menus stay hidden for them. Sensitive menus (Refund History, Cash History, Withdraw Cash, Add Cash, Change Outlet, Office Location, Tables & Areas) are unticked by default: tick them only for staff you trust.',
+              'Centang menu yang boleh dipakai staff, lalu ketuk SIMPAN. Menu yang tidak dicentang tetap tersembunyi untuknya. Menu sensitif (Riwayat Refund, Kas History, Tarik Kas, Tambah Kas, Ganti Outlet, Lokasi Kantor, Meja & Area) tidak dicentang secara default: centang hanya untuk staff yang Anda percaya.')),
       OnboardingStep.menu(
           'Kas',
           '/cashier-shift',
@@ -163,8 +163,8 @@ List<OnboardingStep> onboardingStepsFor(
       OnboardingStep.page(
           '/kas-history',
           'kas-history-main',
-          t('Colour guide: orange = Withdraw Cash, blue = Add Cash, red = handover difference that needs checking, green = handover OK or verified. The owner can VERIFY a difference (a note is required).',
-              'Panduan warna: oranye = Tarik Kas, biru = Tambah Kas, merah = selisih serah-terima yang perlu dicek, hijau = serah-terima sesuai atau sudah terverifikasi. Penjual bisa MEMVERIFIKASI selisih (catatan wajib).')),
+          t('Each row is one cash movement with its balance: cash sales, cash refunds (money out), exchange differences paid in cash (money in), Withdraw Cash and Add Cash. Colour guide: orange = Withdraw Cash, blue = Add Cash, purple = refund/exchange, red = handover difference that needs checking, green = handover OK or verified. The owner can VERIFY a difference (a note is required).',
+              'Tiap baris = satu pergerakan kas beserta saldonya: penjualan tunai, refund tunai (uang keluar), selisih tukar barang yang dibayar tunai (uang masuk), Tarik Kas, dan Tambah Kas. Panduan warna: oranye = Tarik Kas, biru = Tambah Kas, ungu = refund/tukar barang, merah = selisih serah-terima yang perlu dicek, hijau = serah-terima sesuai atau sudah terverifikasi. Penjual bisa MEMVERIFIKASI selisih (catatan wajib).')),
       OnboardingStep.menu(
           'Tarik Kas',
           '/tarik-kas',
@@ -186,15 +186,25 @@ List<OnboardingStep> onboardingStepsFor(
           t('Enter the amount and the reason, then RECORD. It appears in Cash History as Add Cash.',
               'Isi jumlah dan alasan, lalu CATAT. Tampil di Kas History sebagai Tambah Kas.')),
       OnboardingStep.menu(
+          'Sales History',
+          '/history-sales',
+          t('All saved receipts. This is where you refund or exchange a sale. Tap Next to open it.',
+              'Semua nota yang sudah tersimpan. Di sinilah Anda me-refund atau menukar barang dari sebuah nota. Ketuk Lanjut untuk membukanya.')),
+      OnboardingStep.page(
+          '/history-sales',
+          'sale-refund',
+          t("REFUND button (round arrow) on a paid, not-voided sale. In the window choose: RETURN MONEY (set the quantity per item; the value already includes discounts and vouchers; keep 'Return to stock' ticked for resellable items; pay back in cash or bank transfer) or EXCHANGE ITEMS (pick replacement products from your registered list at today's price; the customer pays or gets back the price difference). Write the reason, process, then print the receipt. Only CASH differences move the cash drawer.",
+              "Tombol REFUND (panah melingkar) pada nota yang sudah lunas dan belum dibatalkan. Di jendelanya pilih: KEMBALIKAN UANG (atur jumlah tiap barang; nilainya sudah memperhitungkan diskon dan voucher; biarkan 'Kembalikan ke stok' tercentang untuk barang yang bisa dijual lagi; uang dikembalikan tunai atau transfer bank) atau TUKAR BARANG (pilih barang pengganti dari daftar produk terdaftar dengan harga hari ini; pelanggan membayar atau menerima kembali selisih harga). Tulis alasan, proses, lalu cetak struk. Hanya selisih TUNAI yang menggerakkan laci kas.")),
+      OnboardingStep.menu(
           'Riwayat Refund',
           '/riwayat-refund',
-          t('Refunds and EXCHANGES of items. Tap Next to open it.',
-              'Refund dan TUKAR BARANG. Ketuk Lanjut untuk membukanya.')),
+          t('The record of every refund and exchange. Tap Next to open it.',
+              'Catatan semua refund dan tukar barang. Ketuk Lanjut untuk membukanya.')),
       OnboardingStep.page(
           '/riwayat-refund',
           'refund-howto',
-          t("Read 'How to refund' here. In Sales History tap the round-arrow button on a sale: 'Return money' gives the money back, 'Exchange items' swaps for registered products and settles the price difference (cash goes in/out of the drawer).",
-              "Baca 'Cara refund' di sini. Di Sales History ketuk tombol panah melingkar pada nota: 'Kembalikan uang' mengembalikan uang, 'Tukar barang' menukar dengan produk terdaftar dan menyelesaikan selisih harga (tunai masuk/keluar laci).")),
+          t("Each entry shows the refund number, original sale, who processed it and the price difference (green = customer paid, red = returned). Use the info button for details and the print button to reprint the receipt. Refunds lower the day's sales and exchanges add the replacement value, both on the day they happen. Open 'How to refund' for the full steps. Staff only see this menu if the owner ticks it in Staff Access.",
+              "Tiap catatan menampilkan nomor refund, nota asal, siapa yang memproses, dan selisih harga (hijau = pelanggan membayar, merah = dikembalikan). Tombol info untuk detail, tombol cetak untuk mencetak ulang struk. Refund mengurangi omzet hari itu dan tukar barang menambah nilai barang pengganti, keduanya pada hari kejadian. Buka 'Cara refund' untuk langkah lengkapnya. Staff hanya melihat menu ini bila penjual mencentangnya di Akses Staff.")),
       OnboardingStep.menu(
           'Point of Sale',
           '/penjualan',

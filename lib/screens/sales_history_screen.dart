@@ -21,6 +21,7 @@ import '../utils/debouncer.dart';
 import '../utils/storage.dart';
 import '../utils/constants.dart';
 import '../widgets/refund_dialog.dart';
+import '../widgets/tour_target.dart';
 import 'proof_viewer_screen.dart';
 import 'sales_detail_screen.dart';
 
@@ -402,7 +403,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                                     );
                                   }
                                   return _buildSaleCard(
-                                      _sales[index], langProvider);
+                                      _sales[index], langProvider,
+                                      first: index == 0);
                                 },
                               ),
                   ),
@@ -415,7 +417,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     );
   }
 
-  Widget _buildSaleCard(SaleHistoryModel sale, LanguageProvider langProvider) {
+  Widget _buildSaleCard(SaleHistoryModel sale, LanguageProvider langProvider,
+      {bool first = false}) {
     final textTheme = Theme.of(context).textTheme;
     final dateStr = sale.saleTransdate == null
         ? '-'
@@ -491,12 +494,22 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               ),
       // Refund (2026-10-28): penjual selalu boleh; staff hanya bila owner mencentang "Riwayat Refund".
       if (_canRefund && paid && !sale.isVoided)
-        action(
-          icon: Icons.replay_rounded,
-          color: AppColors.warningDark,
-          tooltip: langProvider.get('Refund', 'Refund'),
-          onPressed: () => showRefundDialog(context, sale.saleId),
-        ),
+        first
+            ? TourTarget(
+                id: 'sale-refund',
+                child: action(
+                  icon: Icons.replay_rounded,
+                  color: AppColors.warningDark,
+                  tooltip: langProvider.get('Refund', 'Refund'),
+                  onPressed: () => showRefundDialog(context, sale.saleId),
+                ),
+              )
+            : action(
+                icon: Icons.replay_rounded,
+                color: AppColors.warningDark,
+                tooltip: langProvider.get('Refund', 'Refund'),
+                onPressed: () => showRefundDialog(context, sale.saleId),
+              ),
       _printingSaleId == sale.saleId
           ? spinner()
           : PopupMenuButton<String>(
