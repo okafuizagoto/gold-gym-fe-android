@@ -1,6 +1,6 @@
 name: gold_gym_fe_android
 description: Okejual - aplikasi kasir (POS) dan manajemen stok untuk usaha
-version: 1.0.0+11
+version: 1.0.0+12
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
