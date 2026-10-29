@@ -11,6 +11,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/page_header.dart';
 import '../widgets/private_route.dart';
 import '../widgets/section_card.dart';
+import 'admin_account_usage_screen.dart';
 import 'admin_online_now_users_screen.dart';
 
 String _dur(num sec) {
@@ -20,6 +21,9 @@ String _dur(num sec) {
   if (m > 0) return '${m}m ${s.toString().padLeft(2, '0')}d';
   return '${s}d';
 }
+
+/// Format durasi yang sama dipakai layar Detail Total Akun.
+String usageDur(num sec) => _dur(sec);
 
 /// Layar ADMIN: statistik pemakaian (live sekarang, pendaftar, durasi pakai). Auto-refresh 30 dtk.
 /// Padanan pages/admin-statistik-pengguna/index.tsx (Next.js).
@@ -142,6 +146,15 @@ class _AdminUsageStatsScreenState extends State<AdminUsageStatsScreen> {
                   SectionCard(
                     title: lang.get('Accounts', 'Akun'),
                     icon: Icons.people_outline,
+                    action: TextButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AdminAccountUsageScreen(),
+                        ),
+                      ),
+                      child: Text(lang.get('Detail', 'Detail')),
+                    ),
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [

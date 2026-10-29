@@ -12,4 +12,11 @@ class UsageStatsApi extends ApiClient {
   /// sekarang", untuk tombol "Detail" di kartu Live Sekarang.
   Future<http.Response> getOnlineNowUsers() =>
       _c.get('/gold-gym/v2/userdata/admin/usage-stats/online-now');
+
+  /// GET /gold-gym/v2/userdata/admin/usage-stats/accounts -- tabel pemakaian per akun (tombol "Detail" di
+  /// kartu Akun). period: today | 7d | 30d | 6m | 1y.
+  Future<http.Response> getAccountUsage(
+          String period, String q, int limit, int offset) =>
+      _c.get('/gold-gym/v2/userdata/admin/usage-stats/accounts'
+          '?period=$period&q=${Uri.encodeQueryComponent(q)}&limit=$limit&offset=$offset');
 }
