@@ -176,11 +176,14 @@ class _AdminStorageUsageScreenState extends State<AdminStorageUsageScreen> {
                                                   MainAxisAlignment
                                                       .spaceBetween,
                                               children: [
-                                                Text(
-                                                    s.environment.toUpperCase(),
-                                                    style: const TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold)),
+                                                Expanded(
+                                                  child: Text(
+                                                      s.environment
+                                                          .toUpperCase(),
+                                                      style: const TextStyle(
+                                                          fontWeight: FontWeight
+                                                              .bold)),
+                                                ),
                                                 if (s.alerted)
                                                   const Chip(
                                                       label: Text(

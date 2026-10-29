@@ -64,7 +64,11 @@ class FakeApi {
     }
     if (path.contains('/stock-transfer/permissions/')) {
       return {
-        'data': {'staff_gold_id': 101, 'send_level': 'PERSETUJUAN', 'receive_level': 'LANGSUNG'}
+        'data': {
+          'staff_gold_id': 101,
+          'send_level': 'PERSETUJUAN',
+          'receive_level': 'LANGSUNG'
+        }
       };
     }
     if (path.endsWith('/v2/staff') && q['type'] == 'office') {
@@ -250,6 +254,137 @@ class FakeApi {
         ]
       };
     }
+    if (path.endsWith('/usage-stats/online-now')) {
+      return {
+        'data': [
+          for (var i = 1; i <= 3; i++)
+            {
+              'gold_id': 1000 + i,
+              'nama': '$long $i',
+              'email':
+                  'email.yang.sangat.panjang.sekali.untuk.uji.overflow.$i@domain-yang-juga-sangat-panjang.example.com',
+              'role': 'SELLER',
+            }
+        ],
+      };
+    }
+    if (path.endsWith('/v2/sales') && q['type'] == 'posoutlets') {
+      return {
+        'data': [
+          for (var i = 1; i <= 3; i++)
+            {
+              'outlet_gold_id': i,
+              'outlet_code': 'OUT0$i',
+              'outlet_name': '$long outlet $i',
+              'outlet_address': '$long alamat',
+              'owner_name': '$long pemilik',
+              'optional': i != 2,
+            }
+        ],
+      };
+    }
+    if (path.endsWith('/v2/sales') &&
+        q['type'] == 'salesreport' &&
+        q['mode'] == 'week') {
+      return {
+        'data': {
+          'label': 'Minggu Yang Labelnya Sangat Panjang Sekali $long',
+          'range_start': '2026-10-26',
+          'range_end': '2026-11-01',
+          'grand_total': 123456789.0,
+          'days': [
+            for (var i = 0; i < 7; i++)
+              {'date': '2026-10-${26 + i}', 'total': 12345678.0, 'count': 123}
+          ],
+        }
+      };
+    }
+    if (path.endsWith('/v2/sales') &&
+        q['type'] == 'salesreport' &&
+        q['mode'] == 'month') {
+      return {
+        'data': {
+          'month': '2026-10',
+          'label': 'Oktober 2026 $long',
+          'grand_total': 987654321.0,
+          'weeks': [
+            for (var i = 1; i <= 5; i++)
+              {
+                'week_no': i,
+                'label': 'Minggu ke-$i $long',
+                'range_start': '2026-10-0$i',
+                'range_end': '2026-10-1$i',
+                'total': 123456789.0,
+                'count': 4567,
+              }
+          ],
+        }
+      };
+    }
+    if (path.endsWith('/v2/sales') && q['type'] == 'dashboardtrend') {
+      return {
+        'data': {
+          'range_start': '2026-10-01',
+          'range_end': '2026-10-29',
+          'days': [
+            for (var i = 1; i <= 10; i++)
+              {'date': '2026-10-0$i', 'total': 1234567.0 * i, 'count': i}
+          ],
+          'total_revenue': 987654321.0,
+          'total_transactions': 123456,
+          'average_order_value': 12345678.0,
+          'prev_period_revenue': 87654321.0,
+          'revenue_change_percent': 123.4,
+          'top_items': [
+            for (var i = 1; i <= 5; i++)
+              {
+                'item_name': '$long barang $i',
+                'qty': 12345,
+                'revenue': 98765432.0
+              }
+          ],
+        }
+      };
+    }
+    if (path.endsWith('/v2/order')) {
+      final type = q['type'];
+      if (type == 'outlets' || type == 'alloutlets') {
+        return {
+          'data': [
+            for (var i = 1; i <= 3; i++)
+              {
+                'outlet_gold_id': i,
+                'outlet_code': 'OUT0$i',
+                'outlet_name': '$long outlet $i',
+                'outlet_type': 'RETAIL',
+                'outlet_address': '$long alamat',
+                'owner_name': '$long pemilik',
+                'visible': i != 2,
+              }
+          ],
+        };
+      }
+      if (type == 'buyerorders' || type == 'sellerorders') {
+        return {
+          'data': [
+            for (var i = 1; i <= 3; i++)
+              {
+                'order_id': 'ORDER-DENGAN-NOMOR-YANG-SANGAT-PANJANG-SEKALI-$i',
+                'order_buyer_id': i,
+                'order_buyer_name': '$long pembeli',
+                'order_gold_id': 1,
+                'order_outcode': 'OUT01',
+                'order_outlet_name': '$long outlet',
+                'order_total': 123456789.0,
+                'order_pay_type': 'TRANSFER',
+                'order_paid_yn': 'N',
+                'order_status': 'WAITING',
+                'order_created_at': '2026-10-29T10:00:00Z',
+              }
+          ],
+        };
+      }
+    }
     if (path.endsWith('/v2/sales') && q['type'] == 'salesreport') {
       return {
         'data': {
@@ -294,7 +429,8 @@ class FakeApi {
               'sale_salescustomer': '$long customer',
               'sale_paymentyn': 'Y',
               'sale_pay_type': 'TRANSFER BANK',
-              'sale_meja_names': 'Meja 1, Meja Dengan Nama Yang Panjang Sekali, Meja 3, Meja 4',
+              'sale_meja_names':
+                  'Meja 1, Meja Dengan Nama Yang Panjang Sekali, Meja 3, Meja 4',
               'sale_void_yn': i == 3 ? 'Y' : 'N',
               'sale_void_reason': '$long alasan void',
               'sale_voided_by': '$long',
@@ -332,7 +468,8 @@ class FakeApi {
               'refund_id': 'R-$i',
               'refund_number': 'RF-NOMOR-REFUND-YANG-SANGAT-PANJANG-SEKALI-$i',
               'refund_sale_id': 'SALE-$i',
-              'refund_sale_number': 'INV-NOMOR-NOTA-YANG-SANGAT-PANJANG-SEKALI-$i',
+              'refund_sale_number':
+                  'INV-NOMOR-NOTA-YANG-SANGAT-PANJANG-SEKALI-$i',
               'refund_outcode': 'OUT01',
               'refund_date': '2026-10-29',
               'refund_time': '10:00:00',
@@ -368,10 +505,253 @@ class FakeApi {
               'sent_by_name': '$long',
               'sent_at': '2026-10-29T10:00:00Z',
               'items': [
-                {'item_id': 1, 'name': '$long barang', 'pack': 'KARTON-BESAR-PANJANG', 'qty': 12}
+                {
+                  'item_id': 1,
+                  'name': '$long barang',
+                  'pack': 'KARTON-BESAR-PANJANG',
+                  'qty': 12
+                }
               ],
             }
         ],
+      };
+    }
+    if (path.endsWith('/v2/items')) {
+      return {
+        'data': [
+          for (var i = 1; i <= 4; i++)
+            {
+              'item_id': i,
+              'item_gold_id': 1,
+              'item_code': 'KODE-BARANG-YANG-SANGAT-PANJANG-SEKALI-$i',
+              'item_name': '$long barang $i',
+              'item_type': 'TIPE-BARANG-PANJANG',
+              'item_pack': 'KARTON-BESAR-ISI-48-PCS-SANGAT-PANJANG',
+              'item_price': 1234567890.0,
+              'item_brand': 'MEREK YANG NAMANYA SANGAT PANJANG SEKALI',
+              'item_description': '$long deskripsi $long',
+              'item_status': 'ACTIVE',
+              'item_photo': '',
+              'item_barcode': '8999999999999999999',
+              'item_created_at': '2026-10-01T00:00:00Z',
+            }
+        ],
+        'metadata': {'page': 1, 'limit': 10, 'total_data': 4, 'total_page': 1},
+      };
+    }
+    if (path.endsWith('/cashier-shift/cash-moves')) {
+      return {
+        'data': [
+          for (var i = 1; i <= 3; i++)
+            {
+              'id': i,
+              'kind': 'IN',
+              'amount': 123456789.0,
+              'reason': '$long alasan',
+              'by': '$long kasir',
+              'by_role': 'STAFF',
+              'at': '2026-10-29T10:00:00Z',
+            }
+        ],
+      };
+    }
+    if (path.endsWith('/v2/storage')) {
+      return {
+        'data': {
+          'used_kb': 123456,
+          'quota_kb': 204800,
+          'item_used_kb': 23456,
+          'item_quota_kb': 102400,
+          'item_max_kb': 2048,
+          'proof_max_kb': 1024,
+          'proof_enabled': true,
+          'entries': [
+            for (var i = 1; i <= 3; i++)
+              {
+                'source_type': const [
+                  'ITEM_PHOTO',
+                  'PAYMENT_PROOF',
+                  'QRIS_PHOTO'
+                ][i - 1],
+                'source_id': i,
+                'label': '$long barang $i',
+                'context_text': '$long konteks',
+                'size_kb': 123456,
+                'uploaded_at': '2026-10-29T10:00:00Z',
+              }
+          ],
+        }
+      };
+    }
+    if (path.endsWith('/featurerequest/mine')) {
+      return {
+        'data': [
+          for (var i = 1; i <= 3; i++)
+            {
+              'request_id': i,
+              'request_gold_id': 1,
+              'request_role': 'SELLER',
+              'request_category': 'Kategori Yang Sangat Panjang Sekali $i',
+              'request_type': 'FITUR_BARU',
+              'request_menu':
+                  'Menu Yang Namanya Sangat Panjang Sekali Sampai Melebihi Layar',
+              'request_title': '$long judul',
+              'request_description': '$long deskripsi $long deskripsi $long',
+              'request_status': 'BARU',
+              'request_created_at': '2026-10-29T10:00:00Z',
+            }
+        ],
+      };
+    }
+    if (path.endsWith('/userdata/plans')) {
+      return {
+        'ui': {'show_marketplace': true, 'show_booking': true},
+        'data': [
+          for (var i = 1; i <= 3; i++)
+            {
+              'id': 'plan$i',
+              'name': 'Paket Yang Namanya Sangat Panjang Sekali $i',
+              'price_monthly': 1234567890,
+              'price_yearly': 1234567890,
+              'max_outlets': 12345,
+              'max_users': 12345,
+              'features': [
+                for (var f = 1; f <= 4; f++)
+                  'Fitur dengan keterangan yang sangat panjang sekali sampai melebihi lebar layar HP $f'
+              ],
+              'original_price_monthly': 1234567890,
+              'original_price_yearly': 1234567890,
+              'discount_percent': 50.0,
+            }
+        ],
+      };
+    }
+    if (path.endsWith('/v2/payment')) {
+      return {
+        'data': [
+          for (var i = 1; i <= 3; i++)
+            {
+              'payment_order_id': 'ORDER-DENGAN-NOMOR-YANG-SANGAT-PANJANG-$i',
+              'outlet_name': '$long outlet',
+              'user_name': '$long pengguna',
+              'user_email':
+                  'email.yang.sangat.panjang.sekali.untuk.uji.overflow.$i@domain-yang-juga-sangat-panjang.example.com',
+              'payment_amount': 1234567890.0,
+              'payment_method': 'QRIS',
+              'payment_status': 'PAID',
+              'payment_sale_id': null,
+              'created_at': '2026-10-29T10:00:00Z',
+            }
+        ],
+        'metadata': {'page': 1, 'limit': 10, 'total_data': 3, 'total_page': 1},
+      };
+    }
+    if (path.endsWith('/v2/backup')) {
+      return {
+        'data': [
+          for (var i = 1; i <= 3; i++)
+            {
+              'backup_id': i,
+              'environment': 'production-lingkungan-panjang',
+              'service_name': 'layanan-dengan-nama-yang-sangat-panjang-sekali-$i',
+              'size_bytes': 123456789012,
+              'status': 'FAILED',
+              'error_message': '$long galat $long',
+              'created_at': '2026-10-29T10:00:00Z',
+            }
+        ],
+      };
+    }
+    if (path.endsWith('/v2/order') && q['type'] == 'catalog') {
+      return {
+        'data': [
+          for (var i = 1; i <= 4; i++)
+            {
+              'stock_id': '$i',
+              'stock_name': '$long barang $i',
+              'stock_pack': 'KARTON-BESAR-ISI-48-PCS-SANGAT-PANJANG',
+              'stock_qty': 123456,
+              'price': 1234567890,
+              'brand': 'MEREK YANG NAMANYA SANGAT PANJANG SEKALI',
+            }
+        ],
+      };
+    }
+    if (path.endsWith('/v2/booking') && q['type'] == 'slots') {
+      return {
+        'data': [
+          for (var i = 0; i < 4; i++)
+            {
+              'start': '1$i:00',
+              'end': '1$i:30',
+              'capacity': 3,
+              'used': 2,
+              'available': 1,
+              'has_unpaid': true,
+              'full': false,
+              'past': false,
+              'bookings': [
+                {
+                  'booking_id': 'BOOK-$i',
+                  'cust_name': '$long pelanggan',
+                  'registered_yn': 'Y',
+                  'status': 'UNPAID',
+                  'duration': 60,
+                  'start': '1$i:00',
+                  'therapy_type': 'DRAGON',
+                  'price': 1234567890,
+                }
+              ],
+            }
+        ],
+      };
+    }
+    if (path.endsWith('/account/profile')) {
+      return {
+        'nama': long,
+        'email':
+            'email.yang.sangat.panjang.sekali.untuk.uji.overflow@domain-yang-juga-sangat-panjang.example.com',
+        'nomor_hp': '+6281234567890123456789',
+      };
+    }
+    if (path.endsWith('/storage/admin/users')) {
+      return {
+        'data': [
+          for (var i = 1; i <= 3; i++)
+            {
+              'gold_id': 1000 + i,
+              'plan': 'PAKET-DENGAN-NAMA-YANG-SANGAT-PANJANG-SEKALI-$i',
+              'item_storage_gb': 123.45,
+              'item_quota_mb': 1024.0,
+              'item_max_mb': 5.0,
+              'proof_max_mb': 5.0,
+              'upload_gb': 1234.56,
+              'download_gb': 1234.56,
+              'storage_gb': 1234.56,
+              'effective_limit_gb': 9999.0,
+              'has_override': true,
+            }
+        ],
+      };
+    }
+    if (path.endsWith('/storage/admin/usage-summary')) {
+      return {
+        'data': [
+          {
+            'environment': 'lingkungan-dengan-nama-sangat-panjang',
+            'upload_gb': 1234.56,
+            'download_gb': 1234.56,
+            'storage_gb': 1234.56,
+            'alert_gb': 100,
+            'limit_gb': 200,
+            'alerted': true,
+          }
+        ],
+      };
+    }
+    if (path.endsWith('/backup/total-by-environment')) {
+      return {
+        'data': {'lingkungan-dengan-nama-sangat-panjang': 123456789012}
       };
     }
     if (path.endsWith('/v2/stock')) {

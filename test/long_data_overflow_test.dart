@@ -40,6 +40,15 @@ class Case {
   /// Buka tab ke-n (layar ber-TabBar) sebelum memeriksa data.
   final int? tabIndex;
 
+  /// Ketuk tab pil (SegmentedTabs) berlabel ini sebelum memeriksa data.
+  final String? tabLabel;
+
+  /// Ketuk teks pertama yang memuat potongan ini lalu tunggu (mis. memilih outlet -> pindah layar).
+  final String? tapText;
+
+  /// Jumlah putaran tunggu awal (layar yang memuat banyak endpoint berurutan butuh lebih banyak).
+  final int waits;
+
   /// Data lokal yang perlu disemai sebelum layar dibuka (mis. 'outbox' = antrean transaksi offline).
   final String? seed;
   const Case(this.route,
@@ -47,6 +56,9 @@ class Case {
       this.marker = 'Nama Yang Sangat',
       this.pickFirstDropdown = false,
       this.tabIndex,
+      this.tabLabel,
+      this.tapText,
+      this.waits = 10,
       this.seed});
 }
 
@@ -124,10 +136,26 @@ Future<({List<String> overflows, bool sawMarker})> renderWithData(
   }
   try {
     await tester.pumpWidget(buildApp(c.route, textScale: scale));
-    for (var i = 0; i < 10; i++) {
+    for (var i = 0; i < c.waits; i++) {
       await tester
           .runAsync(() => Future.delayed(const Duration(milliseconds: 60)));
       await tester.pump(const Duration(milliseconds: 250));
+    }
+    if (c.tapText != null) {
+      await tester.tap(find.textContaining(c.tapText!).first);
+      for (var i = 0; i < 12; i++) {
+        await tester
+            .runAsync(() => Future.delayed(const Duration(milliseconds: 60)));
+        await tester.pump(const Duration(milliseconds: 250));
+      }
+    }
+    if (c.tabLabel != null) {
+      await tester.tap(find.text(c.tabLabel!).first);
+      for (var i = 0; i < 10; i++) {
+        await tester
+            .runAsync(() => Future.delayed(const Duration(milliseconds: 60)));
+        await tester.pump(const Duration(milliseconds: 250));
+      }
     }
     if (c.tabIndex != null) {
       await tester.tap(find.byType(Tab).at(c.tabIndex!));
@@ -165,6 +193,15 @@ Future<({List<String> overflows, bool sawMarker})> renderWithData(
       await tester.pump(const Duration(milliseconds: 300));
       sawMarker =
           sawMarker || find.textContaining(c.marker).evaluate().isNotEmpty;
+    }
+    // widget yang baru dibangun saat digulir (mis. di dasar daftar) bisa memulai request -> beri waktu selesai
+    for (var i = 0; i < 4; i++) {
+      await tester
+          .runAsync(() => Future.delayed(const Duration(milliseconds: 60)));
+      await tester.pump(const Duration(milliseconds: 250));
+    }
+    if (Platform.environment['DBG_REQS'] != null) {
+      stdout.writeln('REQS ${c.route}: ${_reqLog.toSet().toList()}');
     }
     if (!sawMarker) {
       stdout.writeln(
@@ -277,6 +314,55 @@ void main() {
     Case('/akses-staff', pickFirstDropdown: true),
     Case('/izin-transfer-staff', pickFirstDropdown: true),
     Case('/absen-staff', pickFirstDropdown: true),
+    Case('/laporan', tabLabel: 'Per Minggu', marker: 'Minggu Yang Labelnya'),
+    Case('/laporan', tabLabel: 'Per Bulan', marker: 'Oktober 2026'),
+    Case('/laporan', tabLabel: 'Tren'),
+    Case('/pesanan-masuk', marker: 'NAMA YANG SANGAT'),
+    Case('/pesanan-saya',
+        role: AppConstants.roleBuyer, marker: 'NAMA YANG SANGAT'),
+    Case('/pilih-outlet', role: AppConstants.roleBuyer),
+    Case('/pilih-outlet',
+        role: AppConstants.roleBuyer, tapText: 'Nama Yang Sangat'),
+    Case('/admin-outlet-pembeli', role: AppConstants.roleAdmin),
+    Case('/admin-pos-customer', role: AppConstants.roleAdmin),
+    Case('/', marker: ''),
+    Case('/outlet', marker: ''),
+    Case('/about-us', marker: ''),
+    Case('/add-items'),
+    Case('/add-menu', marker: ''),
+    Case('/list-barang'),
+    Case('/tambah-kas'),
+    Case('/tarik-kas'),
+    Case('/tambah-meja', marker: ''),
+    Case('/tambah-area', marker: ''),
+    Case('/new-outlet', marker: ''),
+    Case('/edit-profil', marker: 'email.yang.sangat'),
+    Case('/ganti-password', marker: ''),
+    Case('/keamanan-akun', marker: ''),
+    Case('/langganan', marker: 'Paket Yang Namanya'),
+    Case('/storage'),
+    Case('/thermal-printer', marker: ''),
+    Case('/qris-saya', marker: ''),
+    Case('/request-fitur'),
+    Case('/request-aplikasi-baru', marker: ''),
+    Case('/absen', marker: ''),
+    Case('/daftar-pembeli', marker: ''),
+    Case('/booking', marker: '2/3'),
+    Case('/antrian-saya', role: AppConstants.roleBuyer, marker: ''),
+    Case('/daftar-penjual', role: AppConstants.roleBuyer, marker: ''),
+    Case('/admin-akses-daftar-pembeli', role: AppConstants.roleAdmin, marker: ''),
+    Case('/admin-akses-mode-pembeli', role: AppConstants.roleAdmin, marker: ''),
+    Case('/admin-backup', role: AppConstants.roleAdmin, marker: 'PRODUCTION-LINGKUNGAN'),
+    Case('/admin-langganan-tampilan', role: AppConstants.roleAdmin, marker: ''),
+    Case('/admin-outlet-type-settings', role: AppConstants.roleAdmin, marker: ''),
+    Case('/admin-payment-report', role: AppConstants.roleAdmin),
+    Case('/admin-plan-features', role: AppConstants.roleAdmin, marker: ''),
+    Case('/admin-plan-pricing', role: AppConstants.roleAdmin, marker: ''),
+    Case('/admin-proof-access', role: AppConstants.roleAdmin, marker: ''),
+    Case('/admin-registration-mode', role: AppConstants.roleAdmin, marker: ''),
+    Case('/admin-statistik-pengguna', role: AppConstants.roleAdmin, marker: ''),
+    Case('/admin-storage-usage',
+        role: AppConstants.roleAdmin, marker: 'PAKET-DENGAN'),
   ];
 
   for (final c in cases) {
