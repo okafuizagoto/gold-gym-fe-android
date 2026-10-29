@@ -6,6 +6,7 @@ import '../services/account_api.dart';
 import '../services/core_api.dart';
 import '../utils/constants.dart';
 import '../utils/password_strength.dart';
+import '../utils/seller_outlet_gate.dart';
 import '../utils/storage.dart';
 import '../utils/toast.dart';
 import '../widgets/auth_card.dart';
@@ -70,7 +71,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         await Storage.set(AppConstants.forceChangePasswordKey, '0');
         if (!mounted) return;
         Toast.success(context, 'Password berhasil diganti.');
-        Navigator.pushNamedAndRemoveUntil(context, '/outlet', (r) => false);
+        // Penjual baru tanpa outlet yang belum melihat panduan: Dashboard dulu (panduan pertama), bukan /outlet.
+        final role = await Storage.get(AppConstants.userRoleKey);
+        final tourFirst = role == AppConstants.roleSeller &&
+            await SellerOutletGate.sellerNeedsTourFirst();
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(
+            context, tourFirst ? '/' : '/outlet', (r) => false);
       } else {
         String msg = 'Gagal mengganti password.';
         try {
