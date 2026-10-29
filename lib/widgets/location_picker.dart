@@ -374,6 +374,9 @@ class _LocationPickerState extends State<LocationPicker> {
       child: DropdownButtonFormField<int>(
         key: key,
         initialValue: value,
+        // isExpanded + ellipsis: nama panjang (mis. "DAERAH KHUSUS IBUKOTA JAKARTA") tidak lagi
+        // membuat RenderFlex overflow di baris dropdown.
+        isExpanded: true,
         decoration: InputDecoration(
           labelText: label,
           prefixIcon: const Icon(Icons.map_outlined),
@@ -389,7 +392,9 @@ class _LocationPickerState extends State<LocationPicker> {
         ),
         items: [
           for (final d in options)
-            DropdownMenuItem(value: d.divisionId, child: Text(d.name)),
+            DropdownMenuItem(
+                value: d.divisionId,
+                child: Text(d.name, overflow: TextOverflow.ellipsis)),
         ],
         onChanged: state.enabled ? onChanged : null,
       ),
