@@ -69,32 +69,71 @@ class _AdminUsageStatsScreenState extends State<AdminUsageStatsScreen> {
     }
   }
 
-  String _roles(dynamic m) => (m as Map? ?? {})
-      .entries
-      .map((e) => '${e.key}: ${e.value}')
-      .join('  ·  ');
+  String _fmtSince(dynamic v) {
+    final d = DateTime.tryParse('$v')?.toLocal();
+    if (d == null) return '$v';
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${d.day}/${d.month}/${d.year} ${two(d.hour)}.${two(d.minute)}.${two(d.second)}';
+  }
 
   String _d(Map<String, dynamic> d) => (d['count'] ?? 0) > 0
       ? '${_dur(d['min_sec'])} / ${_dur(d['max_sec'])} / ${_dur(d['avg_sec'])}'
       : '-';
 
-  Widget _period(LanguageProvider lang, String label, Map<String, dynamic> p) {
-    final s = Map<String, dynamic>.from(p['sessions']);
-    final u = Map<String, dynamic>.from(p['per_user_total']);
-    return SectionCard(
-      title: label,
-      icon: Icons.calendar_today_outlined,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(
-            '${lang.get('Active users', 'Pengguna aktif')}: ${p['active_users']}'),
-        Text(
-            '${lang.get('New registrations', 'Pendaftar baru')}: ${p['registered']}'),
-        Text('${lang.get('Sessions', 'Sesi')}: ${s['count']}'),
-        Text(
-            '${lang.get('Session shortest / longest / avg', 'Sesi tersingkat / terlama / rata-rata')}: ${_d(s)}'),
-        Text(
-            '${lang.get('Per-user total shortest / longest / avg', 'Total per pengguna tersingkat / terlama / rata-rata')}: ${_d(u)}'),
-      ]),
+  Widget _roleChips(dynamic m) => Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Wrap(spacing: 4, runSpacing: 4, children: [
+          for (final e in (m as Map? ?? {}).entries)
+            Chip(
+                label: Text('${e.key}: ${e.value}'),
+                visualDensity: VisualDensity.compact),
+        ]),
+      );
+
+  /// Satu tabel periode (padanan Table di web): kolom sama, bisa digeser ke samping.
+  Widget _periodTable(LanguageProvider lang, Map<String, dynamic> r) {
+    final rows = <(String, Map<String, dynamic>)>[
+      (lang.get('Today', 'Hari ini'), Map<String, dynamic>.from(r['today'])),
+      (
+        lang.get('Last 7 days', '7 hari terakhir'),
+        Map<String, dynamic>.from(r['last_7_days'])
+      ),
+      (
+        lang.get('Last 30 days', '30 hari terakhir'),
+        Map<String, dynamic>.from(r['last_30_days'])
+      ),
+    ];
+    DataColumn col(String label) =>
+        DataColumn(label: Text(label), numeric: true);
+    return Card(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          columns: [
+            DataColumn(label: Text(lang.get('Period', 'Periode'))),
+            col(lang.get('Active users', 'Pengguna aktif')),
+            col(lang.get('New registrations', 'Pendaftar baru')),
+            col(lang.get('Sessions', 'Sesi')),
+            col(lang.get('Session shortest / longest / avg',
+                'Sesi tersingkat / terlama / rata-rata')),
+            col(lang.get('Per-user total shortest / longest / avg',
+                'Total per pengguna tersingkat / terlama / rata-rata')),
+          ],
+          rows: [
+            for (final (label, p) in rows)
+              DataRow(cells: [
+                DataCell(Text(label,
+                    style: const TextStyle(fontWeight: FontWeight.w700))),
+                DataCell(Text('${p['active_users']}')),
+                DataCell(Text('${p['registered']}')),
+                DataCell(Text('${(p['sessions'] as Map)['count']}')),
+                DataCell(Text(_d(Map<String, dynamic>.from(p['sessions'])))),
+                DataCell(
+                    Text(_d(Map<String, dynamic>.from(p['per_user_total'])))),
+              ]),
+          ],
+        ),
+      ),
     );
   }
 
@@ -140,11 +179,11 @@ class _AdminUsageStatsScreenState extends State<AdminUsageStatsScreen> {
                                   .textTheme
                                   .displaySmall
                                   ?.copyWith(color: Colors.green)),
-                          Text(_roles(r['online_by_role'])),
+                          _roleChips(r['online_by_role']),
                         ]),
                   ),
                   SectionCard(
-                    title: lang.get('Accounts', 'Akun'),
+                    title: lang.get('Total accounts', 'Total akun'),
                     icon: Icons.people_outline,
                     action: TextButton(
                       onPressed: () => Navigator.push(
@@ -158,25 +197,32 @@ class _AdminUsageStatsScreenState extends State<AdminUsageStatsScreen> {
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                              '${lang.get('Total', 'Total')}: ${r['total_accounts']}'),
-                          Text(_roles(r['accounts_by_role'])),
-                          Text(
-                              '${lang.get('Registration date unknown (older accounts)', 'Tanggal daftar tidak tercatat (akun lama)')}: ${r['registered_date_unknown']}'),
+                          Text('${r['total_accounts']}',
+                              style: Theme.of(context).textTheme.displaySmall),
+                          _roleChips(r['accounts_by_role']),
                         ]),
                   ),
-                  _period(lang, lang.get('Today', 'Hari ini'),
-                      Map<String, dynamic>.from(r['today'])),
-                  _period(lang, lang.get('Last 7 days', '7 hari terakhir'),
-                      Map<String, dynamic>.from(r['last_7_days'])),
-                  _period(lang, lang.get('Last 30 days', '30 hari terakhir'),
-                      Map<String, dynamic>.from(r['last_30_days'])),
+                  SectionCard(
+                    title: lang.get('Registration date unknown',
+                        'Tanggal daftar tidak tercatat'),
+                    icon: Icons.help_outline,
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${r['registered_date_unknown']}',
+                              style: Theme.of(context).textTheme.displaySmall),
+                          Text(
+                              lang.get('Older accounts (before tracking)',
+                                  'Akun lama (sebelum pencatatan)'),
+                              style: Theme.of(context).textTheme.bodySmall),
+                        ]),
+                  ),
+                  _periodTable(lang, r),
                   Padding(
                     padding: const EdgeInsets.all(8),
                     child: Text(
-                      lang.get(
-                          'A session is a run of activity with gaps ≤ 30 minutes; 1-minute resolution. Idle open apps are not counted.',
-                          'Sesi = rangkaian aktivitas dengan jeda ≤ 30 menit; resolusi 1 menit. Aplikasi terbuka tanpa aktivitas tidak dihitung.'),
+                      '${lang.get('A session is a run of activity with gaps ≤ 30 minutes. Durations have 1-minute resolution (a session with one request counts as 1 minute). Only time with requests to the server is measured; an app left open idle is not counted.', 'Sesi = rangkaian aktivitas dengan jeda ≤ 30 menit. Durasi beresolusi 1 menit (sesi dengan satu request dihitung 1 menit). Hanya waktu dengan request ke server yang terukur; aplikasi yang dibiarkan terbuka tanpa aktivitas tidak dihitung.')}'
+                      '${r['tracking_since'] != null ? ' ${lang.get('Tracking since', 'Pencatatan sejak')}: ${_fmtSince(r['tracking_since'])}.' : ' ${lang.get('No sessions recorded yet.', 'Belum ada sesi tercatat.')}'}',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),

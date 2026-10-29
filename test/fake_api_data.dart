@@ -754,6 +754,33 @@ class FakeApi {
         'data': {'lingkungan-dengan-nama-sangat-panjang': 123456789012}
       };
     }
+    if (path.endsWith('/admin/usage-stats')) {
+      Map<String, dynamic> dur() =>
+          {'count': 12345, 'min_sec': 60, 'max_sec': 98765, 'avg_sec': 3725};
+      Map<String, dynamic> period() => {
+            'active_users': 123456,
+            'registered': 12345,
+            'sessions': dur(),
+            'per_user_total': dur(),
+          };
+      return {
+        'data': {
+          'online_now': 12345,
+          'online_by_role': {
+            'SELLER': 1234,
+            'BUYER': 1234,
+            'STAFF_DENGAN_NAMA_PANJANG': 1234
+          },
+          'total_accounts': 123456,
+          'accounts_by_role': {'SELLER': 1234, 'BUYER': 1234, 'ADMIN': 1},
+          'registered_date_unknown': 12345,
+          'today': period(),
+          'last_7_days': period(),
+          'last_30_days': period(),
+          'tracking_since': '2026-10-01T00:00:00Z',
+        }
+      };
+    }
     if (path.endsWith('/v2/stock')) {
       return {
         'data': [

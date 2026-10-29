@@ -115,7 +115,7 @@ class _AdminFeatureRequestScreenState extends State<AdminFeatureRequestScreen> {
       if (resp.statusCode == 200) {
         if (mounted) {
           Toast.success(context,
-              'Status diubah ke ${FeatureRequestStatus.label(status)}');
+              'Status diperbarui');
         }
         await _load();
       } else {
@@ -192,7 +192,7 @@ class _AdminFeatureRequestScreenState extends State<AdminFeatureRequestScreen> {
                                       labelText: 'Kategori'),
                                   items: [
                                     const DropdownMenuItem(
-                                        value: null, child: Text('Semua')),
+                                        value: null, child: Text('Semua Kategori')),
                                     ...FeatureRequestCategory.all.map((c) =>
                                         DropdownMenuItem(
                                             value: c,
@@ -215,7 +215,7 @@ class _AdminFeatureRequestScreenState extends State<AdminFeatureRequestScreen> {
                                       labelText: 'Status'),
                                   items: [
                                     const DropdownMenuItem(
-                                        value: null, child: Text('Semua')),
+                                        value: null, child: Text('Semua Status')),
                                     ...FeatureRequestStatus.all.map((s) =>
                                         DropdownMenuItem(
                                             value: s,
@@ -238,7 +238,7 @@ class _AdminFeatureRequestScreenState extends State<AdminFeatureRequestScreen> {
                                       const InputDecoration(labelText: 'Tipe'),
                                   items: [
                                     const DropdownMenuItem(
-                                        value: null, child: Text('Semua')),
+                                        value: null, child: Text('Semua Tipe')),
                                     DropdownMenuItem(
                                         value: FeatureRequestType.fiturBaru,
                                         child: Text(FeatureRequestType.label(
@@ -269,7 +269,7 @@ class _AdminFeatureRequestScreenState extends State<AdminFeatureRequestScreen> {
                               ? const Padding(
                                   padding: EdgeInsets.all(8),
                                   child: Text(
-                                      'Tidak ada request untuk filter ini'),
+                                      'Belum ada request yang cocok dengan filter ini.'),
                                 )
                               : Column(
                                   children: _rows

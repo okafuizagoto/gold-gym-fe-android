@@ -106,7 +106,7 @@ class _AdminOutletTypeSettingsScreenState
                                 setState(() => _therapyVisible = v),
                             contentPadding: EdgeInsets.zero,
                             title: const Text(
-                                'Tampilkan di daftar Tipe Outlet'),
+                                'Tampilkan "Jasa Terapi & Spa" di Tipe Outlet'),
                             subtitle: Text(
                               _therapyVisible
                                   ? 'Seller bisa memilih tipe ini saat daftar outlet baru -- otomatis mengaktifkan fitur Booking Terapi untuk outlet tersebut.'

@@ -360,7 +360,8 @@ void main() {
     Case('/admin-plan-pricing', role: AppConstants.roleAdmin, marker: ''),
     Case('/admin-proof-access', role: AppConstants.roleAdmin, marker: ''),
     Case('/admin-registration-mode', role: AppConstants.roleAdmin, marker: ''),
-    Case('/admin-statistik-pengguna', role: AppConstants.roleAdmin, marker: ''),
+    Case('/admin-statistik-pengguna',
+        role: AppConstants.roleAdmin, marker: 'Tanggal daftar tidak tercatat'),
     Case('/admin-storage-usage',
         role: AppConstants.roleAdmin, marker: 'PAKET-DENGAN'),
   ];
