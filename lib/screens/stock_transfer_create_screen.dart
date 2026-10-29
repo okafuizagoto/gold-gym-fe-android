@@ -170,6 +170,7 @@ class _StockTransferCreateScreenState extends State<StockTransferCreateScreen> {
                 padding: const EdgeInsets.all(16),
                 children: [
                   DropdownButtonFormField<String>(
+                    isExpanded: true,
                     value: _outlets.any((o) => o.outlet_code == _from) ? _from : null,
                     decoration: const InputDecoration(labelText: 'Dari outlet'),
                     items: [
@@ -190,6 +191,7 @@ class _StockTransferCreateScreenState extends State<StockTransferCreateScreen> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
+                    isExpanded: true,
                     value: _outlets.any((o) => o.outlet_code == _to) ? _to : null,
                     decoration: const InputDecoration(labelText: 'Ke outlet'),
                     items: [

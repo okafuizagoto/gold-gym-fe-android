@@ -210,6 +210,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: _category,
               decoration: const InputDecoration(labelText: 'Kategori'),
               items: ExpenseCategory.all
@@ -262,6 +263,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
             ),
             if (_isRecurring)
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 initialValue: _recurringPeriod,
                 decoration: const InputDecoration(labelText: 'Periode'),
                 items: RecurringPeriod.all

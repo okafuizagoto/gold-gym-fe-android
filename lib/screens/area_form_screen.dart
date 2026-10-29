@@ -107,6 +107,7 @@ class _AreaFormScreenState extends State<AreaFormScreen> {
                       ),
                       const SizedBox(height: 14),
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         initialValue: _areaType,
                         decoration: const InputDecoration(
                           labelText: 'Tipe Area',

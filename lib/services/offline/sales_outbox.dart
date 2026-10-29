@@ -102,6 +102,12 @@ class SalesOutbox extends ChangeNotifier {
   int get failedCount => _items.where((e) => e.status == OutboxStatus.failed).length;
   bool get syncing => _syncing;
 
+  /// Hentikan sinkronisasi berkala (dipakai tes agar tidak meninggalkan Timer tertunda).
+  void stop() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
   Future<void> init() async {
     await _load();
     ConnectivityMonitor.instance.addListener(() {

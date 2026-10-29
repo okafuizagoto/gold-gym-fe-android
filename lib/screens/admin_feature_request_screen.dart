@@ -187,6 +187,7 @@ class _AdminFeatureRequestScreenState extends State<AdminFeatureRequestScreen> {
                                 width: 180,
                                 child: DropdownButtonFormField<String?>(
                                   initialValue: _category,
+                                  isExpanded: true,
                                   decoration: const InputDecoration(
                                       labelText: 'Kategori'),
                                   items: [
@@ -209,6 +210,7 @@ class _AdminFeatureRequestScreenState extends State<AdminFeatureRequestScreen> {
                                 width: 180,
                                 child: DropdownButtonFormField<String?>(
                                   initialValue: _status,
+                                  isExpanded: true,
                                   decoration: const InputDecoration(
                                       labelText: 'Status'),
                                   items: [
@@ -231,6 +233,7 @@ class _AdminFeatureRequestScreenState extends State<AdminFeatureRequestScreen> {
                                 width: 180,
                                 child: DropdownButtonFormField<String?>(
                                   initialValue: _type,
+                                  isExpanded: true,
                                   decoration:
                                       const InputDecoration(labelText: 'Tipe'),
                                   items: [

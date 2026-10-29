@@ -194,6 +194,7 @@ class _QrisOutletScreenState extends State<QrisOutletScreen> {
                           title: 'Pilih outlet',
                           icon: Icons.qr_code_2,
                           child: DropdownButtonFormField<String>(
+                            isExpanded: true,
                             initialValue: _outletCode,
                             items: _outlets
                                 .map((o) => DropdownMenuItem(
@@ -275,6 +276,7 @@ class _QrisOutletScreenState extends State<QrisOutletScreen> {
                                 ),
                               if (_copyMode) ...[
                                 DropdownButtonFormField<String>(
+                                  isExpanded: true,
                                   initialValue: _copyFrom,
                                   decoration: const InputDecoration(
                                       labelText: 'Salin dari outlet'),

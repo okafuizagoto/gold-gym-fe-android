@@ -1511,6 +1511,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
 
             // Jenis pembayaran: Tunai atau Transfer Bank
             DropdownButtonFormField<String>(
+              isExpanded: true,
               key: ValueKey(cart.paymentType),
               initialValue: cart.paymentType.isEmpty ? null : cart.paymentType,
               decoration: InputDecoration(

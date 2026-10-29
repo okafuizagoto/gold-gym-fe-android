@@ -91,6 +91,7 @@ class _StaffTransferPermissionScreenState
       Padding(
         padding: const EdgeInsets.only(top: 12),
         child: DropdownButtonFormField<String>(
+          isExpanded: true,
           value: value,
           decoration: InputDecoration(labelText: label),
           items: [
@@ -119,6 +120,7 @@ class _StaffTransferPermissionScreenState
                     padding: const EdgeInsets.all(16),
                     children: [
                       DropdownButtonFormField<StaffRow>(
+                        isExpanded: true,
                         value: _selected,
                         decoration: const InputDecoration(labelText: 'Pilih Staff'),
                         items: [

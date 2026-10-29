@@ -227,6 +227,7 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               DropdownButtonFormField<int>(
+                                isExpanded: true,
                                 initialValue: _selected?.goldId,
                                 decoration: const InputDecoration(
                                   labelText: 'Pilih Staff',

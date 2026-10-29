@@ -181,6 +181,7 @@ class _FeatureRequestScreenState extends State<FeatureRequestScreen> {
                       if (isPerbaikan) ...[
                         const SizedBox(height: 14),
                         DropdownButtonFormField<String>(
+                          isExpanded: true,
                           initialValue: _selectedMenu,
                           decoration: const InputDecoration(
                             labelText: 'Menu yang dilaporkan',

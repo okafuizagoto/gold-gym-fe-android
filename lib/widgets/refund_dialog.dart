@@ -409,6 +409,7 @@ class _RefundDialogState extends State<_RefundDialog> {
           const SizedBox(height: 10),
           if (!_exchange || _net.round() != 0)
             DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: _method,
               decoration: InputDecoration(
                   labelText: _exchange

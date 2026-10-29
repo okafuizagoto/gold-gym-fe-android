@@ -172,6 +172,7 @@ class _StaffMenuAccessScreenState extends State<StaffMenuAccessScreen> {
                         Padding(
                           padding: EdgeInsets.fromLTRB(pad, 12, pad, 4),
                           child: DropdownButtonFormField<int>(
+                            isExpanded: true,
                             initialValue: _selected?.goldId,
                             decoration: const InputDecoration(
                               labelText: 'Pilih Staff',

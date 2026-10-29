@@ -279,6 +279,7 @@ class _MejaTabViewState extends State<_MejaTabView> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<int>(
+                isExpanded: true,
                 initialValue: areaId,
                 decoration: const InputDecoration(labelText: 'Area'),
                 items: _areaList
@@ -538,6 +539,7 @@ class _AreaTabViewState extends State<_AreaTabView> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 initialValue: areaType,
                 decoration: const InputDecoration(labelText: 'Tipe'),
                 items: const [

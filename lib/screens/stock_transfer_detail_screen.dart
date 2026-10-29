@@ -308,6 +308,7 @@ class _StockTransferDetailScreenState extends State<StockTransferDetailScreen> {
                   style: TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 value: _paper,
                 decoration: const InputDecoration(labelText: 'Ukuran kertas'),
                 items: [

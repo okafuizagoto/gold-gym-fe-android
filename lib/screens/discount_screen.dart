@@ -161,6 +161,7 @@ class _DiscountScreenState extends State<DiscountScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: type,
                   decoration: const InputDecoration(labelText: 'Tipe'),
                   items: const [
@@ -376,6 +377,7 @@ class _DiscountScreenState extends State<DiscountScreen> {
                 style: textTheme.titleSmall),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
+              isExpanded: true,
               key: ValueKey('type-$_discountScope-$_discountType'),
               initialValue: _discountType,
               items: [

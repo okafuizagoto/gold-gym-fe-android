@@ -171,6 +171,7 @@ class _CashMoveScreenState extends State<CashMoveScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         value: _kind,
                         decoration: const InputDecoration(labelText: 'Jenis'),
                         items: [

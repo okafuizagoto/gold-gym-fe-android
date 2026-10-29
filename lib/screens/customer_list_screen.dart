@@ -135,6 +135,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
                   initialValue: typeId,
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Tipe Pelanggan',
                     helperText: 'Opsional -- kelola daftar tipe di menu Tipe Pelanggan',
@@ -146,7 +147,8 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                     for (final t in _types)
                       DropdownMenuItem(
                           value: int.tryParse('${t['ct_id']}') ?? 0,
-                          child: Text('${t['ct_name'] ?? ''}')),
+                          child: Text('${t['ct_name'] ?? ''}',
+                              overflow: TextOverflow.ellipsis)),
                   ],
                   onChanged: (v) => setD(() => typeId = v ?? 0),
                 ),
@@ -435,19 +437,25 @@ class _CustomerTile extends StatelessWidget {
                         ),
                         if (typeName.isNotEmpty) ...[
                           const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: AppColors.blueLight,
-                              borderRadius: BorderRadius.circular(6),
+                          // Batasi lebar + ellipsis: nama tipe yang panjang tidak boleh mendorong baris
+                          // sampai meluap (subtitle sudah Flexible, chip ini tidak).
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 110),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: AppColors.blueLight,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(typeName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.blueDark)),
                             ),
-                            child: Text(typeName,
-                                maxLines: 1,
-                                style: const TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.blueDark)),
                           ),
                         ],
                       ],
