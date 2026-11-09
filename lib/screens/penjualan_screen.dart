@@ -1357,7 +1357,24 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
         _quickAdd(stock);
         Toast.success(context, '${stock.stock_name} ditambahkan');
       } else if (resp.statusCode == 404) {
-        Toast.error(context, 'Barcode tidak ditemukan');
+        // 2026-11-09: item DENGAN barcode ini sudah terdaftar tetapi stoknya belum ada -> pesan khusus
+        // (backend: 404 + {"error":"item_no_stock"}); selain itu tetap "tidak ditemukan".
+        var noStock = false;
+        try {
+          noStock = jsonDecode(resp.body)['error'] == 'item_no_stock';
+        } catch (_) {}
+        if (noStock) {
+          final lang = Provider.of<LanguageProvider>(context, listen: false);
+          Toast.error(
+            context,
+            lang.get(
+              'This item is registered, but it has no stock yet. Add stock first in the Stock menu.',
+              'Item sudah terdaftar, tetapi stoknya belum ada. Tambahkan stok lebih dulu di menu Stock.',
+            ),
+          );
+        } else {
+          Toast.error(context, 'Barcode tidak ditemukan');
+        }
       } else {
         Toast.error(context, 'Gagal mencari barcode');
       }
