@@ -26,6 +26,7 @@ class StaffMenuKeys {
     StaffMenuKeyOption('/kas-history', 'Kas History (lihat buku kas harian)'),
     StaffMenuKeyOption('/tarik-kas', 'Tarik Kas (catat uang keluar laci)'),
     StaffMenuKeyOption('/tambah-kas', 'Tambah Kas (catat uang masuk laci)'),
+    StaffMenuKeyOption('/ekspor-data', 'Ekspor Data (unduh barang, stok, transaksi)'),
   ];
 }
 

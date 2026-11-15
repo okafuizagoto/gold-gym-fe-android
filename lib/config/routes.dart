@@ -68,6 +68,7 @@ import '../screens/pos_queue_screen.dart';
 import '../screens/my_queue_screen.dart';
 import '../screens/refund_history_screen.dart';
 import '../screens/cash_history_screen.dart';
+import '../screens/data_export_screen.dart';
 import '../screens/cash_move_screen.dart';
 import '../screens/customer_type_screen.dart';
 import '../screens/admin_plan_features_screen.dart';
@@ -132,6 +133,7 @@ class AppRoutes {
   static const String lokasiKantor = '/lokasi-kantor';
   static const String riwayatRefund = '/riwayat-refund';
   static const String kasHistory = '/kas-history';
+  static const String eksporData = '/ekspor-data';
   static const String tarikKas = '/tarik-kas';
   static const String tambahKas = '/tambah-kas';
   static const String customerType = '/customer-type';
@@ -210,6 +212,7 @@ class AppRoutes {
         lokasiKantor: (context) => const OfficeLocationScreen(),
         riwayatRefund: (context) => const RefundHistoryScreen(),
         kasHistory: (context) => const CashHistoryScreen(),
+        eksporData: (context) => const DataExportScreen(),
         tarikKas: (context) => const CashMoveScreen(incoming: false),
         tambahKas: (context) => const CashMoveScreen(incoming: true),
         customerType: (context) => const CustomerTypeScreen(),

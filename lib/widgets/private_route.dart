@@ -110,6 +110,21 @@ class _PrivateRouteState extends State<PrivateRoute> {
         'Masa percobaan gratis: sisa $left hari. Setelah itu akun otomatis turun ke paket Free (tetap bisa jualan) sampai Anda memilih paket berbayar.',
       );
       bg = left <= 3 ? const Color(0xFFFEF3C7) : const Color(0xFFE8F1FD);
+    } else if (s.status == 'ACTIVE' && s.daysLeft != null && s.daysLeft! <= 7) {
+      // Pengingat langganan berbayar akan habis (2026-11-16): 7 hari terakhir, makin mendesak di 3 dan 1 hari.
+      // Hanya menjelaskan yang terjadi (turun ke Free, data aman); tidak ada aturan baru.
+      final left = s.daysLeft!;
+      final auto = s.source == 'PLAY';
+      text = left <= 1
+          ? lang.get(
+              'Your subscription ends today or tomorrow. After that your account moves to the Free plan: the cashier (POS), sales history, receipts and stock keep working (1 outlet, 1 user). Your data is not deleted.',
+              'Langganan Anda berakhir hari ini atau besok. Setelah itu akun turun ke paket Free: kasir (POS), riwayat penjualan, struk, dan stok tetap berjalan (1 outlet, 1 pengguna). Data Anda tidak dihapus.',
+            )
+          : lang.get(
+              'Your subscription ends in $left day(s). ${auto ? 'It renews automatically through Google Play unless you cancel.' : 'Renew to keep reports, customers and QRIS.'} If it ends, your account moves to the Free plan (the cashier keeps working; your data is not deleted).',
+              'Langganan Anda berakhir dalam $left hari. ${auto ? 'Diperpanjang otomatis lewat Google Play kecuali Anda membatalkan.' : 'Perpanjang agar laporan, data pelanggan, dan QRIS tetap tersedia.'} Bila berakhir, akun turun ke paket Free (kasir tetap berjalan; data Anda tidak dihapus).',
+            );
+      bg = left <= 3 ? const Color(0xFFFEF3C7) : const Color(0xFFE8F1FD);
     } else {
       text = null;
       bg = Colors.transparent;

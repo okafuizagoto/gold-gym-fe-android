@@ -336,6 +336,12 @@ class _AppDrawerState extends State<AppDrawer> {
           icon: Icons.assessment,
           route: '/laporan',
         ),
+      if (!buyerView && !isAdmin && (isSeller || isStaff))
+        MenuItem(
+          title: 'Ekspor Data',
+          icon: Icons.file_download_outlined,
+          route: '/ekspor-data',
+        ),
       // Pencatatan Pengeluaran: ledger biaya operasional per outlet
       // (sewa/listrik/gaji/dst), berdampingan dengan Laporan Penjualan.
       // Sama seperti Stock/Items, staff yang bekerja untuk penjual ikut
