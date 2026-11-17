@@ -27,7 +27,8 @@ class CashHistoryScreen extends StatefulWidget {
   State<CashHistoryScreen> createState() => _CashHistoryScreenState();
 }
 
-class _CashHistoryScreenState extends State<CashHistoryScreen> {
+class _CashHistoryScreenState extends State<CashHistoryScreen>
+    with WidgetsBindingObserver {
   final _api = CashierShiftApi();
   DateTime _date = DateTime.now();
   CashDay? _day;
@@ -40,12 +41,26 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Storage.get(AppConstants.userRoleKey).then((r) {
       if (mounted) {
         setState(() => _isSeller = (r ?? AppConstants.roleSeller) == AppConstants.roleSeller);
       }
     });
     _load();
+  }
+
+  // Layar yang dibiarkan terbuka di latar belakang memuat ulang saat aplikasi kembali ke depan,
+  // supaya angka tidak basi (sesi lain/web bisa mengubah buku kas).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted && !_loading) _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<void> _verify(HandoffNote h) async {
