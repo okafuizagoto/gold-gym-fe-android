@@ -1,8 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gold_gym_fe_android/models/outlet_tax_model.dart';
 import 'package:gold_gym_fe_android/models/sales_model.dart';
+import 'package:gold_gym_fe_android/utils/subscription_state.dart' as sub;
+import 'package:gold_gym_fe_android/utils/text_formatter.dart';
 
 void main() {
+  formatTests();
   group('computeTax (sama dengan outlettax.Compute di server)', () {
     test('mati / persen 0 / net 0 -> tanpa pajak', () {
       expect(computeTax(null, 10000).tax, 0);
@@ -60,6 +63,23 @@ void main() {
         'sale_tax_inclusive': true,
       });
       expect(inc.payableTotal, 9000);
+    });
+  });
+}
+
+// Format rupiah negatif harus sama dengan web: "-Rp980" (dulu "Rp-.980" / "Rp-980").
+void formatTests() {
+  group('formatRupiah negatif', () {
+    test('subscription_state', () {
+      expect(sub.formatRupiah(-980), '-Rp980');
+      expect(sub.formatRupiah(-8990), '-Rp8.990');
+      expect(sub.formatRupiah(1234567), 'Rp1.234.567');
+      expect(sub.formatRupiah(0), 'Rp0');
+    });
+    test('TextFormatter', () {
+      expect(TextFormatter.formatRupiah(-980), '-Rp980');
+      expect(TextFormatter.formatRupiah(-8990.4), '-Rp8.990');
+      expect(TextFormatter.formatRupiah(1234567), 'Rp1.234.567');
     });
   });
 }

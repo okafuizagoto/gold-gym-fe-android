@@ -4,7 +4,9 @@ class TextFormatter {
   // Format Rupiah: 1000000 → "Rp1.000.000"
   static String formatRupiah(double nominal) {
     final formatter = NumberFormat('#,##0', 'id_ID');
-    return 'Rp${formatter.format(nominal).replaceAll(',', '.')}';
+    // Negatif: tanda di depan "Rp" ("-Rp980"), sama dengan web.
+    final neg = nominal.round() < 0;
+    return '${neg ? '-' : ''}Rp${formatter.format(nominal.abs()).replaceAll(',', '.')}';
   }
 
   // Format Currency (generic)

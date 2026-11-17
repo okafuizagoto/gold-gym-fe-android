@@ -206,13 +206,14 @@ const featureLabels = <String, String>{
 String featureLabel(String key) => featureLabels[key] ?? key;
 
 String formatRupiah(int n) {
-  final s = n.toString();
+  // Negatif: tanda di depan "Rp" ("-Rp980"), sama dengan formatRupiah di web (utils/text.ts).
+  final s = n.abs().toString();
   final buf = StringBuffer();
   for (var i = 0; i < s.length; i++) {
     if (i > 0 && (s.length - i) % 3 == 0) buf.write('.');
     buf.write(s[i]);
   }
-  return 'Rp$buf';
+  return '${n < 0 ? '-' : ''}Rp$buf';
 }
 
 String formatLimit(int n, String unit) =>
