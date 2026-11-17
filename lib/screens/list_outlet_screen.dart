@@ -691,6 +691,16 @@ class _OutletTile extends StatelessWidget {
             ],
             if (!readOnly && !item.deleted) ...[
               const SizedBox(height: 10),
+              // Pajak di baris sendiri: tiga tombol sejajar terlalu sempit di HP (teks terpotong "Paja/k").
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: item.locked ? null : onTax,
+                  icon: const Icon(Icons.percent_rounded, size: 18),
+                  label: const Text('Pajak'),
+                ),
+              ),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
@@ -699,14 +709,6 @@ class _OutletTile extends StatelessWidget {
                       onPressed: item.locked ? null : onEdit,
                       icon: const Icon(Icons.edit_outlined, size: 18),
                       label: const Text('Edit'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: item.locked ? null : onTax,
-                      icon: const Icon(Icons.percent_rounded, size: 18),
-                      label: const Text('Pajak'),
                     ),
                   ),
                   const SizedBox(width: 8),
