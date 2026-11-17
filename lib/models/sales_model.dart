@@ -22,6 +22,11 @@ class SaleHistoryModel {
   final String? saleVoucherCode;
   final double? saleVoucherPercent;
   final double? saleVoucherAmount;
+  // Pajak outlet (2026-11-17): snapshot saat nota dibuat; null = nota tanpa pajak.
+  final String? saleTaxName;
+  final double? saleTaxPercent;
+  final bool? saleTaxInclusive;
+  final double? saleTaxAmount;
   // Void/pembatalan nota yang sudah tersimpan (2026-10-10): 'Y' = dibatalkan, nota TIDAK dihitung
   // sebagai omzet lagi (stok sudah dikembalikan server). Nota lama = 'N'.
   final String saleVoidYn;
@@ -47,6 +52,10 @@ class SaleHistoryModel {
     this.saleVoucherCode,
     this.saleVoucherPercent,
     this.saleVoucherAmount,
+    this.saleTaxName,
+    this.saleTaxPercent,
+    this.saleTaxInclusive,
+    this.saleTaxAmount,
     this.saleVoidYn = 'N',
     this.saleVoidReason,
     this.saleVoidedBy,
@@ -56,6 +65,18 @@ class SaleHistoryModel {
   bool get isVoided => saleVoidYn == 'Y';
   bool get hasTotalDiscount => saleTotalDiscountAmount != null;
   bool get hasVoucher => saleVoucherAmount != null;
+  bool get hasTax => saleTaxAmount != null && saleTaxAmount! > 0;
+
+  /// Pajak ditambahkan ke total (mode "belum termasuk"); mode "sudah termasuk" tidak mengubah total.
+  bool get taxAddsToTotal => hasTax && saleTaxInclusive == false;
+
+  /// sale_transtotal = setelah diskon item & diskon total, SEBELUM voucher. Jumlah sebelum diskon total:
+  double get subtotalBeforeTotalDiscount =>
+      saleTranstotal + (saleTotalDiscountAmount ?? 0);
+
+  /// Jumlah yang benar-benar dibayar pelanggan: transtotal - voucher (+ pajak bila belum termasuk).
+  double get payableTotal =>
+      saleTranstotal - (saleVoucherAmount ?? 0) + (taxAddsToTotal ? saleTaxAmount! : 0);
   bool get hasMeja => saleMejaNames != null && saleMejaNames!.isNotEmpty;
 
   static double _toDouble(dynamic value) {
@@ -98,6 +119,19 @@ class SaleHistoryModel {
       saleVoucherAmount: json['sale_voucher_amount'] == null
           ? null
           : _toDouble(json['sale_voucher_amount']),
+      saleTaxName: json['sale_tax_name'],
+      saleTaxPercent: json['sale_tax_percent'] == null
+          ? null
+          : _toDouble(json['sale_tax_percent']),
+      saleTaxInclusive: json['sale_tax_inclusive'] is bool
+          ? json['sale_tax_inclusive'] as bool
+          : (json['sale_tax_inclusive'] == null
+              ? null
+              : json['sale_tax_inclusive'].toString() != '0' &&
+                  json['sale_tax_inclusive'].toString() != 'false'),
+      saleTaxAmount: json['sale_tax_amount'] == null
+          ? null
+          : _toDouble(json['sale_tax_amount']),
     );
   }
 }

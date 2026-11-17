@@ -277,7 +277,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-                'Nota ${sale.saleTrancnum} (${TextFormatter.formatRupiah(sale.saleTranstotal)}) '
+                'Nota ${sale.saleTrancnum} (${TextFormatter.formatRupiah(sale.payableTotal)}) '
                 'akan dibatalkan. Stok otomatis dikembalikan dan nota ini tidak lagi dihitung '
                 'sebagai omzet. Nota tetap tersimpan sebagai riwayat.'),
             const SizedBox(height: 12),
@@ -675,7 +675,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                         style: textTheme.bodySmall,
                       ),
                       Text(
-                        TextFormatter.formatRupiah(sale.saleTranstotal),
+                        TextFormatter.formatRupiah(sale.payableTotal),
                         style: textTheme.titleSmall
                             ?.copyWith(color: AppColors.blueDark),
                       ),

@@ -129,6 +129,14 @@ class _SalesDetailScreenState extends State<SalesDetailScreen> {
                       InfoRow(label: 'No Meja', value: header.saleMejaNames!),
                     InfoRow(label: 'Outlet', value: header.saleOutcode),
                     const Divider(height: 20),
+                    if (header.hasTotalDiscount ||
+                        header.hasVoucher ||
+                        header.taxAddsToTotal)
+                      InfoRow(
+                        label: 'Subtotal',
+                        value: TextFormatter.formatRupiah(
+                            header.subtotalBeforeTotalDiscount),
+                      ),
                     if (header.hasTotalDiscount)
                       InfoRow(
                         label:
@@ -145,9 +153,17 @@ class _SalesDetailScreenState extends State<SalesDetailScreen> {
                             '-${TextFormatter.formatRupiah(header.saleVoucherAmount!)}',
                         color: AppColors.warningDark,
                       ),
+                    if (header.hasTax)
+                      InfoRow(
+                        label:
+                            '${header.saleTaxName ?? 'Pajak'} ${(header.saleTaxPercent ?? 0).toStringAsFixed((header.saleTaxPercent ?? 0).truncateToDouble() == (header.saleTaxPercent ?? 0) ? 0 : 2)}%${header.taxAddsToTotal ? '' : ' (sudah termasuk)'}',
+                        value: header.taxAddsToTotal
+                            ? '+${TextFormatter.formatRupiah(header.saleTaxAmount!)}'
+                            : TextFormatter.formatRupiah(header.saleTaxAmount!),
+                      ),
                     InfoRow(
                       label: 'Total',
-                      value: TextFormatter.formatRupiah(header.saleTranstotal),
+                      value: TextFormatter.formatRupiah(header.payableTotal),
                       bold: true,
                     ),
                     InfoRow(

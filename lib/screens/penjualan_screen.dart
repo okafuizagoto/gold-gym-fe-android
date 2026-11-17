@@ -45,6 +45,8 @@ import '../utils/toast.dart';
 import '../utils/debouncer.dart';
 import '../utils/constants.dart';
 import '../utils/storage.dart';
+import '../models/outlet_tax_model.dart';
+import '../services/outlet_api.dart';
 import '../extensions/string_extension.dart';
 import 'payment_success_screen.dart';
 import '../widgets/tour_target.dart';
@@ -676,6 +678,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
         // Muat diskon aktif outlet ini sekali per load stok -- dipakai
         // auto-apply saat item ditambah ke keranjang (lihat _addToCart).
         _loadActiveDiscounts(outcode);
+        _loadTaxSettings(outcode);
       } else {
         Toast.error(context, "Failed to fetch items");
       }
@@ -703,6 +706,37 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     stockPaginationNotifier.value = StockPagination.fromJson(data);
     stockCachedAt.value = cached.savedAt;
     return true;
+  }
+
+  /// Pajak outlet (2026-11-17). Gagal baca -> pakai pengaturan terakhir di perangkat (supaya nota offline tetap memuat
+  /// pajak); tanpa cache -> pajak mati (perilaku lama). Server tetap menolak nota "belum termasuk" tanpa pajak
+  /// (tax_not_applied), jadi tidak ada nota tanpa pajak yang lolos diam-diam.
+  Future<void> _loadTaxSettings(String outcode) async {
+    final cacheKey = 'okejual.tax.$outcode';
+    TaxSettings? fresh;
+    try {
+      final resp = await OutletsApi().getTax(outcode);
+      if (resp.statusCode == 200) {
+        final d = jsonDecode(resp.body)['data'];
+        if (d is Map) {
+          fresh = TaxSettings.fromJson(Map<String, dynamic>.from(d));
+          await Storage.set(cacheKey, jsonEncode(fresh.toJson()));
+        }
+      }
+    } catch (_) {
+      fresh = null;
+    }
+    if (fresh == null) {
+      try {
+        final raw = await Storage.get(cacheKey);
+        if (raw != null && raw.isNotEmpty) {
+          fresh = TaxSettings.fromJson(
+              Map<String, dynamic>.from(jsonDecode(raw) as Map));
+        }
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    Provider.of<CartProvider>(context, listen: false).setTaxSettings(fresh);
   }
 
   Future<void> _loadActiveDiscounts(String outcode) async {
@@ -2765,6 +2799,14 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
               value:
                   '-${TextFormatter.formatRupiah(cart.voucherDiscountAmount)}',
               color: AppColors.warningDark,
+            ),
+          if (cart.tax != null && cart.tax!.enabled && cart.taxAmount > 0)
+            InfoRow(
+              label:
+                  '${cart.tax!.name} ${cart.tax!.percent.toStringAsFixed(cart.tax!.percent.truncateToDouble() == cart.tax!.percent ? 0 : 2)}%${cart.tax!.inclusive ? ' (${langProvider.get('included', 'sudah termasuk')})' : ''}',
+              value: cart.tax!.inclusive
+                  ? TextFormatter.formatRupiah(cart.taxAmount)
+                  : '+${TextFormatter.formatRupiah(cart.taxAmount)}',
             ),
           InfoRow(
             label: langProvider.get('Total', 'Total'),

@@ -39,8 +39,25 @@ class CashierShiftApi extends ApiClient {
         queryParams: {'code': outcode});
   }
 
+  /// GET /settings: saklar hitung uang saat tutup/buka. Gagal baca -> bawaan Wajib/Wajib (aman).
+  Future<http.Response> getSettings(String outcode) {
+    return _client.get('/gold-gym/v2/cashier-shift/settings',
+        queryParams: {'code': outcode});
+  }
+
+  /// PUT /settings: hanya pemilik. true = Wajib, false = Opsional.
+  Future<http.Response> saveSettings(
+      String outcode, bool countOnClose, bool countOnOpen) {
+    return _client.put('/gold-gym/v2/cashier-shift/settings', {
+      'outcode': outcode,
+      'count_on_close': countOnClose,
+      'count_on_open': countOnOpen,
+    });
+  }
+
   /// POST /open: buka sesi kasir baru dengan modal awal (+ alasan bila berbeda dari kas akhir sesi sebelumnya).
-  Future<http.Response> open(String outcode, double openingCash,
+  /// openingCash null = isi otomatis dari kas akhir shift sebelumnya (hanya bila pemilik mengizinkan dan hari yang sama).
+  Future<http.Response> open(String outcode, double? openingCash,
       {String handoffReason = ''}) {
     return _client.post('/gold-gym/v2/cashier-shift/open', {
       'outcode': outcode,
@@ -76,8 +93,8 @@ class CashierShiftApi extends ApiClient {
     });
   }
 
-  /// POST /close: tutup sesi kasir dengan hasil hitung fisik uang di laci.
-  Future<http.Response> close(int shiftId, double countedCash, String note) {
+  /// POST /close: tutup sesi kasir. countedCash null = tidak dihitung (hanya bila pemilik mengizinkan).
+  Future<http.Response> close(int shiftId, double? countedCash, String note) {
     return _client.post('/gold-gym/v2/cashier-shift/close', {
       'shift_id': shiftId,
       'counted_cash': countedCash,

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/outlet_api.dart';
 import '../models/outlet_model.dart';
+import '../models/outlet_tax_model.dart';
 import '../utils/roles.dart';
 import '../utils/toast.dart';
 import '../widgets/auth_card.dart';
@@ -180,6 +181,141 @@ class _OutletScreenState extends State<ListOutletScreen> {
     }
   }
 
+  /// Pengaturan pajak outlet (2026-11-17, T4 tahap 1): hanya pemilik; server menolak peran lain.
+  Future<void> _openTaxDialog(OutletResponse item) async {
+    TaxSettings cur = TaxSettings.off;
+    try {
+      final resp = await outletsApi.getTax(item.outlet_code);
+      if (resp.statusCode == 200) {
+        final d = jsonDecode(resp.body)['data'];
+        if (d is Map) cur = TaxSettings.fromJson(Map<String, dynamic>.from(d));
+      }
+    } catch (_) {}
+    if (!mounted) return;
+
+    var form = cur;
+    final nameCtl = TextEditingController(text: cur.name);
+    final pctCtl = TextEditingController(
+        text: cur.percent > 0
+            ? (cur.percent.truncateToDouble() == cur.percent
+                ? cur.percent.toStringAsFixed(0)
+                : '${cur.percent}')
+            : '11');
+    var saving = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setD) => AlertDialog(
+          title: Text('Pengaturan pajak · ${item.outlet_name}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(form.enabled ? 'Pajak AKTIF' : 'Pajak MATI (bawaan)'),
+                  value: form.enabled,
+                  onChanged: (v) => setD(() => form = form.copyWith(enabled: v)),
+                ),
+                if (form.enabled) ...[
+                  TextField(
+                    controller: nameCtl,
+                    maxLength: 20,
+                    decoration: const InputDecoration(
+                        labelText: 'Nama pajak (mis. PPN, PB1)'),
+                  ),
+                  TextField(
+                    controller: pctCtl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Persen (%)'),
+                  ),
+                  const SizedBox(height: 12),
+                  SegmentedButton<bool>(
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(
+                          value: true,
+                          label: Text('Sudah termasuk', maxLines: 2)),
+                      ButtonSegment(
+                          value: false,
+                          label: Text('Belum termasuk', maxLines: 2)),
+                    ],
+                    selected: {form.inclusive},
+                    onSelectionChanged: (v) =>
+                        setD(() => form = form.copyWith(inclusive: v.first)),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    form.inclusive
+                        ? 'Harga sudah termasuk pajak. Total tidak berubah; bagian pajak ditampilkan di struk.'
+                        : 'Harga belum termasuk pajak. Pajak ditambahkan di atas total setelah diskon dan voucher. Wajib memakai aplikasi versi terbaru di semua perangkat kasir.',
+                    style: const TextStyle(
+                        fontSize: 12.5, color: AppColors.muted),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      final percent =
+                          double.tryParse(pctCtl.text.trim().replaceAll(',', '.')) ??
+                              double.nan;
+                      if (form.enabled &&
+                          (percent.isNaN || percent <= 0 || percent > 100)) {
+                        Toast.error(
+                            context, 'Persen pajak harus antara 0 dan 100');
+                        return;
+                      }
+                      setD(() => saving = true);
+                      try {
+                        // percent dikirim sebagai ANGKA (server menolak string).
+                        final res = await outletsApi.setTax(item.outlet_code, {
+                          'enabled': form.enabled,
+                          'name': nameCtl.text.trim().isEmpty
+                              ? 'PPN'
+                              : nameCtl.text.trim(),
+                          'percent': form.enabled ? percent : 0,
+                          'inclusive': form.inclusive,
+                        });
+                        if (!mounted) return;
+                        if (res.statusCode == 200) {
+                          Toast.success(context, 'Pengaturan pajak disimpan');
+                          if (dialogContext.mounted) Navigator.pop(dialogContext);
+                        } else {
+                          String msg = 'Gagal menyimpan pengaturan pajak';
+                          try {
+                            msg = jsonDecode(res.body)['error'] ?? msg;
+                          } catch (_) {}
+                          Toast.error(context, msg);
+                          setD(() => saving = false);
+                        }
+                      } catch (_) {
+                        if (mounted) {
+                          Toast.error(
+                              context, 'Gagal menyimpan pengaturan pajak');
+                          setD(() => saving = false);
+                        }
+                      }
+                    },
+              child: const Text('Simpan'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _toggleQueue(OutletResponse item) async {
     try {
       final response =
@@ -282,6 +418,7 @@ class _OutletScreenState extends State<ListOutletScreen> {
                             onCancel: _cancelEdit,
                             onDelete: () => _confirmDeleteOutlet(items[i]),
                             onToggleQueue: () => _toggleQueue(items[i]),
+                            onTax: () => _openTaxDialog(items[i]),
                             tourFirst: i == 0,
                           ),
                         ),
@@ -335,6 +472,7 @@ class _OutletTile extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback onDelete;
   final VoidCallback onToggleQueue;
+  final VoidCallback onTax;
   final bool readOnly;
   // baris pertama = target Panduan Penggunaan (tombol antrian)
   final bool tourFirst;
@@ -350,6 +488,7 @@ class _OutletTile extends StatelessWidget {
     required this.onCancel,
     required this.onDelete,
     required this.onToggleQueue,
+    required this.onTax,
     this.readOnly = false,
     this.tourFirst = false,
   });
@@ -560,6 +699,14 @@ class _OutletTile extends StatelessWidget {
                       onPressed: item.locked ? null : onEdit,
                       icon: const Icon(Icons.edit_outlined, size: 18),
                       label: const Text('Edit'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: item.locked ? null : onTax,
+                      icon: const Icon(Icons.percent_rounded, size: 18),
+                      label: const Text('Pajak'),
                     ),
                   ),
                   const SizedBox(width: 8),

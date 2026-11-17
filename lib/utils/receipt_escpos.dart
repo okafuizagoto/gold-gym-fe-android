@@ -75,16 +75,20 @@ class ReceiptEscPos {
     bytes += generator.hr();
 
     // ----- total & potongan -----
-    final subtotal = sale.detail.fold<double>(
-        0, (sum, i) => sum + i.saleTotalsalesprice);
-    bytes += generator.row([
-      PosColumn(text: 'Subtotal', width: 7),
-      PosColumn(
-        text: TextFormatter.formatRupiah(subtotal),
-        width: 5,
-        styles: const PosStyles(align: PosAlign.right),
-      ),
-    ]);
+    // sale_transtotal = setelah diskon item & diskon total, SEBELUM voucher; jadi SUBTOTAL = transtotal + diskon total,
+    // dan TOTAL = transtotal - voucher (+ pajak bila "belum termasuk"). Sama dengan struk PDF server & web.
+    final showBreakdown =
+        header.hasTotalDiscount || header.hasVoucher || header.taxAddsToTotal;
+    if (showBreakdown) {
+      bytes += generator.row([
+        PosColumn(text: 'Subtotal', width: 7),
+        PosColumn(
+          text: TextFormatter.formatRupiah(header.subtotalBeforeTotalDiscount),
+          width: 5,
+          styles: const PosStyles(align: PosAlign.right),
+        ),
+      ]);
+    }
     if (header.hasTotalDiscount) {
       bytes += generator.row([
         PosColumn(
@@ -107,13 +111,29 @@ class ReceiptEscPos {
         ),
       ]);
     }
+    if (header.hasTax) {
+      final pct = header.saleTaxPercent ?? 0;
+      final pctText = pct.toStringAsFixed(pct.truncateToDouble() == pct ? 0 : 2);
+      bytes += generator.row([
+        PosColumn(
+            text:
+                '${header.saleTaxName ?? 'Pajak'} $pctText%${header.taxAddsToTotal ? '' : ' (incl)'}',
+            width: 7),
+        PosColumn(
+          text:
+              '${header.taxAddsToTotal ? '+' : ''}${TextFormatter.formatRupiah(header.saleTaxAmount!)}',
+          width: 5,
+          styles: const PosStyles(align: PosAlign.right),
+        ),
+      ]);
+    }
     bytes += generator.row([
       PosColumn(
           text: 'TOTAL',
           width: 7,
           styles: const PosStyles(bold: true, height: PosTextSize.size2)),
       PosColumn(
-        text: TextFormatter.formatRupiah(header.saleTranstotal),
+        text: TextFormatter.formatRupiah(header.payableTotal),
         width: 5,
         styles: const PosStyles(
             align: PosAlign.right, bold: true, height: PosTextSize.size2),

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/sales_item_model.dart';
 import '../models/discount_model.dart';
+import '../models/outlet_tax_model.dart';
 import '../utils/constants.dart';
 
 class CartProvider with ChangeNotifier {
@@ -132,9 +133,40 @@ class CartProvider with ChangeNotifier {
     return payableTotal * (_voucherPercent! / 100);
   }
 
+  /// Pajak outlet (2026-11-17): null/enabled=false = tanpa pajak (perilaku lama).
+  TaxSettings? _tax;
+  TaxSettings? get tax => _tax;
+
+  void setTaxSettings(TaxSettings? t) {
+    _tax = t;
+    notifyListeners();
+  }
+
+  /// Total setelah voucher, SEBELUM pajak.
+  double get totalBeforeTax => payableTotal - voucherDiscountAmount;
+
+  /// Pajak outlet. Dihitung dari angka yang SAMA dengan yang divalidasi server: sale_transtotal dibulatkan, voucher
+  /// dibulatkan, lalu net = selisihnya (lihat outlettax.Compute di backend).
+  ({double tax, double due}) get _taxCalc {
+    if (_tax == null || !_tax!.enabled) {
+      return (tax: 0, due: totalBeforeTax);
+    }
+    final payable = payableTotal.roundToDouble();
+    final voucher = _voucherPercent == null
+        ? 0.0
+        : (payable * _voucherPercent! / 100).roundToDouble();
+    return computeTax(_tax, payable - voucher);
+  }
+
+  /// Pajak yang tampil di rincian (0 bila pajak mati).
+  double get taxAmount => _taxCalc.tax;
+
+  /// Pajak yang DITAMBAHKAN ke total (hanya mode "belum termasuk"); mode "sudah termasuk" tidak mengubah total.
+  double get _taxAdded => (_tax != null && _tax!.addsToTotal) ? _taxCalc.tax : 0;
+
   /// Jumlah akhir yang benar-benar harus dibayar pelanggan (dipakai untuk
-  /// hitung kembalian) -- estimasi sisi klien berdasar pratinjau voucher.
-  double get grandTotal => payableTotal - voucherDiscountAmount;
+  /// hitung kembalian) -- estimasi sisi klien berdasar pratinjau voucher (+ pajak "belum termasuk").
+  double get grandTotal => totalBeforeTax + _taxAdded;
 
   // Calculate change
   double get change {
@@ -227,6 +259,8 @@ class CartProvider with ChangeNotifier {
                 totalDiscountAmount.toStringAsFixed(0),
           },
           if (_voucherCode != null) 'sale_voucher_code': _voucherCode,
+          // Outlet berpajak "belum termasuk": menyatakan total/pembayaran sudah memuat pajak (server menolak bila tidak ada).
+          if (_tax != null && _tax!.addsToTotal) 'sale_tax_applied': true,
         },
         'detail': _items.map((item) => item.toSaleDetailJson()).toList(),
         if (bookingIds.isNotEmpty) 'booking_ids': bookingIds,

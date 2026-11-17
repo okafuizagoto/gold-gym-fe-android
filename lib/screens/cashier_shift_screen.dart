@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../utils/tour_demo.dart';
 import '../config/theme.dart';
 import '../models/cash_day_model.dart';
+import '../models/shift_settings_model.dart';
 import '../services/cashier_shift_api.dart';
 import '../utils/constants.dart';
 import '../utils/storage.dart';
@@ -31,6 +32,9 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
   String _outcode = '';
   Map<String, dynamic>? _current; // null = belum ada shift terbuka
   List<Map<String, dynamic>> _history = [];
+  // Pengaturan pemilik: hitung uang saat tutup/buka Wajib (bawaan) atau Opsional.
+  ShiftSettings _settings = const ShiftSettings();
+  bool _savingSettings = false;
 
   @override
   void initState() {
@@ -51,6 +55,16 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
         final data = jsonDecode(cur.body)['data'];
         _current = data == null ? null : Map<String, dynamic>.from(data);
       }
+      // Gagal baca pengaturan -> bawaan Wajib/Wajib (aman).
+      try {
+        final st = await _api.getSettings(_outcode);
+        _settings = st.statusCode == 200
+            ? ShiftSettings.fromJson(
+                (jsonDecode(st.body)['data'] as Map?)?.cast<String, dynamic>())
+            : const ShiftSettings();
+      } catch (_) {
+        _settings = const ShiftSettings();
+      }
       final hist = await _api.history(_outcode);
       if (hist.statusCode == 200) {
         final rows = (jsonDecode(hist.body)['data'] ?? []) as List;
@@ -60,6 +74,36 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
       if (mounted) Toast.error(context, 'Gagal memuat data sesi kasir');
     }
     if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _changeSetting(ShiftSettings next) async {
+    final prev = _settings;
+    setState(() {
+      _settings = next;
+      _savingSettings = true;
+    });
+    try {
+      final res = await _api.saveSettings(
+          _outcode, next.countOnClose, next.countOnOpen);
+      if (res.statusCode == 200) {
+        if (mounted) Toast.success(context, 'Pengaturan hitung uang disimpan');
+      } else {
+        String msg = 'Gagal menyimpan pengaturan';
+        try {
+          msg = jsonDecode(res.body)['error'] ?? msg;
+        } catch (_) {}
+        if (mounted) {
+          setState(() => _settings = prev);
+          Toast.error(context, msg);
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _settings = prev);
+        Toast.error(context, 'Gagal menyimpan pengaturan');
+      }
+    }
+    if (mounted) setState(() => _savingSettings = false);
   }
 
   Future<void> _openShift() async {
@@ -75,17 +119,23 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
     final expected = ho == null ? null : _toDouble(ho['expected']);
     final gapMoves = ho == null ? <dynamic>[] : (ho['gap_moves'] ?? []) as List;
     final prevBy = ho?['prev_shift']?['shift_closed_by'];
+    final prevSkipped = ho?['prev_skipped'] == true;
+    // Pemilik mengizinkan buka opsional DAN sesi sebelumnya ditutup hari yang sama: modal boleh dikosongkan.
+    final canAutoOpen = ho?['can_auto_open'] == true;
+    var autoOpen = canAutoOpen; // bawaannya lanjut otomatis tanpa menghitung
 
     final ctl = TextEditingController(
         text: expected == null ? '0' : expected.round().toString());
     final reasonCtl = TextEditingController();
+    // Hasil dialog: null = dibatalkan; _autoOpenMark = lanjut otomatis (server memakai kas akhir sesi sebelumnya).
     final value = await showDialog<double>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setD) {
           final entered = double.tryParse(ctl.text.trim()) ?? 0;
           final diff = expected == null ? 0.0 : entered - expected;
-          final mismatch = expected != null && diff.round() != 0;
+          final auto = autoOpen && canAutoOpen;
+          final mismatch = !auto && expected != null && diff.round() != 0;
           return AlertDialog(
             title: const Text('Buka Sesi Kasir'),
             content: SingleChildScrollView(
@@ -105,7 +155,7 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                              'Kas akhir shift sebelumnya: ${formatRupiah(_toDouble(ho!['prev_counted']).round())}'
+                              '${prevSkipped ? 'Kas akhir shift sebelumnya (harapan sistem, tidak dihitung)' : 'Kas akhir shift sebelumnya'}: ${formatRupiah(_toDouble(ho!['prev_counted']).round())}'
                               '${prevBy != null ? ' (ditutup oleh $prevBy)' : ''}',
                               style: const TextStyle(fontWeight: FontWeight.w600)),
                           for (final m in gapMoves)
@@ -118,6 +168,16 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
                       ),
                     ),
                   ],
+                  if (canAutoOpen)
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text(
+                          'Lanjut dari kas akhir sebelumnya tanpa menghitung',
+                          style: TextStyle(fontSize: 14)),
+                      value: autoOpen,
+                      onChanged: (v) => setD(() => autoOpen = v),
+                    ),
+                  if (!auto) ...[
                   const SizedBox(height: 12),
                   TextField(
                     controller: ctl,
@@ -126,6 +186,7 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
                     autofocus: true,
                     onChanged: (_) => setD(() {}),
                   ),
+                  ],
                   if (mismatch) ...[
                     const SizedBox(height: 8),
                     Text(
@@ -147,7 +208,10 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(
-                    dialogContext, double.tryParse(ctl.text.trim()) ?? 0),
+                    dialogContext,
+                    (autoOpen && canAutoOpen)
+                        ? _autoOpenMark
+                        : (double.tryParse(ctl.text.trim()) ?? 0)),
                 child: const Text('BUKA SESI'),
               ),
             ],
@@ -156,11 +220,13 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
       ),
     );
     if (value == null) return;
-    if (value < 0) {
+    final useAuto = value == _autoOpenMark;
+    if (!useAuto && value < 0) {
       if (mounted) Toast.error(context, 'Modal awal tidak boleh negatif');
       return;
     }
-    if (expected != null &&
+    if (!useAuto &&
+        expected != null &&
         (value - expected).round() != 0 &&
         reasonCtl.text.trim().length < 3) {
       if (mounted) {
@@ -170,7 +236,7 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
       return;
     }
     try {
-      final resp = await _api.open(_outcode, value,
+      final resp = await _api.open(_outcode, useAuto ? null : value,
           handoffReason: reasonCtl.text.trim());
       if (resp.statusCode == 200) {
         if (mounted) Toast.success(context, 'Sesi kasir dibuka');
@@ -208,9 +274,12 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
 
     final countedCtl = TextEditingController();
     final noteCtl = TextEditingController();
+    var skipCount = false; // tutup tanpa hitung (hanya bila pemilik mengizinkan)
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => StatefulBuilder(builder: (dialogContext, setD) {
+        final skip = skipCount && !_settings.countOnClose;
+        return AlertDialog(
         title: const Text('Tutup Sesi Kasir'),
         content: SingleChildScrollView(
           child: Column(
@@ -225,14 +294,25 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
               Text('Ekspektasi kas di laci: ${formatRupiah(expected.round())}',
                   style: const TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 12),
-              const Text('Hitung uang fisik di laci sekarang, lalu masukkan jumlahnya:'),
-              const SizedBox(height: 8),
-              TextField(
-                controller: countedCtl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Uang hasil hitung (Rp)'),
-                autofocus: true,
-              ),
+              if (!_settings.countOnClose)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                      'Lewati hitung uang (selisih ditandai tidak diketahui)',
+                      style: TextStyle(fontSize: 14)),
+                  value: skipCount,
+                  onChanged: (v) => setD(() => skipCount = v),
+                ),
+              if (!skip) ...[
+                const Text('Hitung uang fisik di laci sekarang, lalu masukkan jumlahnya:'),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: countedCtl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Uang hasil hitung (Rp)'),
+                  autofocus: true,
+                ),
+              ],
               const SizedBox(height: 8),
               TextField(
                 controller: noteCtl,
@@ -254,11 +334,13 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
             child: const Text('TUTUP SESI'),
           ),
         ],
-      ),
+      );
+      }),
     );
     if (confirmed != true) return;
-    final counted = double.tryParse(countedCtl.text.trim());
-    if (counted == null || counted < 0) {
+    final skipped = skipCount && !_settings.countOnClose;
+    final double? counted = skipped ? null : double.tryParse(countedCtl.text.trim());
+    if (!skipped && (counted == null || counted < 0)) {
       if (mounted) Toast.error(context, 'Isi jumlah uang hasil hitung yang valid');
       return;
     }
@@ -267,14 +349,21 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
       final resp = await _api.close(shiftId, counted, noteCtl.text.trim());
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body)['data'];
-        final diff = _toDouble(data?['shift']?['shift_difference']);
+        final rawDiff = data?['shift']?['shift_difference'];
         if (mounted) {
-          Toast.success(
-            context,
-            diff == 0
-                ? 'Sesi ditutup, kas pas'
-                : 'Sesi ditutup, selisih ${diff > 0 ? '+' : ''}${formatRupiah(diff.round())}',
-          );
+          if (rawDiff == null) {
+            // Tidak dihitung: jangan tampilkan "kas pas" -- selisihnya memang tidak diketahui.
+            Toast.success(context,
+                'Sesi ditutup tanpa hitung uang (selisih tidak diketahui)');
+          } else {
+            final diff = _toDouble(rawDiff);
+            Toast.success(
+              context,
+              diff == 0
+                  ? 'Sesi ditutup, kas pas'
+                  : 'Sesi ditutup, selisih ${diff > 0 ? '+' : ''}${formatRupiah(diff.round())}',
+            );
+          }
         }
         await _load();
       } else {
@@ -288,6 +377,8 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
       if (mounted) Toast.error(context, 'Gagal: $e');
     }
   }
+
+  static const double _autoOpenMark = -1;
 
   static double _toDouble(dynamic v) {
     if (v == null) return 0;
@@ -387,6 +478,42 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
                         ),
                         const SizedBox(height: 16),
                         SectionCard(
+                          title: 'Pengaturan hitung uang',
+                          icon: Icons.tune_rounded,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                  'Atur apakah kasir wajib menghitung uang fisik di laci. Bila opsional dan dilewati, selisih ditandai "tidak dihitung" (bukan kas pas), dan modal awal shift berikutnya lanjut dari kas akhir (hanya pada hari yang sama).',
+                                  style: TextStyle(
+                                      fontSize: 12.5, color: AppColors.muted)),
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(
+                                    'Hitung uang saat tutup sesi: ${_settings.countOnClose ? 'Wajib' : 'Opsional'}',
+                                    style: const TextStyle(fontSize: 14)),
+                                value: _settings.countOnClose,
+                                onChanged: _savingSettings
+                                    ? null
+                                    : (v) => _changeSetting(
+                                        _settings.copyWith(countOnClose: v)),
+                              ),
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(
+                                    'Hitung uang saat buka sesi: ${_settings.countOnOpen ? 'Wajib' : 'Opsional'}',
+                                    style: const TextStyle(fontSize: 14)),
+                                value: _settings.countOnOpen,
+                                onChanged: _savingSettings
+                                    ? null
+                                    : (v) => _changeSetting(
+                                        _settings.copyWith(countOnOpen: v)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SectionCard(
                           title: 'Riwayat sesi',
                           icon: Icons.history_rounded,
                           child: _history.isEmpty
@@ -394,7 +521,10 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
                               : Column(
                                   children: _history.map((h) {
                                     final closed = h['shift_status'] == 'CLOSED';
-                                    final diff = closed
+                                    final uncounted = closed &&
+                                        (h['close_skipped'] == true ||
+                                            h['shift_difference'] == null);
+                                    final diff = closed && !uncounted
                                         ? _toDouble(h['shift_difference'])
                                         : null;
                                     return ListTile(
@@ -403,10 +533,11 @@ class _CashierShiftScreenState extends State<CashierShiftScreen> {
                                           '${h['shift_opened_by']} • ${closed ? 'Selesai' : 'Berjalan'}'),
                                       subtitle: Text(
                                           'Modal: ${formatRupiah(_toDouble(h['shift_opening_cash']).round())}'
-                                          '${closed ? ' • Selisih: ${diff! >= 0 ? '+' : ''}${formatRupiah(diff.round())}' : ''}'
+                                          '${h['open_auto'] == true ? ' (otomatis dari kas akhir sebelumnya)' : ''}'
+                                          '${closed ? (uncounted ? ' • Tidak dihitung (selisih tidak diketahui)' : ' • Selisih: ${diff! >= 0 ? '+' : ''}${formatRupiah(diff.round())}') : ''}'
                                           '${h['handoff_diff'] != null && _toDouble(h['handoff_diff']) != 0 ? '\nSelisih serah-terima ${_toDouble(h['handoff_diff']) > 0 ? '+' : ''}${formatRupiah(_toDouble(h['handoff_diff']).round())}${(h['handoff_gap_net'] != null && _toDouble(h['handoff_gap_net']) == 0) ? (_toDouble(h['handoff_diff']) < 0 ? ' (belum ada catatan Tarik Kas)' : ' (belum ada catatan Tambah Kas)') : ''}, alasan selisih: "${h['handoff_reason']}" — ${h['handoff_by']}'
                                           '${h['verify_status'] != null ? ' · TERVERIFIKASI ✓ ${h['verify_status'] == 'RESOLVED' ? 'terselesaikan' : 'diterima apa adanya'} oleh ${h['verify_by']}: "${h['verify_note']}"' : ' · belum terverifikasi penjual'}' : ''}'),
-                                      trailing: closed && diff != 0
+                                      trailing: closed && (uncounted || diff != 0)
                                           ? Icon(Icons.warning_amber_rounded,
                                               color: AppColors.warningDark,
                                               size: 18)

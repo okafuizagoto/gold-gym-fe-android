@@ -484,6 +484,15 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
                 Text(
                     '${lang.get('Non-cash sales (transfer, QRIS, etc.) are not in the drawer', 'Penjualan non-tunai (transfer, QRIS, dll) tidak masuk laci')}: ${TextFormatter.formatRupiah(day.nonCash)} · ${day.salesCount} ${lang.get('receipts', 'nota')}',
                     style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                if (day.uncountedShifts > 0) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                      '${day.uncountedShifts} ${lang.get('session(s) closed without counting cash: the difference for this day is unknown (not zero).', 'sesi ditutup tanpa hitung uang: selisih hari ini tidak diketahui (bukan nol).')}',
+                      style: TextStyle(
+                          color: Colors.orange.shade800,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12.5)),
+                ],
                 if (day.counted != null) ...[
                   const SizedBox(height: 10),
                   Card(

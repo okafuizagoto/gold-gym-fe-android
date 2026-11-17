@@ -54,6 +54,18 @@ class OutletsApi extends ApiClient {
     );
   }
 
+  /// GET /gold-gym/v2/outlet/:code/tax -- pengaturan pajak outlet (penjual/staf).
+  Future<http.Response> getTax(String code) async {
+    final ApiClient client = ApiClient();
+    return client.get("/gold-gym/v2/outlet/${Uri.encodeComponent(code)}/tax");
+  }
+
+  /// PUT /gold-gym/v2/outlet/:code/tax -- ubah pengaturan pajak (hanya pemilik). percent HARUS angka, bukan string.
+  Future<http.Response> setTax(String code, Map<String, dynamic> body) async {
+    final ApiClient client = ApiClient();
+    return client.put("/gold-gym/v2/outlet/${Uri.encodeComponent(code)}/tax", body);
+  }
+
   /// POST ?type=dummyensure -- siapkan outlet dummy panduan (hanya penjual yang belum punya outlet asli; idempoten).
   Future<http.Response> ensureDummyOutlet() async {
     final ApiClient client = ApiClient();

@@ -99,6 +99,9 @@ class CashDay {
   final int salesCount;
   final double? counted;
   final double? difference;
+
+  /// Sesi ditutup hari ini tanpa hitung fisik; selisih hari itu tidak diketahui (bukan nol).
+  final int uncountedShifts;
   final List<CashMovement> movements;
 
   CashDay({
@@ -115,6 +118,7 @@ class CashDay {
     required this.salesCount,
     required this.counted,
     required this.difference,
+    this.uncountedShifts = 0,
     required this.movements,
   });
 
@@ -136,6 +140,7 @@ class CashDay {
         salesCount: _n(j['sales_count']).toInt(),
         counted: j['counted'] == null ? null : _n(j['counted']),
         difference: j['difference'] == null ? null : _n(j['difference']),
+        uncountedShifts: _n(j['uncounted_shifts']).toInt(),
         movements: ((j['movements'] ?? []) as List)
             .map((e) => CashMovement.fromJson(e as Map<String, dynamic>))
             .toList(),
