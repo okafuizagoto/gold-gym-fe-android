@@ -247,6 +247,10 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
         return (lang.get('Withdraw cash', 'Tarik Kas'), Colors.orange.shade800);
       case 'CASH_IN':
         return (lang.get('Add cash', 'Tambah Kas'), Colors.blue.shade700);
+      case 'COUNT_DIFF':
+        return flag == 'NOTED'
+            ? (lang.get('Cash mismatch · reason noted', 'Uang tidak sesuai · ada alasan'), Colors.amber.shade800)
+            : (lang.get('Cash mismatch · NO REASON', 'Uang tidak sesuai · TANPA ALASAN'), Colors.red.shade700);
       case 'HANDOFF_OK':
         return (lang.get('Handover OK ✓', 'Serah-terima SESUAI ✓'), Colors.green.shade700);
       case 'HANDOFF_DIFF':
@@ -294,7 +298,8 @@ class _CashHistoryScreenState extends State<CashHistoryScreen> {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     _chip(label, c, outlined: m.kind == 'HANDOFF_OK'),
-                    if (m.kind == 'HANDOFF_DIFF' && m.flag == 'REVIEW')
+                    if ((m.kind == 'HANDOFF_DIFF' && m.flag == 'REVIEW') ||
+                        (m.kind == 'COUNT_DIFF' && m.flag == 'UNKNOWN'))
                       _chip(lang.get('CHECK', 'PERLU DICEK'), Colors.red.shade700,
                           outlined: true),
                     Text(m.ref, style: const TextStyle(fontWeight: FontWeight.w700)),
