@@ -1,3 +1,5 @@
+import '../models/manual_pay_model.dart';
+import '../services/manual_pay_api.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
@@ -33,6 +35,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   bool _loading = true;
   bool _buying = false;
   String _focusFeature = '';
+  // Status permintaan bayar transfer yang dibuat pemilik di WEB (2026-11-18). Android hanya menampilkan statusnya,
+  // tanpa rekening/instruksi bayar (kebijakan Google Play: pembelian di aplikasi lewat Play Billing).
+  PayRequest? _pendingPay;
+  PayRequest? _rejectedPay;
 
   @override
   void initState() {
@@ -60,6 +66,20 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       });
     }
     final fresh = await SubscriptionState.refresh();
+    if (role != AppConstants.roleStaff) {
+      try {
+        final r = await ManualPayApi().mine();
+        if (r.statusCode == 200) {
+          final d = (jsonDecode(r.body) as Map)['data'];
+          final list = (d is Map ? d['requests'] as List? : null) ?? [];
+          final reqs = list.map((e) => PayRequest.fromJson((e as Map).cast<String, dynamic>())).toList();
+          _pendingPay = reqs.where((e) => e.status == 'PENDING').firstOrNull;
+          _rejectedPay = _pendingPay == null && reqs.isNotEmpty && reqs.first.status == 'REJECTED' ? reqs.first : null;
+        }
+      } catch (_) {
+        // status pembayaran opsional; abaikan bila gagal
+      }
+    }
     try {
       final res = await SubscriptionApi().getPlans();
       if (res.statusCode == 200) {
@@ -217,6 +237,31 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   ),
                   child: Text(
                       'Fitur ${featureLabel(_focusFeature)} tersedia di paket yang lebih tinggi.'),
+                ),
+              if (_pendingPay != null)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                      'Pembayaran ${_pendingPay!.reference} (paket ${_pendingPay!.plan} ${_pendingPay!.yearly ? 'tahunan' : 'bulanan'}) '
+                      'sedang menunggu konfirmasi admin. Paket aktif otomatis setelah dikonfirmasi.'),
+                ),
+              if (_rejectedPay != null)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text('Pembayaran ${_rejectedPay!.reference} ditolak admin: '
+                      '${_rejectedPay!.adminNote.isEmpty ? '-' : _rejectedPay!.adminNote}.'),
                 ),
               // ---- Status ----
               Card(

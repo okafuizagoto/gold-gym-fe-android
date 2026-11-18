@@ -170,7 +170,13 @@ class SalesOutbox extends ChangeNotifier {
     }
   }
 
-  Future<_Send> _sendOne(OutboxSale e) async {
+  /// replay=true: nota dikirim dari antrean (bukan langsung saat kasir menekan simpan). Ditandai sale_offline supaya
+  /// server mencatatnya dengan pajak yang berlaku saat nota dibuat bila pemilik sempat mengubah pajak (2026-11-18).
+  Future<_Send> _sendOne(OutboxSale e, {bool replay = false}) async {
+    if (replay) {
+      final header = (e.payload['data'] as Map?)?['header'];
+      if (header is Map) header['sale_offline'] = true;
+    }
     e.attempts++;
     try {
       final resp = await _api.insertSales(e.payload);
@@ -224,7 +230,7 @@ class SalesOutbox extends ChangeNotifier {
     notifyListeners();
     try {
       for (final e in todo) {
-        final r = await _sendOne(e);
+        final r = await _sendOne(e, replay: true);
         if (r == _Send.network) break;
       }
     } finally {

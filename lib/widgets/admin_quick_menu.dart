@@ -54,6 +54,14 @@ class AdminQuickMenu extends StatelessWidget {
     final hargaPaket = _QuickLink(Icons.sell_rounded,
         lang.get('Plan Pricing & Discount', 'Harga & Diskon Paket'),
         AppRoutes.adminPlanPricing);
+    final fiturPaket = _QuickLink(Icons.tune_rounded,
+        lang.get('Features per Plan', 'Fitur per Paket'), AppRoutes.adminPlanFeatures);
+    final konfirmasiBayar = _QuickLink(Icons.payments_outlined,
+        lang.get('Payment Confirmation', 'Konfirmasi Pembayaran'),
+        AppRoutes.adminKonfirmasiPembayaran);
+    final kontakBayar = _QuickLink(Icons.contact_support_outlined,
+        lang.get('Contact & Payment', 'Kontak & Pembayaran'),
+        AppRoutes.adminKontakPembayaran);
     final aksesDaftarPembeli = _QuickLink(Icons.person_add_alt_rounded,
         lang.get('Buyer Registration Access', 'Akses Daftar Pembeli'),
         AppRoutes.adminAksesDaftarPembeli);
@@ -109,7 +117,7 @@ class AdminQuickMenu extends StatelessWidget {
         AppColors.warning,
         lang.get('Plans & Subscription Pricing', 'Paket & Harga Langganan'),
         lang.get('What each plan costs', 'Harga tiap paket'),
-        [hargaPaket, tampilanLangganan],
+        [hargaPaket, konfirmasiBayar, kontakBayar, fiturPaket, tampilanLangganan],
       ),
       _QuickGroup(
         Icons.payments_rounded,

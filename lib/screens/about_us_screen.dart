@@ -8,9 +8,28 @@ import '../widgets/app_bar_custom.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/page_header.dart';
 import '../providers/language_provider.dart';
+import '../models/manual_pay_model.dart';
+import '../utils/support.dart';
+import '../widgets/support_whatsapp_button.dart';
 
-class AboutUsScreen extends StatelessWidget {
+class AboutUsScreen extends StatefulWidget {
   const AboutUsScreen({super.key});
+
+  @override
+  State<AboutUsScreen> createState() => _AboutUsScreenState();
+}
+
+class _AboutUsScreenState extends State<AboutUsScreen> {
+  // Kontak dari pengaturan admin (2026-11-18); baris kosong disembunyikan, tidak ada nomor contoh.
+  SupportContact? _c = Support.cached;
+
+  @override
+  void initState() {
+    super.initState();
+    Support.load().then((v) {
+      if (mounted) setState(() => _c = v);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,15 +48,22 @@ class AboutUsScreen extends StatelessWidget {
             title: langProvider.get('Address', 'Alamat'),
             content: 'Jakarta, Indonesia',
           ),
+          if ((_c?.whatsapp ?? '').isNotEmpty)
+            _InfoCard(
+              icon: Icons.phone_rounded,
+              title: 'WhatsApp',
+              content: '+${_c!.whatsapp}${_c!.name.isNotEmpty ? ' (${_c!.name})' : ''}',
+            ),
+          if ((_c?.hours ?? '').isNotEmpty)
+            _InfoCard(
+              icon: Icons.schedule_rounded,
+              title: langProvider.get('Support hours', 'Jam layanan'),
+              content: _c!.hours,
+            ),
           _InfoCard(
-            icon: Icons.phone_rounded,
-            title: langProvider.get('Phone', 'Telepon'),
-            content: '+62 xxx xxxx xxxx',
-          ),
-          const _InfoCard(
             icon: Icons.email_rounded,
             title: 'Email',
-            content: 'support@okejual.com',
+            content: (_c?.email ?? '').isNotEmpty ? _c!.email : 'support@okejual.com',
           ),
         ];
 
@@ -96,6 +122,12 @@ class AboutUsScreen extends StatelessWidget {
                   ),
                   itemCount: cards.length,
                   itemBuilder: (context, i) => cards[i],
+                ),
+                const SizedBox(height: 12),
+                SupportWhatsAppButton(
+                  filled: true,
+                  expand: true,
+                  label: langProvider.get('Chat support on WhatsApp', 'Chat bantuan via WhatsApp'),
                 ),
               ],
             ),

@@ -304,6 +304,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 alignment: WrapAlignment.center,
                 children: [
                   for (final (label, path) in [
+                    (lang.get('Plans & Pricing', 'Paket & Harga'), '/harga'),
+                    (lang.get('Data Security', 'Keamanan Data'),
+                        '/keamanan-data'),
                     (lang.get('Privacy Policy', 'Kebijakan Privasi'),
                         '/kebijakan-privasi'),
                     (lang.get('Terms & Conditions', 'Syarat & Ketentuan'),

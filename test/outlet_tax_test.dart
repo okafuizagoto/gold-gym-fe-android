@@ -1,11 +1,29 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gold_gym_fe_android/models/outlet_tax_model.dart';
 import 'package:gold_gym_fe_android/models/sales_model.dart';
+import 'package:gold_gym_fe_android/providers/cart_provider.dart';
 import 'package:gold_gym_fe_android/utils/subscription_state.dart' as sub;
 import 'package:gold_gym_fe_android/utils/text_formatter.dart';
 
 void main() {
   formatTests();
+  group('payload nota memuat pajak yang dipakai (nota offline, 2026-11-18)', () {
+    test('sale_tax_client dikirim apa adanya; pajak mati -> persen 0', () {
+      final cart = CartProvider()
+        ..setTaxSettings(const TaxSettings(enabled: true, name: 'PB1', percent: 10, inclusive: false));
+      var h = (cart.buildInsertPayload(outcode: 'OUF001', salesPerson: 'x')['data'] as Map)['header'] as Map;
+      expect(h['sale_tax_client'], {'enabled': true, 'name': 'PB1', 'percent': 10.0, 'inclusive': false});
+      expect(h['sale_tax_applied'], true);
+      expect(h.containsKey('sale_offline'), false, reason: 'tanda offline hanya dipasang antrean saat mengirim ulang');
+      cart.setTaxSettings(const TaxSettings(enabled: false, percent: 11));
+      h = (cart.buildInsertPayload(outcode: 'OUF001', salesPerson: 'x')['data'] as Map)['header'] as Map;
+      expect((h['sale_tax_client'] as Map)['enabled'], false);
+      expect((h['sale_tax_client'] as Map)['percent'], 0);
+      cart.setTaxSettings(null);
+      h = (cart.buildInsertPayload(outcode: 'OUF001', salesPerson: 'x')['data'] as Map)['header'] as Map;
+      expect(h.containsKey('sale_tax_client'), false, reason: 'pengaturan pajak tidak diketahui -> tidak dikirim');
+    });
+  });
   group('computeTax (sama dengan outlettax.Compute di server)', () {
     test('mati / persen 0 / net 0 -> tanpa pajak', () {
       expect(computeTax(null, 10000).tax, 0);

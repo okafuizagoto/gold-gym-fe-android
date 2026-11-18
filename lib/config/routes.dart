@@ -1,3 +1,5 @@
+import '../screens/admin_manual_payment_screen.dart';
+import '../screens/admin_contact_payment_screen.dart';
 import 'package:flutter/material.dart';
 import '../screens/login_screen.dart';
 import '../screens/outlet_screen.dart';
@@ -105,6 +107,8 @@ class AppRoutes {
   static const String adminOutletTypeSettings = '/admin-outlet-type-settings';
   static const String adminLanggananTampilan = '/admin-langganan-tampilan';
   static const String adminPlanPricing = '/admin-plan-pricing';
+  static const String adminKonfirmasiPembayaran = '/admin-konfirmasi-pembayaran';
+  static const String adminKontakPembayaran = '/admin-kontak-pembayaran';
   static const String cashierShift = '/cashier-shift';
   static const String thermalPrinter = '/thermal-printer';
   static const String adminPaymentReport = '/admin-payment-report';
@@ -182,6 +186,8 @@ class AppRoutes {
         adminOutletTypeSettings: (context) => const AdminOutletTypeSettingsScreen(),
         adminLanggananTampilan: (context) => const AdminPricingUiScreen(),
         adminPlanPricing: (context) => const AdminPlanPricingScreen(),
+        adminKonfirmasiPembayaran: (context) => const AdminManualPaymentScreen(),
+        adminKontakPembayaran: (context) => const AdminContactPaymentScreen(),
         cashierShift: (context) => const CashierShiftScreen(),
         thermalPrinter: (context) => const ThermalPrinterScreen(),
         adminPaymentReport: (context) => const AdminPaymentReportScreen(),

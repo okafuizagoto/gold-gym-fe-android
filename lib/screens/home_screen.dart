@@ -1,3 +1,4 @@
+import '../widgets/owner_today_card.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../config/theme.dart';
@@ -26,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isTherapy = false;
   bool _isAdmin = false;
   bool _isSeller = false;
+  bool _buyerView = false;
 
   @override
   void initState() {
@@ -38,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final outletType = await Storage.get(AppConstants.outletTypeKey) ?? 'RETAIL';
     final role = await Storage.get(AppConstants.userRoleKey);
     final outcode = await Storage.get(AppConstants.outcode) ?? '';
+    final shopMode = await Storage.get(AppConstants.shopModeKey) ?? '';
     if (!mounted) return;
 
     setState(() {
@@ -46,6 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _isTherapy = outletType == AppConstants.outletTherapy;
       _isAdmin = role == AppConstants.roleAdmin;
       _isSeller = role == AppConstants.roleSeller;
+      _buyerView = shopMode == AppConstants.shopModeBuyer;
     });
   }
 
@@ -169,6 +173,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: textTheme.bodyLarge?.copyWith(color: AppColors.muted),
                   ),
                   const SizedBox(height: 20),
+
+                  // Kartu "Hari ini" semua outlet, hanya pemilik (2026-11-18; sama dengan web).
+                  if (_isSeller && !_buyerView) ...[
+                    const OwnerTodayCard(),
+                    const SizedBox(height: 20),
+                  ],
 
                   // Banner bernuansa jual-beli/pasar
                   ClipRRect(

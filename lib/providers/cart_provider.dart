@@ -261,6 +261,15 @@ class CartProvider with ChangeNotifier {
           if (_voucherCode != null) 'sale_voucher_code': _voucherCode,
           // Outlet berpajak "belum termasuk": menyatakan total/pembayaran sudah memuat pajak (server menolak bila tidak ada).
           if (_tax != null && _tax!.addsToTotal) 'sale_tax_applied': true,
+          // Pengaturan pajak yang dipakai saat nota dibuat (2026-11-18). Server hanya memakainya untuk nota dari
+          // antrean offline bila pemilik sempat mengubah pajak sebelum nota terkirim (nota tidak ditolak lalu hilang).
+          if (_tax != null)
+            'sale_tax_client': {
+              'enabled': _tax!.enabled,
+              'name': _tax!.name,
+              'percent': _tax!.enabled ? _tax!.percent : 0,
+              'inclusive': _tax!.inclusive,
+            },
         },
         'detail': _items.map((item) => item.toSaleDetailJson()).toList(),
         if (bookingIds.isNotEmpty) 'booking_ids': bookingIds,

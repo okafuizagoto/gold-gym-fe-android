@@ -1,3 +1,4 @@
+import 'support_whatsapp_button.dart';
 import 'dart:convert';
 import '../services/sales_api.dart';
 import 'package:flutter/material.dart';
@@ -407,6 +408,16 @@ class _AppDrawerState extends State<AppDrawer> {
               title: 'Fitur per Paket',
               icon: Icons.tune_rounded,
               route: '/admin-plan-features',
+            ),
+            MenuItem(
+              title: 'Konfirmasi Pembayaran',
+              icon: Icons.payments_outlined,
+              route: '/admin-konfirmasi-pembayaran',
+            ),
+            MenuItem(
+              title: 'Kontak & Pembayaran',
+              icon: Icons.contact_support_outlined,
+              route: '/admin-kontak-pembayaran',
             ),
             MenuItem(
               title: 'Akses Daftar Pembeli',
@@ -895,6 +906,11 @@ class _AppDrawerState extends State<AppDrawer> {
 
             // Logout Button
             const Divider(),
+            // Bantuan via WhatsApp (2026-11-18): tersembunyi bila admin belum mengisi nomor dukungan.
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: SupportWhatsAppButton(expand: true),
+            ),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: _DrawerTile(

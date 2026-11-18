@@ -1,3 +1,4 @@
+import '../widgets/support_whatsapp_button.dart';
 import 'package:flutter/material.dart';
 import '../services/offline/connectivity_monitor.dart';
 import '../services/offline/sales_outbox.dart';
@@ -40,6 +41,13 @@ class SalesOutboxScreen extends StatelessWidget {
                     label: const Text('Kirim sekarang'),
                   ),
                 ]),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: SupportWhatsAppButton(label: 'Minta bantuan', topic: 'nota di antrean transaksi'),
+                ),
               ),
               Expanded(
                 child: items.isEmpty

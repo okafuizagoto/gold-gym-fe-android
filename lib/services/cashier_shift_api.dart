@@ -33,6 +33,12 @@ class CashierShiftApi extends ApiClient {
         queryParams: {'code': outcode, 'date': date});
   }
 
+  /// GET /owner-today: kartu "Hari ini" semua outlet (HANYA pemilik; 2026-11-18). date kosong = hari ini WIB.
+  Future<http.Response> ownerToday({String date = ''}) {
+    return _client.get('/gold-gym/v2/cashier-shift/owner-today',
+        queryParams: date.isEmpty ? null : {'date': date});
+  }
+
   /// GET /handoff: kas akhir sesi sebelumnya + Tarik Kas sesudahnya (cek serah-terima saat buka sesi).
   Future<http.Response> handoff(String outcode) {
     return _client.get('/gold-gym/v2/cashier-shift/handoff',
