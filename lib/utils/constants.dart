@@ -1,6 +1,6 @@
 class AppConstants {
   static const String appName = 'Okejual';
-  static const String version = '1.0.0';
+  static const String version = '1.0.1';
 
   // Storage Keys
   static const String accessTokenKey = 'access_token';
