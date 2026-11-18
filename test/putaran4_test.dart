@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:gold_gym_fe_android/providers/language_provider.dart';
 import 'package:gold_gym_fe_android/models/manual_pay_model.dart';
 import 'package:gold_gym_fe_android/models/owner_today_model.dart';
 import 'package:gold_gym_fe_android/utils/support.dart';
@@ -17,6 +19,8 @@ void main() {
       expect(o(diff: 3000).cashStatus, ('Selisih +Rp3.000', 'warning'));
       expect(o(open: true).cashStatus, ('Sesi berjalan', 'neutral'));
       expect(o().cashStatus, ('Belum ada sesi', 'neutral'));
+      expect(o(diff: -1980).cashStatusFor((en, id) => en), ('Difference -Rp1.980', 'error'));
+      expect(o(diff: 0).cashStatusFor((en, id) => en), ('Cash matches', 'success'));
     });
     test('parse respons server (angka desimal sebagai string)', () {
       final d = OwnerToday.fromJson({
@@ -42,10 +46,14 @@ void main() {
     });
     testWidgets('tombol tersembunyi bila nomor belum diisi admin', (t) async {
       Support.setCachedForTest(const SupportContact(whatsapp: '6281234567890'));
-      await t.pumpWidget(const MaterialApp(home: Scaffold(body: SupportWhatsAppButton())));
+      Widget app(Widget child) => ChangeNotifierProvider(
+            create: (_) => LanguageProvider(),
+            child: MaterialApp(home: Scaffold(body: child)),
+          );
+      await t.pumpWidget(app(const SupportWhatsAppButton()));
       expect(find.text('Bantuan via WhatsApp'), findsOneWidget);
       Support.setCachedForTest(const SupportContact());
-      await t.pumpWidget(const MaterialApp(home: Scaffold(body: SupportWhatsAppButton(key: ValueKey(2)))));
+      await t.pumpWidget(app(const SupportWhatsAppButton(key: ValueKey(2))));
       expect(find.text('Bantuan via WhatsApp'), findsNothing);
     });
   });

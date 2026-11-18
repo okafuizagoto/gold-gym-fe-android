@@ -1,10 +1,12 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../config/routes.dart';
 import '../config/theme.dart';
 import '../models/owner_today_model.dart';
+import '../providers/language_provider.dart';
 import '../services/cashier_shift_api.dart';
 import '../services/offline/sales_outbox.dart';
 import '../utils/constants.dart';
@@ -76,6 +78,7 @@ class _OwnerTodayCardState extends State<OwnerTodayCard> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final lang = context.watch<LanguageProvider>();
     final d = _data;
     return Card(
       child: Padding(
@@ -84,7 +87,7 @@ class _OwnerTodayCardState extends State<OwnerTodayCard> {
           Row(children: [
             const Icon(Icons.today_rounded, color: AppColors.blue),
             const SizedBox(width: 6),
-            Text('Hari ini', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+            Text(lang.get('Today', 'Hari ini'), style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
             if (d != null) ...[
               const SizedBox(width: 6),
               Text(d.date, style: textTheme.bodySmall?.copyWith(color: AppColors.muted)),
@@ -93,19 +96,19 @@ class _OwnerTodayCardState extends State<OwnerTodayCard> {
             TextButton.icon(
               onPressed: _loading ? null : _load,
               icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Muat ulang'),
+              label: Text(lang.get('Reload', 'Muat ulang')),
             ),
           ]),
           if (_loading && d == null)
             const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()))
           else if (_failed && d == null)
-            Text('Ringkasan hari ini belum bisa dimuat. Coba muat ulang.',
+            Text(lang.get('Today\'s summary could not be loaded. Try reloading.', 'Ringkasan hari ini belum bisa dimuat. Coba muat ulang.'),
                 style: textTheme.bodyMedium?.copyWith(color: AppColors.muted))
           else if (d != null) ...[
-            Text('Penjualan semua outlet', style: textTheme.bodySmall?.copyWith(color: AppColors.muted)),
+            Text(lang.get('Sales, all outlets', 'Penjualan semua outlet'), style: textTheme.bodySmall?.copyWith(color: AppColors.muted)),
             Text(TextFormatter.formatRupiah(d.sales),
                 style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
-            Text('${d.salesCount} nota', style: textTheme.bodySmall?.copyWith(color: AppColors.muted)),
+            Text('${d.salesCount} ${lang.get('receipts', 'nota')}', style: textTheme.bodySmall?.copyWith(color: AppColors.muted)),
             const SizedBox(height: 8),
             AnimatedBuilder(
               animation: SalesOutbox.instance,
@@ -113,21 +116,21 @@ class _OwnerTodayCardState extends State<OwnerTodayCard> {
                 final ob = SalesOutbox.instance;
                 final unsent = ob.pendingCount + ob.failedCount;
                 return Wrap(spacing: 6, runSpacing: 6, children: [
-                  if (d.needsCheck > 0) _chip('${d.needsCheck} PERLU DICEK', Colors.red.shade700),
-                  if (d.uncountedShifts > 0) _chip('${d.uncountedShifts} sesi tidak dihitung', Colors.orange.shade800),
+                  if (d.needsCheck > 0) _chip('${d.needsCheck} ${lang.get('TO CHECK', 'PERLU DICEK')}', Colors.red.shade700),
+                  if (d.uncountedShifts > 0) _chip('${d.uncountedShifts} ${lang.get('shifts not counted', 'sesi tidak dihitung')}', Colors.orange.shade800),
                   if (unsent > 0)
-                    _chip('$unsent nota di perangkat ini belum terkirim',
+                    _chip('$unsent ${lang.get('receipts on this device not sent yet', 'nota di perangkat ini belum terkirim')}',
                         ob.failedCount > 0 ? Colors.red.shade700 : AppColors.muted,
                         onTap: () => Navigator.pushNamed(context, AppRoutes.antreanTransaksi)),
                 ]);
               },
             ),
             const SizedBox(height: 8),
-            for (final o in d.outlets) _outletRow(o, textTheme),
+            for (final o in d.outlets) _outletRow(o, textTheme, lang),
             if (d.outlets.length > 1)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
-                child: Text('Ketuk outlet yang sedang aktif untuk membuka Kas History. Outlet lain: pilih dulu di menu Outlet.',
+                child: Text(lang.get('Tap the active outlet to open Cash History. Other outlets: choose them first in the Outlet menu.', 'Ketuk outlet yang sedang aktif untuk membuka Kas History. Outlet lain: pilih dulu di menu Outlet.'),
                     style: textTheme.bodySmall?.copyWith(color: AppColors.muted)),
               ),
           ],
@@ -136,8 +139,8 @@ class _OwnerTodayCardState extends State<OwnerTodayCard> {
     );
   }
 
-  Widget _outletRow(OutletToday o, TextTheme textTheme) {
-    final (status, level) = o.cashStatus;
+  Widget _outletRow(OutletToday o, TextTheme textTheme, LanguageProvider lang) {
+    final (status, level) = o.cashStatusFor(lang.get);
     final isActive = o.outcode == _active;
     return Card(
       margin: const EdgeInsets.only(top: 6),
@@ -160,8 +163,8 @@ class _OwnerTodayCardState extends State<OwnerTodayCard> {
                 ),
                 Text(
                   o.error.isNotEmpty
-                      ? 'Gagal dibaca'
-                      : '${TextFormatter.formatRupiah(o.sales)} · ${o.salesCount} nota${o.openShift ? ' · sesi berjalan' : ''}',
+                      ? lang.get('Could not be read', 'Gagal dibaca')
+                      : '${TextFormatter.formatRupiah(o.sales)} · ${o.salesCount} ${lang.get('receipts', 'nota')}${o.openShift ? ' · ${lang.get('shift running', 'sesi berjalan')}' : ''}',
                   style: textTheme.bodySmall?.copyWith(color: AppColors.muted),
                 ),
               ]),

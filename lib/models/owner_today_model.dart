@@ -49,15 +49,25 @@ class OutletToday {
       );
 
   /// Status kas untuk chip: (teks, tingkat) -- tingkat: error / warning / success / neutral. Sama dengan web.
-  (String, String) get cashStatus {
-    if (needsCheck > 0) return ('$needsCheck PERLU DICEK', 'error');
-    if (uncountedShifts > 0) return ('Kas tidak dihitung', 'warning');
+  (String, String) get cashStatus => cashStatusFor((en, id) => id);
+
+  /// Sama dengan [cashStatus] tetapi mengikuti bahasa aplikasi: [t] memilih teks (en, id), mis. `lang.get`.
+  (String, String) cashStatusFor(String Function(String en, String id) t) {
+    if (needsCheck > 0) return ('$needsCheck ${t('TO CHECK', 'PERLU DICEK')}', 'error');
+    if (uncountedShifts > 0) return (t('Cash not counted', 'Kas tidak dihitung'), 'warning');
     if (difference == null) {
-      return (openShift ? 'Sesi berjalan' : closedShifts > 0 ? 'Belum lengkap' : 'Belum ada sesi', 'neutral');
+      return (
+        openShift
+            ? t('Shift running', 'Sesi berjalan')
+            : closedShifts > 0
+                ? t('Incomplete', 'Belum lengkap')
+                : t('No shift yet', 'Belum ada sesi'),
+        'neutral'
+      );
     }
-    if (difference == 0) return ('Kas cocok', 'success');
+    if (difference == 0) return (t('Cash matches', 'Kas cocok'), 'success');
     final d = difference!;
-    return ('Selisih ${d < 0 ? '-' : '+'}Rp${_thousand(d.abs())}', d < 0 ? 'error' : 'warning');
+    return ('${t('Difference', 'Selisih')} ${d < 0 ? '-' : '+'}Rp${_thousand(d.abs())}', d < 0 ? 'error' : 'warning');
   }
 
   static String _thousand(double v) {
