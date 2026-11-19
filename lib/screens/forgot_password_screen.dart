@@ -27,6 +27,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   bool _step2 = false;
   bool _isLoading = false;
   bool _obscurePassword = true;
+  String? _emailError; // galat inline di bawah kolom email (mis. email belum terdaftar)
 
   @override
   void dispose() {
@@ -48,6 +49,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         Toast.success(
             context, lang.get('OTP code sent, check your email.', 'Kode OTP terkirim, cek email Anda.'));
         setState(() => _step2 = true);
+      } else if (_errorCode(response.body) == 'EMAIL_NOT_FOUND') {
+        // Email tidak ada di database: tetap di langkah email (tidak pindah ke halaman OTP).
+        final msg = lang.get(
+            'This email is not registered. Check the address or sign up for a new account.',
+            'Email belum terdaftar. Periksa alamat email Anda atau daftar akun baru.');
+        setState(() => _emailError = msg);
+        Toast.error(context, msg);
+      } else if (_errorCode(response.body) == 'OTP_SEND_FAILED') {
+        Toast.error(context,
+            lang.get('Failed to send the OTP code. Please try again shortly.', 'Gagal mengirim kode OTP. Coba lagi beberapa saat.'));
       } else {
         Toast.error(context, _extractError(response.body,
             lang.get('Failed to send OTP. Check the email address.', 'Gagal mengirim OTP. Periksa alamat email.')));
@@ -82,8 +93,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             lang.get('Password changed. Please log in again.', 'Password berhasil diganti. Silakan masuk kembali.'));
         Navigator.pushReplacementNamed(context, '/login');
       } else {
-        Toast.error(context, _extractError(response.body,
-            lang.get('Failed to reset password. Check the OTP code.', 'Gagal mengganti password. Periksa kode OTP.')));
+        final known = <String, String>{
+          'OTP_INVALID': lang.get('The OTP code is incorrect.', 'Kode OTP salah.'),
+          'OTP_EXPIRED': lang.get('The OTP code has expired. Please request a new one.',
+              'Kode OTP sudah kedaluwarsa. Silakan minta OTP baru.'),
+          'OTP_TOO_MANY': lang.get('Too many wrong attempts. Please request a new OTP.',
+              'Terlalu banyak percobaan salah. Silakan minta OTP baru.'),
+        };
+        Toast.error(
+            context,
+            known[_errorCode(response.body)] ??
+                _extractError(response.body,
+                    lang.get('Failed to reset password. Check the OTP code.', 'Gagal mengganti password. Periksa kode OTP.')));
       }
     } catch (_) {
       if (mounted) {
@@ -92,6 +113,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  String? _errorCode(String body) {
+    try {
+      final e = jsonDecode(body)['error'];
+      if (e is String) return e;
+    } catch (_) {}
+    return null;
   }
 
   String _extractError(String body, String fallback) {
@@ -126,14 +155,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       children: [
         TextField(
           controller: _emailController,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Email',
             hintText: 'contoh: nama@email.com',
-            prefixIcon: Icon(Icons.email_outlined),
+            prefixIcon: const Icon(Icons.email_outlined),
+            errorText: _emailError,
           ),
           keyboardType: TextInputType.emailAddress,
           autofillHints: const [AutofillHints.email],
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) => setState(() => _emailError = null),
           onSubmitted: (_) => _sendOtp(lang),
         ),
         const SizedBox(height: 20),
