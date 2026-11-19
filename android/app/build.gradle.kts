@@ -88,6 +88,21 @@ android {
 dependencies {
     // Play Integrity API (anti APK modifikasi) -- dipakai MainActivity lewat MethodChannel "okejual/integrity".
     implementation("com.google.android.play:integrity:1.4.0")
+
+    // Peringatan Play Console "aplikasi bisa crash di perangkat 16 KB" (20 Nov 2026): library native
+    // libdatastore_shared_counter.so di androidx.datastore 1.2.0 (ditarik shared_preferences_android) dibangun
+    // dengan toolchain Kotlin/Native (linker LLD 8.0.7), jadi Play menandainya "NDK lama" walau segmennya sudah
+    // rata 16 KB. Versi 1.3.0 membangunnya dengan Android NDK r27 (LLD 18). Constraint ini hanya menaikkan versi.
+    constraints {
+        listOf(
+            "datastore", "datastore-core", "datastore-core-okio",
+            "datastore-preferences", "datastore-preferences-core",
+        ).forEach { module ->
+            implementation("androidx.datastore:$module:1.3.0") {
+                because("libdatastore_shared_counter.so dibangun dengan NDK r27 (kompatibel 16 KB)")
+            }
+        }
+    }
 }
 
 flutter {
